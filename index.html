@@ -835,11 +835,10 @@ function moveDelta(i){
   const mover=moverOf(i),s=mover===BLACK?1:-1;
   return{mover,dw:s*(ev[i][0]-ev[i-1][0]),dl:s*(ev[i][1]-ev[i-1][1])};
 }
-// 집 손해가 3집 이상이면 실수, 6집 이상이면 악수. 이미 승패가 기운 판에서 집 추정이 출렁이는 것은
-// 실수로 치지 않도록 승률도 2%p 이상 떨어진 경우만 센다
+// 그 수로 두는 사람의 승률이 20%p 이상 떨어지면 실수, 50%p 이상이면 블런더
 function mistakes(){
   const out=[];if(!game.evals)return out;
-  for(let i=1;i<=game.moves.length;i++){const d=moveDelta(i);if(d&&d.dl<=-3&&d.dw<=-0.02&&game.moves[i-1]!==PASS)out.push({i,mover:d.mover,loss:-d.dl});}
+  for(let i=1;i<=game.moves.length;i++){const d=moveDelta(i);if(d&&d.dw<=-0.2&&game.moves[i-1]!==PASS)out.push({i,mover:d.mover,loss:-d.dw});}
   return out;
 }
 function moveName(p){if(p===PASS)return '패스';const[x,y]=board.xy(p);return COLS[x]+(game.n-y);}
@@ -851,7 +850,7 @@ function reviewText(vi){
   const d=vi?moveDelta(vi):null;
   if(d){
     const dw=Math.round(d.dw*100);t+=` · 이 수 ${dw>=0?'+':''}${dw}%p`;
-    if(d.dl<=-3&&d.dw<=-0.02&&game.moves[vi-1]!==PASS)t+=` <span class="bad">${d.dl<=-6?'악수':'실수'} (${(-d.dl).toFixed(1)}집 손해)</span>`;
+    if(d.dw<=-0.2&&game.moves[vi-1]!==PASS)t+=` <span class="bad">${d.dw<=-0.5?'블런더':'실수'}</span>`;
   }
   return t;
 }
@@ -873,7 +872,7 @@ function drawGraph(){
   }
   g.strokeStyle='rgba(128,128,128,.7)';g.setLineDash([3,3]);g.lineWidth=1;g.beginPath();g.moveTo(0,Y(.5));g.lineTo(w,Y(.5));g.stroke();g.setLineDash([]);
   for(const m of mistakes()){
-    g.fillStyle=m.loss>=6?'#e0463f':'#f0a020';
+    g.fillStyle=m.loss>=0.5?'#e0463f':'#f0a020';
     g.beginPath();g.arc(X(m.i),Y(ev[m.i][0]),m.mover===game.human?4:2.5,0,7);g.fill();
   }
   const vi=view!==null?view:game.moves.length;
