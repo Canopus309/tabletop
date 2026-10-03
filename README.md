@@ -1,0 +1,17 @@
+# 바둑 AI
+
+오프라인에서 동작하는 인공지능 바둑 웹앱입니다. 브라우저에서 KataGo 신경망을 직접 실행하며, 홈 화면에 추가하면 인터넷 없이 쓸 수 있습니다 (iPhone · Android · PC).
+
+- 9 / 13 / 19줄, 접바둑, 덤 설정
+- 난이도 5단계 (입문 18급 · 초급 12급 · 중급 5급 · 고급 1단 · 최강 3단+, 고급·최강은 추정치)
+- 힌트, 형세 판단, 자동 계가, 복기, SGF 기보 저장
+
+## 사용한 오픈소스
+
+| 구성 요소 | 라이선스 |
+|---|---|
+| [KataGo](https://github.com/lightvector/KataGo) 신경망 `g170-b6c96-s175395328-d26788732` (`models/katago-b6.js`) | MIT (`vendor/LICENSE-katago.txt`) |
+| [TensorFlow.js](https://github.com/tensorflow/tfjs) 4.22.0 (`vendor/`) | Apache-2.0 |
+| [KaTrain](https://github.com/sanderland/katrain)의 급수 보정 봇 공식 (`rankNMoves`, `rankMove`) | MIT |
+
+입력 특징·축 판독·모델 형식은 KataGo의 `nninputs.cpp`, `board.cpp`, `desc.cpp`를 따랐고, 브라우저 구현은 [web-katrain](https://github.com/Sir-Teo/web-katrain)(MIT)을 참고했습니다.
