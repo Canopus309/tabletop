@@ -85,6 +85,12 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .result h3{margin:2px 0 4px;font-size:20px;letter-spacing:-.02em}
 .result p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
 .review{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.graph-wrap{height:88px;margin:4px 0 8px;border-radius:10px;overflow:hidden;background:var(--chip)}
+#wrGraph{display:block;width:100%;height:100%;touch-action:none;cursor:pointer}
+.ana{font-size:13px;margin:0 0 10px;min-height:18px;line-height:1.5;text-align:left}
+.ana .bad{color:var(--danger);font-weight:700}
+.mistake-btn{width:100%;margin:-2px 0 12px;padding:9px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--danger);font-weight:600;cursor:pointer}
+.mistake-btn:disabled{color:var(--muted);cursor:default}
 .review input{flex:1;accent-color:var(--accent)}
 .review button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
 .review span{font-size:12.5px;color:var(--muted);min-width:48px;text-align:right}
@@ -167,12 +173,15 @@ select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--li
     <div class="card result hidden" id="resultCard">
       <h3 id="resTitle"></h3>
       <p id="resDetail"></p>
+      <div class="graph-wrap"><canvas id="wrGraph" aria-label="수마다 흑 승률 그래프. 눌러서 그 수로 이동"></canvas></div>
+      <p id="anaText" class="ana"></p>
       <div class="review">
         <button id="rvPrev" aria-label="이전 수">‹</button>
         <input type="range" id="rvRange" min="0" max="0" value="0" aria-label="복기">
         <button id="rvNext" aria-label="다음 수">›</button>
         <span id="rvText"></span>
       </div>
+      <button class="mistake-btn hidden" id="nextMistake"></button>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
     </div>
 
@@ -216,7 +225,14 @@ select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--li
     <label class="toggle"><div>착수 확인<small>한 번 눌러 위치 확인, 다시 눌러 착수 (실수 방지)</small></div><span class="sw"><input type="checkbox" id="optConfirm"><span></span></span></label>
     <label class="toggle"><div>효과음 · 진동</div><span class="sw"><input type="checkbox" id="optSound"><span></span></span></label>
     <label class="toggle"><div>대국 중 AI 형세 보기<small>끄면 승률 막대는 대국이 끝난 뒤에만 보입니다</small></div><span class="sw"><input type="checkbox" id="optShowWr"><span></span></span></label>
-    <p class="credit">AI: <b>KataGo</b> 신경망 g170-b6c96 (MIT 라이선스, lightvector/KataGo) · 추론: TensorFlow.js (Apache-2.0)<br><span id="engineInfo"></span></p>
+    <div class="field" style="margin:14px 0 0"><span class="flabel">AI 신경망</span>
+      <div class="seg" id="segModel">
+        <input type="radio" name="model" id="mB6" value="b6"><label for="mB6">가벼움<small>b6 · 4MB</small></label>
+        <input type="radio" name="model" id="mB10" value="b10"><label for="mB10">표준<small>b10 · 11MB</small></label>
+        <input type="radio" name="model" id="mB15" value="b15"><label for="mB15">강함<small>b15 · 35MB</small></label>
+      </div>
+      <div class="lvdesc" id="modelDesc"></div></div>
+    <p class="credit">AI: <b>KataGo</b> 신경망 (g170e b10·b15: CC0 · b6: MIT, lightvector/KataGo) · 추론: TensorFlow.js (Apache-2.0) · 급수 보정: KaTrain (MIT)<br><span id="engineInfo"></span></p>
     <div class="dlg-actions" style="margin-top:14px"><button type="button" class="primary" data-close="ok">닫기</button></div>
   </div>
 </dialog>
@@ -490,15 +506,18 @@ const LEVELS=[
   {name:'입문',rank:'18급',desc:'바둑을 처음 배우는 분께. 수를 몇 개만 살펴보고 둡니다.',kata:{mode:'rank',kyu:18},playouts:120,time:250,temp:1},
   {name:'초급',rank:'12급',desc:'규칙을 알고 몇 판 둬 본 분께.',kata:{mode:'rank',kyu:12},playouts:1200,time:700,temp:0.35},
   {name:'중급',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
-  {name:'고급',rank:'1단',desc:'KataGo가 150수를 읽고 둡니다.',kata:{mode:'search',visits:150,time:3000},playouts:1e9,time:3500,temp:0},
-  {name:'최강',rank:'3단+',desc:'KataGo가 1,200수 이상 읽고, 내 차례에도 미리 읽습니다.',kata:{mode:'search',visits:1200,time:7000},playouts:1e9,time:8000,temp:0},
+  {name:'고급',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
+  {name:'최강',get rank(){return TOP_RANK[curModel()]||'3단+';},desc:'KataGo가 1,200수 이상 읽고, 내 차례에도 미리 읽습니다. 기력은 추정치입니다.',kata:{mode:'search',visits:1200,time:7000},playouts:1e9,time:8000,temp:0},
 ];
+// 최강 단계 추정 기력 (신경망별)
+const TOP_RANK={b6:'3단+',b10:'5단+',b15:'7단+'};
+const curModel=()=>(typeof Kata!=='undefined'&&Kata.model)||settings.model;
 const COLS='ABCDEFGHJKLMNOPQRST';
 const NAME={1:'흑',2:'백'};
 
 function load(k,def){try{const v=JSON.parse(localStorage.getItem(k));return v?Object.assign({},def,v):def;}catch(e){return def;}}
 function store(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-const settings=load('baduk-settings',{coords:true,numbers:false,sound:true,showWr:false,confirm:matchMedia('(pointer:coarse)').matches});
+const settings=load('baduk-settings',{coords:true,numbers:false,sound:true,showWr:false,model:'b10',confirm:matchMedia('(pointer:coarse)').matches});
 
 let game=null,board=null,view=null,thinking=false,thinkFor=0,epoch=0;
 let hints=null,ownMap=null,deadSet=null,pending=0,hover=0;
@@ -528,8 +547,8 @@ let kataState='loading',kataInfo='AI 엔진 불러오는 중…';
 const BACKEND_NAME={webgpu:'GPU(WebGPU)',webgl:'GPU(WebGL)',wasm:'CPU(WASM)',cpu:'CPU'};
 function startKata(){
   if(typeof Kata==='undefined'){kataState='failed';kataInfo='기본 AI';return;}
-  Kata.load(s=>{kataInfo=s;ui();}).then(info=>{
-    kataState='ready';kataInfo=`KataGo · ${BACKEND_NAME[info.backend]}`;ui();
+  Kata.load(s=>{kataInfo=s;ui();},settings.model).then(info=>{
+    kataState='ready';kataInfo=`KataGo ${info.model} · ${BACKEND_NAME[info.backend]}`;ui();if(game&&game.over)analyzeGame();
     if(game)Kata.warmup(game.n).then(startPonder,()=>{});
   }).catch(e=>{console.error('[KataGo]',e);kataState='failed';kataInfo='기본 AI (KataGo를 불러오지 못했습니다)';ui();});
 }
@@ -703,13 +722,89 @@ function scoreResult(b,own,komi){
   const diff=bs-ws-komi;
   return{bs,ws,diff,winner:diff>0?BLACK:WHITE,dead};
 }
+async function analyzeGame(){
+  if(!game||!game.over||game.analyzing||!(await kataReady()))return;
+  const ev=game.evals||(game.evals=[]),idx=[];
+  for(let i=0;i<=game.moves.length;i++)if(!ev[i])idx.push(i);
+  if(!idx.length)return;
+  const ep=epoch;game.analyzing=true;
+  for(let k=0;k<idx.length;k+=16){
+    const part=idx.slice(k,k+16),res=await Kata.evalPositions(part.map(i=>stateOf(game.moves.slice(0,i))));
+    if(ep!==epoch){game.analyzing=false;return;}
+    res.forEach((r,j)=>ev[part[j]]=[+r.wr.toFixed(4),+r.lead.toFixed(1)]);
+    ui();
+  }
+  game.analyzing=false;save();ui();
+}
+// i번째 수(1부터)를 둔 사람과 그 수로 생긴 손익 (두는 사람 기준 집, 승률)
+const moverOf=i=>{const first=game.setup.length?WHITE:BLACK;return (i-1)%2===0?first:3-first;};
+function moveDelta(i){
+  const ev=game.evals;if(!ev||!ev[i]||!ev[i-1])return null;
+  const mover=moverOf(i),s=mover===BLACK?1:-1;
+  return{mover,dw:s*(ev[i][0]-ev[i-1][0]),dl:s*(ev[i][1]-ev[i-1][1])};
+}
+// 집 손해가 3집 이상이면 실수, 6집 이상이면 악수. 이미 승패가 기운 판에서 집 추정이 출렁이는 것은
+// 실수로 치지 않도록 승률도 2%p 이상 떨어진 경우만 센다
+function mistakes(){
+  const out=[];if(!game.evals)return out;
+  for(let i=1;i<=game.moves.length;i++){const d=moveDelta(i);if(d&&d.dl<=-3&&d.dw<=-0.02&&game.moves[i-1]!==PASS)out.push({i,mover:d.mover,loss:-d.dl});}
+  return out;
+}
+function moveName(p){if(p===PASS)return '패스';const[x,y]=board.xy(p);return COLS[x]+(game.n-y);}
+function reviewText(vi){
+  const ev=game.evals&&game.evals[vi];
+  if(!ev)return game.analyzing?'수마다 승률 분석 중…':'';
+  let t=vi?`<b>${vi}수</b> ${NAME[moverOf(vi)]} ${moveName(game.moves[vi-1])} · `:'<b>시작</b> · ';
+  t+=`흑 승률 ${Math.round(ev[0]*100)}% · ${Math.abs(ev[1])<0.5?'비슷함':(ev[1]>0?'흑':'백')+' '+Math.abs(ev[1]).toFixed(1)+'집 우세'}`;
+  const d=vi?moveDelta(vi):null;
+  if(d){
+    const dw=Math.round(d.dw*100);t+=` · 이 수 ${dw>=0?'+':''}${dw}%p`;
+    if(d.dl<=-3&&d.dw<=-0.02&&game.moves[vi-1]!==PASS)t+=` <span class="bad">${d.dl<=-6?'악수':'실수'} (${(-d.dl).toFixed(1)}집 손해)</span>`;
+  }
+  return t;
+}
+const gcv=$('#wrGraph');
+function drawGraph(){
+  if(!game||!game.over)return;
+  const w=gcv.clientWidth,h=gcv.clientHeight;if(!w||!h)return;
+  const dpr=window.devicePixelRatio||1;gcv.width=Math.round(w*dpr);gcv.height=Math.round(h*dpr);
+  const g=gcv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);
+  const N=Math.max(1,game.moves.length),ev=game.evals||[],pad=3;
+  const X=i=>pad+i/N*(w-2*pad),Y=v=>pad+(1-v)*(h-2*pad);
+  // 막대와 같은 색: 아래(검정)가 흑 몫, 위(밝은색)가 백 몫
+  const dark=getComputedStyle($('#wrBar')).backgroundColor,light=getComputedStyle($('.bar')).backgroundColor;
+  g.fillStyle=light;g.fillRect(0,0,w,h);
+  let last=-1;while(last+1<=game.moves.length&&ev[last+1])last++;
+  if(last>=0){
+    g.beginPath();g.moveTo(X(0),h);for(let i=0;i<=last;i++)g.lineTo(X(i),Y(ev[i][0]));g.lineTo(X(last),h);g.closePath();
+    g.fillStyle=dark;g.fill();
+  }
+  g.strokeStyle='rgba(128,128,128,.7)';g.setLineDash([3,3]);g.lineWidth=1;g.beginPath();g.moveTo(0,Y(.5));g.lineTo(w,Y(.5));g.stroke();g.setLineDash([]);
+  for(const m of mistakes()){
+    g.fillStyle=m.loss>=6?'#e0463f':'#f0a020';
+    g.beginPath();g.arc(X(m.i),Y(ev[m.i][0]),m.mover===game.human?4:2.5,0,7);g.fill();
+  }
+  const vi=view!==null?view:game.moves.length;
+  g.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2f6f5e';
+  g.lineWidth=2;g.beginPath();g.moveTo(X(vi),0);g.lineTo(X(vi),h);g.stroke();
+}
+// 그래프를 누르거나 끌면 그 수로 이동
+function graphPick(e){const r=gcv.getBoundingClientRect();setView(Math.round((e.clientX-r.left)/r.width*game.moves.length));}
+gcv.addEventListener('pointerdown',e=>{if(!game||!game.over)return;try{gcv.setPointerCapture(e.pointerId);}catch(_){}graphPick(e);});
+gcv.addEventListener('pointermove',e=>{if(e.buttons&&game&&game.over)graphPick(e);});
+$('#nextMistake').onclick=()=>{
+  const mine=mistakes().filter(m=>m.mover===game.human);if(!mine.length)return;
+  const cur=view!==null?view:game.moves.length,next=mine.find(m=>m.i>cur)||mine[0];
+  setView(next.i);
+};
+new ResizeObserver(()=>drawGraph()).observe(gcv);
 function endGame(winner,detail,how){
   game.over=true;stopPonder();
   const youWin=winner===game.human;
   game.result={winner,detail,title:`${NAME[winner]} ${how}`,youWin};
   game.wr=winner===BLACK?1:0;
   save();sound(youWin?'win':'pass');
-  view=game.moves.length;ui();draw();
+  view=game.moves.length;ui();draw();analyzeGame();
 }
 
 function undo(){
@@ -720,7 +815,7 @@ function undo(){
   const mv=game.moves.slice();
   do{mv.pop();}while(mv.length&&turnAt(mv.length)!==game.human);
   if(game.over)game.wr=0.5;
-  game.moves=mv;game.over=false;game.result=null;
+  game.moves=mv;game.over=false;game.result=null;if(game.evals)game.evals.length=Math.min(game.evals.length,mv.length+1);
   resetView();rebuild();save();
   maybeAI();
 }
@@ -931,7 +1026,8 @@ function ui(){
   else st.innerHTML=`<b>${NAME[board.turn]}</b> 차례${board.turn===game.human?' · 내 차례':''}`;
   $('#moveText').textContent=`${view!==null?view:game.moves.length}수`;
   $('#wrBox').classList.toggle('hidden',!(game.over||settings.showWr));
-  const wb=Math.round(game.wr*100);
+  const vi=view!==null?view:game.moves.length,ev=game.evals&&game.evals[vi];
+  const wb=Math.round((game.over&&ev?ev[0]:game.wr)*100);
   $('#wrB').textContent=wb+'%';$('#wrW').textContent=(100-wb)+'%';$('#wrBar').style.width=wb+'%';
   const myTurn=!game.over&&!thinking&&board.turn===game.human;
   $('#aUndo').disabled=!game.moves.length;
@@ -945,6 +1041,11 @@ function ui(){
     $('#resDetail').textContent=game.result.detail;
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=view===null?game.moves.length:view;
     $('#rvText').textContent=`${rg.value}/${game.moves.length}`;
+    $('#anaText').innerHTML=reviewText(vi);
+    const mine=mistakes().filter(m=>m.mover===game.human),mb=$('#nextMistake');
+    mb.classList.toggle('hidden',!!game.analyzing||!game.evals);
+    mb.disabled=!mine.length;mb.textContent=mine.length?`내 실수 ${mine.length}개 · 다음 실수 보기 ›`:'큰 실수 없음';
+    drawGraph();
   }
   $('#metaText').textContent=`${game.n}×${game.n} · 덤 ${game.komi}${game.setup.length?' · '+game.setup.length+'점 접바둑':''} · ${kataInfo}`;
 }
@@ -1000,7 +1101,7 @@ document.addEventListener('keydown',e=>{
 
 // 새 게임 대화상자
 const segL=$('#segLevel');
-LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${l.rank}</small></label>`));
+LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small></small></label>`));
 const lastOpt=load('baduk-newopts',{size:9,color:1,level:1,handicap:0,komi:'auto'});
 function fillHandi(){
   const n=+document.querySelector('input[name=size]:checked').value,sel=$('#selHandi'),cur=+sel.value||0,max=n===9?5:9;
@@ -1011,6 +1112,7 @@ function lvDesc(){const l=LEVELS[+document.querySelector('input[name=level]:chec
 document.querySelectorAll('input[name=size]').forEach(el=>el.onchange=fillHandi);
 segL.addEventListener('change',lvDesc);
 function openNew(){
+  LEVELS.forEach((l,i)=>{$(`label[for=lv${i}] small`).textContent=l.rank;});
   document.querySelector(`input[name=size][value="${lastOpt.size}"]`).checked=true;
   document.querySelector(`input[name=color][value="${lastOpt.color}"]`).checked=true;
   document.querySelector(`input[name=level][value="${lastOpt.level}"]`).checked=true;
@@ -1028,7 +1130,26 @@ function startFromDialog(v){
 
 // 설정
 const OPT={coords:'#optCoords',numbers:'#optNumbers',confirm:'#optConfirm',sound:'#optSound',showWr:'#optShowWr'};
-$('#btnSettings').onclick=()=>{$('#engineInfo').textContent='현재 엔진: '+kataInfo;for(const k in OPT)$(OPT[k]).checked=settings[k];openDlg($('#dlgSettings'));};
+const MODEL_DESC={b6:'가장 가볍지만 기력과 승률 판단이 약합니다.',b10:'권장. 휴대폰에서도 빠르고 b6보다 훨씬 강합니다.',b15:'가장 강합니다. 처음 고를 때 35MB를 받고, 계산이 b10의 약 3배 걸립니다.'};
+function modelUi(){
+  const el=document.querySelector(`input[name=model][value="${settings.model}"]`);if(el)el.checked=true;
+  $('#modelDesc').textContent=MODEL_DESC[settings.model];$('#engineInfo').textContent='현재 엔진: '+kataInfo;
+}
+$('#btnSettings').onclick=()=>{for(const k in OPT)$(OPT[k]).checked=settings[k];modelUi();openDlg($('#dlgSettings'));};
+$('#segModel').addEventListener('change',e=>{settings.model=e.target.value;store('baduk-settings',settings);modelUi();switchModel(settings.model);});
+async function switchModel(key){
+  if(kataState!=='ready')return; // 아직 불러오는 중이면 다음 실행 때 적용된다
+  stopPonder();
+  const status=s=>{kataInfo=s;ui();$('#engineInfo').textContent='현재 엔진: '+s;};
+  status('신경망 바꾸는 중…');
+  try{
+    const got=await Kata.setModel(key,status);
+    status(`KataGo ${got} · ${BACKEND_NAME[Kata.backend]}`);
+    toast(got!==key?'파일을 직접 연 경우에는 b6만 쓸 수 있습니다':`신경망을 ${got}로 바꿨습니다`);
+    if(game&&game.over){game.evals=[];analyzeGame();}
+    startPonder();
+  }catch(e){console.error(e);status('신경망을 바꾸지 못했습니다');toast('신경망을 받지 못했습니다. 인터넷 연결을 확인하세요.');}
+}
 for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('baduk-settings',settings);pending=0;resize();ui();};
 
 // ---------- 시작 ----------

@@ -517,12 +517,36 @@ const Kata = (() => {
   function loadScript(src) {
     return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error(src + ' 를 불러오지 못했습니다')); document.head.appendChild(s); });
   }
+  const gunzip = async stream => new Uint8Array(await new Response(stream.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
   async function decodeModel() {
     const b64 = window.KATAGO_MODEL_B64; window.KATAGO_MODEL_B64 = null;
     const bin = atob(b64), gz = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) gz[i] = bin.charCodeAt(i);
-    const ds = new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'));
-    return new Uint8Array(await new Response(ds).arrayBuffer());
+    return gunzip(new Blob([gz]).stream());
+  }
+  // 신경망 목록. g170 신경망은 CC0, b6는 KataGo 저장소의 시험용 신경망(MIT)
+  const MODELS = {
+    b6: { label: 'b6', file: null },
+    b10: { label: 'b10', file: 'models/g170e-b10c128.bin.gz' },
+    b15: { label: 'b15', file: 'models/g170e-b15c192.bin.gz' },
+  };
+  let modelKey = '';
+  // 원하는 신경망의 바이트. 파일을 직접 연 경우(file://)처럼 받을 수 없으면 내장된 b6로 대신한다
+  async function modelBytes(key, onStatus) {
+    const m = MODELS[key];
+    if (m && m.file && location.protocol !== 'file:') {
+      try {
+        const res = await fetch(m.file);
+        if (res.ok) {
+          const total = +res.headers.get('content-length') || 0;
+          let got = 0;
+          const counted = res.body.pipeThrough(new TransformStream({ transform(ch, c) { got += ch.length; if (total) onStatus(`신경망 받는 중… ${Math.round(got / total * 100)}%`); c.enqueue(ch); } }));
+          return { key, raw: await gunzip(counted) };
+        }
+      } catch (e) { console.warn('[KataGo] ' + m.file + ' 를 받지 못해 b6로 대신합니다', e); }
+    }
+    if (!window.KATAGO_MODEL_B64) await loadScript('models/katago-b6.js');
+    return { key: 'b6', raw: await decodeModel() };
   }
   // 9줄 시험 국면으로 백엔드 출력이 CPU 계산과 같은지 확인
   async function probe(n) {
@@ -541,15 +565,15 @@ const Kata = (() => {
   }
   const close = (a, b) => Math.abs(a.wl - b.wl) < 0.02 && Math.abs(a.lead - b.lead) < 0.5 && a.pri.every((x, i) => Math.abs(x - b.pri[i]) < 0.01);
 
-  function load(onStatus = () => {}) {
+  function load(onStatus = () => {}, wantModel = 'b10') {
     if (loading) return loading;
     loading = (async () => {
       onStatus('AI 엔진 불러오는 중…');
       if (typeof DecompressionStream === 'undefined') throw new Error('이 브라우저는 압축 해제를 지원하지 않습니다');
       await loadScript('vendor/tf.min.js');
       if (navigator.gpu) { try { await loadScript('vendor/tf-backend-webgpu.min.js'); } catch (e) { } }
-      await loadScript('models/katago-b6.js');
-      desc = parseModel(await decodeModel());
+      const mb = await modelBytes(wantModel, onStatus);
+      desc = parseModel(mb.raw); modelKey = mb.key;
       onStatus('AI 엔진 준비 중…');
       // 기준값: CPU
       await tf.setBackend('cpu'); await tf.ready();
@@ -578,9 +602,41 @@ const Kata = (() => {
       await tf.setBackend(best.be);
       net = best.net; backend = best.be;
       if (best.net !== cpuNet) cpuNet.dispose();
-      return { backend, name: desc.name, ms: best.ms };
+      return { backend, model: modelKey, name: desc.name, ms: best.ms };
     })();
     return loading;
+  }
+  // 실행 중에 신경망 바꾸기 (진행 중인 탐색이 끝난 뒤 교체)
+  function setModel(key, onStatus = () => {}) {
+    gen++;
+    return queue(async () => {
+      if (key === modelKey) return modelKey;
+      const mb = await modelBytes(key, onStatus);
+      onStatus('AI 엔진 준비 중…');
+      const d = parseModel(mb.raw), old = net;
+      net = buildNet(d); desc = d; modelKey = mb.key;
+      if (old) old.dispose();
+      sess.root = null; sess.moves = null;
+      return modelKey;
+    });
+  }
+  // 여러 국면의 흑 승률·흑 기준 집 차이. 대칭 2개를 평균해 흔들림을 줄인다 (CPU 계열은 1개)
+  async function evalPositions(states, onProgress = () => {}) {
+    const sy = backend === 'cpu' || backend === 'wasm' ? [0] : [0, 5], per = BATCH / sy.length, out = [];
+    for (let i = 0; i < states.length; i += per) {
+      const roots = states.slice(i, i + per).map(rootFromState);
+      const nodes = [], syms = [];
+      roots.forEach(r => sy.forEach(s => { nodes.push(r); syms.push(s); }));
+      const rs = await evalNodes(nodes, states[0].komi, { syms });
+      roots.forEach((r, j) => {
+        let wl = 0, lead = 0;
+        for (let k = 0; k < sy.length; k++) { wl += rs[j * sy.length + k].wl / sy.length; lead += rs[j * sy.length + k].lead / sy.length; }
+        const sign = r.board.turn === BLACK ? 1 : -1;
+        out.push({ wr: (sign * wl + 1) / 2, lead: sign * lead });
+      });
+      onProgress(out.length / states.length);
+    }
+    return out;
   }
   // 미리 셰이더 컴파일 (판 크기별 첫 계산이 느리므로)
   async function warmup(n) { const root = rootFromState({ n, setup: [], moves: [] }); await evalNodes([root], 7); }
@@ -607,5 +663,6 @@ const Kata = (() => {
     return { moves: r.moves, priors: r.priors, winrate: (r.wl + 1) / 2, lead: r.lead, board: root.board };
   }
 
-  return { load, warmup, analyze, think, ponder, stopPonder, resetSession, ownership, policyEval, ttScore, get backend() { return backend; }, get ready() { return !!net; }, _internal: { parseModel, buildNet, rootFromState, encode, ladders, evalNodes, search, rootStats, setNet: (n) => { net = n; }, getNet: () => net, getDesc: () => desc } };
+  return { load, setModel, evalPositions, get model() { return modelKey; }, warmup, analyze, think, ponder, stopPonder, resetSession, ownership, policyEval, ttScore, get backend() { return backend; }, get ready() { return !!net; }, _internal: { parseModel, buildNet, rootFromState, encode, ladders, evalNodes, search, rootStats, setNet: (n) => { net = n; }, getNet: () => net, getDesc: () => desc,
+    async useModelBytes(raw) { const d = parseModel(raw); const old = net; net = buildNet(d); desc = d; if (old) old.dispose(); sess.root = null; return d.name; } } };
 })();

@@ -1,10 +1,10 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다.
-const CACHE = 'baduk-ai-v4';
+const CACHE = 'baduk-ai-v5';
 const FILES = ['./', './index.html', './katago.js', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
   './vendor/tf.min.js', './vendor/tf-backend-webgpu.min.js', './vendor/tf-backend-wasm.min.js',
   './vendor/tfjs-backend-wasm.wasm', './vendor/tfjs-backend-wasm-simd.wasm', './vendor/tfjs-backend-wasm-threaded-simd.wasm',
-  './models/katago-b6.js'];
+  './models/g170e-b10c128.bin.gz'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });
