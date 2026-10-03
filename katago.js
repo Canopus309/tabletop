@@ -621,7 +621,9 @@ const Kata = (() => {
     });
   }
   // 여러 국면의 흑 승률·흑 기준 집 차이. 대칭 2개를 평균해 흔들림을 줄인다 (CPU 계열은 1개)
-  async function evalPositions(states, onProgress = () => {}) {
+  // next[i]: i번째 국면에서 실제로 둔 수. 주면 그 수가 정책 순위로 몇 번째였는지(mq)도 돌려준다
+  //   mq = [순위(1부터), 착수 가능한 수 개수, 1위 정책 확률, 2위 정책 확률]  — 기력 추정에 쓴다
+  async function evalPositions(states, onProgress = () => {}, opts = {}) {
     const sy = backend === 'cpu' || backend === 'wasm' ? [0] : [0, 5], per = BATCH / sy.length, out = [];
     for (let i = 0; i < states.length; i += per) {
       const roots = states.slice(i, i + per).map(rootFromState);
@@ -632,7 +634,18 @@ const Kata = (() => {
         let wl = 0, lead = 0;
         for (let k = 0; k < sy.length; k++) { wl += rs[j * sy.length + k].wl / sy.length; lead += rs[j * sy.length + k].lead / sy.length; }
         const sign = r.board.turn === BLACK ? 1 : -1;
-        out.push({ wr: (sign * wl + 1) / 2, lead: sign * lead });
+        const res = { wr: (sign * wl + 1) / 2, lead: sign * lead, mq: null };
+        const nx = opts.next ? opts.next[i + j] : undefined;
+        if (nx !== undefined && nx !== PASS) {
+          const first = rs[j * sy.length], pr = new Float32Array(first.priors.length);
+          for (let k = 0; k < sy.length; k++) { const p = rs[j * sy.length + k].priors; for (let m = 0; m < pr.length; m++) pr[m] += p[m] / sy.length; }
+          const list = [];
+          for (let m = 0; m < first.moves.length; m++) if (first.moves[m] !== PASS) list.push([pr[m], first.moves[m]]);
+          list.sort((a, b) => b[0] - a[0]);
+          const k = list.findIndex(e => e[1] === nx) + 1;
+          if (k > 0) res.mq = [k, list.length, +list[0][0].toFixed(4), +(list[1] ? list[1][0] : 0).toFixed(4)];
+        }
+        out.push(res);
       });
       onProgress(out.length / states.length);
     }
