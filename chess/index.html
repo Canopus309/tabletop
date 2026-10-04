@@ -172,6 +172,7 @@
 <script type="module">
 import { Chess } from './vendor/chess.js';
 import { Engine, LEVELS, winPct } from './engine.js';
+migrateLevels('chess',['chess-game','chess-newopts','chess-rating']);
 
 const NAME={w:'백',b:'흑'};
 const VAL={p:1,n:3,b:3,r:5,q:9,k:0};
@@ -474,7 +475,7 @@ document.addEventListener('keydown',e=>{
 // 새 게임 대화상자
 const segL=$('#segLevel');
 LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${l.elo}</small></label>`));
-const lastOpt=load('chess-newopts',{color:'w',level:1});
+const lastOpt=load('chess-newopts',{color:'w',level:2});
 function recommend(){const R=loadRating();if(!R.games)return -1;let bi=0;LEVELS.forEach((l,i)=>{if(Math.abs(l.elo-R.rating)<Math.abs(LEVELS[bi].elo-R.rating))bi=i;});return bi;}
 function lvDesc(){
   const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`레이팅 ${l.elo} · ${l.desc}`;
@@ -504,7 +505,7 @@ for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('ch
     game=saved;ch=replay(game.moves.length);view=game.over?game.moves.length:null;render();ui();
     if(game.over)analyzeGame();else{toast('이어서 둡니다');maybeAI();}
   }else{
-    game={id:Date.now(),human:'w',level:1,moves:[],sans:[],over:false,result:null,assisted:false,evals:null};
+    game={id:Date.now(),human:'w',level:2,moves:[],sans:[],over:false,result:null,assisted:false,evals:null};
     ch=new Chess();render();ui();openNew();
   }
 })();

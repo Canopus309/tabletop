@@ -343,6 +343,7 @@ const RJ = (() => {
   // 단계: 0 입문 ~ 4 최강
   const LEVELS = [
     { name: '입문', noSearch: true, temp: 1.2, blockFive: 0.8, blockThree: 0.3 },
+    { name: '초보', noSearch: true, temp: 0.7, blockFive: 0.9, blockThree: 0.5 },
     { name: '초급', noSearch: true, temp: 0.35, blockFive: 1, blockThree: 0.7 },
     { name: '중급', depth: 2, vcf: 6, time: 600, width: 10 },
     { name: '고급', depth: 4, vcf: 10, time: 1500, width: 10 },

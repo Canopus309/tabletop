@@ -5,6 +5,22 @@ const $=s=>document.querySelector(s);
 function load(k,def){try{const v=JSON.parse(localStorage.getItem(k));return v?Object.assign({},def,v):def;}catch(e){return def;}}
 function store(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// 난이도 단계를 중간에 끼워 넣었을 때 저장된 단계 번호를 한 칸씩 민다
+// (v2: 모든 게임의 1번 자리에 '초보' 추가 → 기존 1번 이상은 +1). 대국·마지막 선택·기록의 level 을 옮긴다
+function migrateLevels(game,keys){
+  const vk='tt-levels-'+game;
+  try{
+    if(localStorage.getItem(vk)==='2')return;
+    const shift=o=>{if(o&&typeof o.level==='number'&&o.level>=1)o.level++;};
+    for(const k of keys){
+      const raw=localStorage.getItem(k);if(!raw)continue;
+      const v=JSON.parse(raw);
+      if(Array.isArray(v))v.forEach(shift);else{shift(v);if(v&&Array.isArray(v.history))v.history.forEach(shift);}
+      localStorage.setItem(k,JSON.stringify(v));
+    }
+    localStorage.setItem(vk,'2');
+  }catch(e){}
+}
 
 // 대화상자: 폼 제출 없이 JS로만 열고 닫는다 (미리보기 창 등 폼이 막힌 환경에서도 동작)
 const NATIVE_DLG=typeof HTMLDialogElement==='function'&&'showModal' in HTMLDialogElement.prototype;

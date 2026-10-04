@@ -407,10 +407,12 @@ self.onmessage=e=>self.postMessage(handleMessage(e.data));
 <script>
 "use strict";
 function soundEnabled(){return settings.sound;}
+migrateLevels('go',['baduk-game','baduk-newopts','baduk-rating']);
 // kata: KataGo 신경망 설정 / playouts·time·temp: KataGo를 못 쓸 때의 기본 AI 설정
 // rank: 화면에 보이는 기력. 입문~중급은 KaTrain(MIT)의 급수 보정 공식, 고급·최강은 추정치
 const LEVELS=[
   {name:'입문',rank:'18급',desc:'바둑을 처음 배우는 분께. 수를 몇 개만 살펴보고 둡니다.',kata:{mode:'rank',kyu:18},playouts:120,time:250,temp:1},
+  {name:'초보',rank:'15급',desc:'바둑을 막 배운 분께. 단수와 따내기를 알면 둘 만합니다.',kata:{mode:'rank',kyu:15},playouts:400,time:400,temp:0.7},
   {name:'초급',rank:'12급',desc:'규칙을 알고 몇 판 둬 본 분께.',kata:{mode:'rank',kyu:12},playouts:1200,time:700,temp:0.35},
   {name:'중급',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
   {name:'고급',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
@@ -467,7 +469,7 @@ const kataBatch=(n,visits)=>n>=19?(visits>=600?32:16):8;
 // 휴대폰은 배터리와 메모리를 아끼려고 미리 읽기를 짧게 한다
 const IS_MOBILE=matchMedia('(pointer:coarse)').matches||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 function startPonder(){
-  if(kataState!=='ready'||game.over||board.turn!==game.human||LEVELS[game.level].kata.mode!=='search'||game.level<4)return;
+  if(kataState!=='ready'||game.over||board.turn!==game.human||LEVELS[game.level].kata.mode!=='search'||game.level<LEVELS.length-1)return;
   if(document.visibilityState==='hidden')return;
   const n=game.n;
   const visits=IS_MOBILE?(n>=19?2000:n>=13?3000:4000):(n>=19?6000:n>=13?8000:12000);
@@ -565,7 +567,7 @@ function overallRank(){
   for(const r of list)for(const mq of r.s)samples.push({mq,squares:r.n*r.n});
   return{rank:estimateRank(samples),games:list.length};
 }
-const LEVEL_KYU=()=>[18,12,5,0,{b6:-2,b10:-4,b15:-6}[curModel()]??-4];
+const LEVEL_KYU=()=>[18,15,12,5,0,{b6:-2,b10:-4,b15:-6}[curModel()]??-4];
 function recommendLevel(kyu){const ks=LEVEL_KYU();let bi=0;ks.forEach((k,i)=>{if(Math.abs(k-kyu)<Math.abs(ks[bi]-kyu))bi=i;});return bi;}
 function showRank(){
   const{rank,games}=overallRank(),list=loadRating().slice().reverse();
@@ -1078,7 +1080,7 @@ document.addEventListener('keydown',e=>{
 // 새 게임 대화상자
 const segL=$('#segLevel');
 LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small></small></label>`));
-const lastOpt=load('baduk-newopts',{size:9,color:1,level:1,handicap:0,komi:'auto'});
+const lastOpt=load('baduk-newopts',{size:9,color:1,level:2,handicap:0,komi:'auto'});
 function fillHandi(){
   const n=+document.querySelector('input[name=size]:checked').value,sel=$('#selHandi'),cur=+sel.value||0,max=n===9?5:9;
   sel.innerHTML='<option value="0">없음 (호선)</option>';for(let h=2;h<=max;h++)sel.insertAdjacentHTML('beforeend',`<option value="${h}">${h}점</option>`);
@@ -1140,7 +1142,7 @@ initWorker();startKata();setTimeout(lbSync,3000);saveSummary();
     if(game.over){view=game.moves.length;if(game.moves.length>=2&&game.moves.at(-1)===PASS&&game.moves.at(-2)===PASS&&!game.result.title.includes('불계'))finishGame();ui();}
     else{toast('이어서 둡니다');maybeAI();}
   }else{
-    game={n:9,komi:6.5,handicap:0,human:1,level:1,setup:[],moves:[],over:false,result:null,wr:0.5};
+    game={n:9,komi:6.5,handicap:0,human:1,level:2,setup:[],moves:[],over:false,result:null,wr:0.5};
     rebuild();openNew();
   }
 })();

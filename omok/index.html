@@ -142,11 +142,14 @@
 const {N,BLACK,WHITE,EMPTY,CENTER}=RJ;
 const NAME={1:'흑',2:'백'};
 const COLS='ABCDEFGHIJKLMNO';
-const LEVEL_RATING=[600,1080,1320,1500,2050];
+// 초보는 입문 상대 31승 9패, 초급 상대 13승 27패 (입문·초급 직접 대결과 합쳐 약 860)
+const LEVEL_RATING=[600,860,1080,1320,1500,2050];
 // 레이팅 → 급수 (입문 600 = 18급, 80점 = 1급, 0급 이하는 단)
 function omokRank(r){const k=Math.min(30,Math.round(18-(r-600)/80));return k>=1?k+'급':(1-k)+'단';}
+migrateLevels('omok',['omok-game','omok-newopts','omok-rating']);
 const LEVEL_DESC=[
   '오목을 처음 두는 분께. 수를 대충 보고 가끔 큰 위협도 놓칩니다.',
+  '규칙을 막 익힌 분께. 4는 대체로 막지만 열린 3을 자주 놓칩니다.',
   '기본은 지키지만 열린 3을 가끔 놓칩니다.',
   '두 수 앞을 읽고, 4로 몰아붙이는 수순(VCF)을 찾습니다.',
   '네 수 앞을 읽고, 더 긴 연속 4 수순을 찾습니다.',
@@ -241,7 +244,7 @@ async function showHint(){
   if(game.over||thinking||g.turn!==game.human)return;
   if(hint>=0){hint=-1;draw();ui();return;}
   const ep=epoch;thinking=true;ui();
-  const r=await aiMove(game.moves.slice(),3);
+  const r=await aiMove(game.moves.slice(),RJ.LEVELS.length-2); // 힌트는 고급 단계로
   if(ep!==epoch)return;
   thinking=false;hint=r.move;game.assisted=true;save();draw();ui();
 }
@@ -382,7 +385,7 @@ document.addEventListener('keydown',e=>{
 // 새 게임 대화상자
 const segL=$('#segLevel');
 RJ.LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${omokRank(LEVEL_RATING[i])}</small></label>`));
-const lastOpt=load('omok-newopts',{color:1,level:1});
+const lastOpt=load('omok-newopts',{color:1,level:2});
 function lvDesc(){
   const i=+document.querySelector('input[name=level]:checked').value;$('#lvDesc').textContent=`기력 약 ${omokRank(LEVEL_RATING[i])} · ${LEVEL_DESC[i]}`;
   const rec=RB.recommend();$('#recLevel').textContent=rec>=0?`내 급수 ${RB.text(RB.get())} → 추천 난이도: ${RJ.LEVELS[rec].name}`:'';
@@ -412,7 +415,7 @@ initWorker();
     game=saved;view=game.over?game.moves.length:null;rebuild();
     if(!game.over){toast('이어서 둡니다');maybeAI();}
   }else{
-    game={id:Date.now(),human:BLACK,level:1,moves:[],over:false,result:null};
+    game={id:Date.now(),human:BLACK,level:2,moves:[],over:false,result:null};
     rebuild();openNew();
   }
 })();
