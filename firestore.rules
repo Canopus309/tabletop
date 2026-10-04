@@ -11,6 +11,22 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // 체스: 레이팅 순위 (Glicko-2 레이팅·편차)
+    match /chess/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null && request.auth.uid == uid && validChess(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    function validChess(d) {
+      return d.keys().hasOnly(['name', 'rating', 'rd', 'games', 'updated'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 12
+        && d.rating is number && d.rating >= 100 && d.rating <= 3500
+        && d.rd is number && d.rd >= 0 && d.rd <= 400
+        && d.games is int && d.games >= 3 && d.games <= 100000
+        && d.updated == request.time;
+    }
+
     function validPlayer(d) {
       return d.keys().hasOnly(['name', 'kyu', 'weak', 'strong', 'games', 'moves', 'model', 'updated'])
         && d.name is string && d.name.size() >= 1 && d.name.size() <= 12

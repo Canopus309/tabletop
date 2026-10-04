@@ -1,5 +1,5 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
-const CACHE = 'tabletop-v1';
+const CACHE = 'tabletop-v2';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -11,6 +11,10 @@ const FILES = [
   './go/models/g170e-b10c128.bin.gz',
   // 오목
   './omok/', './omok/index.html', './omok/renju.js',
+  // 체스
+  './chess/', './chess/index.html', './chess/engine.js', './chess/vendor/chess.js',
+  './chess/vendor/stockfish-19-lite-single.js', './chess/vendor/stockfish-19-lite-single.wasm',
+  ...['w', 'b'].flatMap(c => ['K', 'Q', 'R', 'B', 'N', 'P'].map(p => `./chess/pieces/${c}${p}.svg`)),
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

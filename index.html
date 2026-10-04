@@ -72,7 +72,7 @@
       <div class="me" id="meOmok"></div>
     </a>
 
-    <div class="game soon" aria-disabled="true">
+    <a class="game" href="chess/">
       <span class="art"><svg viewBox="0 0 160 100" aria-hidden="true">
         <rect width="160" height="100" fill="#eeeed2"/>
         <g fill="#769656"><path d="M0 0h20v20H0zM40 0h20v20H40zM80 0h20v20H80zM120 0h20v20h-20zM20 20h20v20H20zM60 20h20v20H60zM100 20h20v20h-20zM140 20h20v20h-20zM0 40h20v20H0zM40 40h20v20H40zM80 40h20v20H80zM120 40h20v20h-20zM20 60h20v20H20zM60 60h20v20H60zM100 60h20v20h-20zM140 60h20v20h-20zM0 80h20v20H0zM40 80h20v20H40zM80 80h20v20H80zM120 80h20v20h-20z"/></g>
@@ -81,10 +81,10 @@
           <g fill="#222" transform="translate(110 32) scale(.15)" stroke="#fff"><circle cx="0" cy="34" r="30"/><path d="M-34 74 Q0 62 34 74 L22 90 Q40 150 56 196 L-56 196 Q-40 150 -22 90 Z"/><rect x="-70" y="196" width="140" height="30" rx="12"/></g>
         </g>
       </svg></span>
-      <h2>체스 <span class="badge">준비 중</span></h2>
-      <p>Stockfish 엔진 AI · 레이팅으로 단계 조절</p>
-      <div class="me"></div>
-    </div>
+      <h2>체스</h2>
+      <p>Stockfish 19 AI · 레이팅 600~2800 단계 · 내 레이팅과 수마다 분석</p>
+      <div class="me" id="meChess"></div>
+    </a>
   </div>
 
   <p class="foot">한 번 열어 두면 인터넷 없이도 동작합니다. 홈 화면에 추가하면 앱처럼 쓸 수 있어요.<br>순위표는 인터넷이 연결될 때 자동으로 갱신됩니다.</p>
@@ -95,6 +95,7 @@ try{
   const s=JSON.parse(localStorage.getItem('tt-summary'))||{};
   if(s.go)document.getElementById('meGo').textContent='내 기력 '+s.go;
   if(s.omok)document.getElementById('meOmok').textContent=s.omok;
+  if(s.chess)document.getElementById('meChess').textContent=s.chess;
 }catch(e){}
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>

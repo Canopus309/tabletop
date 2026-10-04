@@ -20,7 +20,11 @@
 - 흑 차례에 금수 자리 표시, 5목 승리선 표시, 복기
 - AI 5단계: 패턴 평가 + 알파베타 탐색 + 연속 4 승리 수순(VCF) 탐색. 백일 때는 흑을 금수 자리로 몰아넣는 수도 노림
 
-### 체스 — 준비 중
+### 체스 (`chess/`)
+- Stockfish 19 Lite (WASM, 1.8MB) 를 Web Worker 로 실행. 규칙은 chess.js
+- AI 6단계를 레이팅으로 표시: 입문 600 · 초급 1050 · 중급 1400 · 고급 1800 · 상급 2200 · 최강 2800 (1320 이상은 Stockfish 의 UCI_Elo, 그 아래는 1400 단계와 대국해 추정)
+- 내 레이팅: Glicko-2 (무르기·힌트를 쓴 대국은 미반영), 온라인 순위표는 레이팅 순
+- 눌러서/끌어서 두기, 갈 수 있는 칸·체크 표시, 프로모션, 기보, 대국 후 수마다 승률 분석·실수 찾기
 
 ## 구조
 - `index.html` 홈 (게임 고르기), `sw.js` 오프라인 캐시, `manifest.webmanifest`
@@ -34,5 +38,8 @@
 | [KataGo](https://github.com/lightvector/KataGo) 시험용 신경망 `g170-b6c96-s175395328-d26788732` (`go/models/katago-b6.js`) | MIT (`go/vendor/LICENSE-katago.txt`) |
 | [TensorFlow.js](https://github.com/tensorflow/tfjs) 4.22.0 (`go/vendor/`) | Apache-2.0 |
 | [KaTrain](https://github.com/sanderland/katrain)의 급수 보정 봇 공식 (`rankNMoves`, `rankMove`) | MIT |
+| [Stockfish](https://github.com/official-stockfish/Stockfish) 19 Lite WASM ([nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js)) (`chess/vendor/`) | GPL-3.0 |
+| [chess.js](https://github.com/jhlywa/chess.js) 1.4.0 (`chess/vendor/chess.js`) | BSD-2-Clause |
+| cburnett 체스 말 그림 (`chess/pieces/`, lichess) | GPL-2.0+ |
 
 바둑 엔진의 입력 특징·축 판독·모델 형식은 KataGo의 `nninputs.cpp`, `board.cpp`, `desc.cpp`를 따랐고, 브라우저 구현은 [web-katrain](https://github.com/Sir-Teo/web-katrain)(MIT)을 참고했습니다. 오목 엔진은 직접 작성했습니다.

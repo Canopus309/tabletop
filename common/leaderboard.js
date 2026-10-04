@@ -46,36 +46,41 @@ const LB = (() => {
   const fromField = f => !f ? undefined : f.stringValue !== undefined ? f.stringValue
     : f.integerValue !== undefined ? +f.integerValue : f.doubleValue !== undefined ? f.doubleValue : f.timestampValue;
 
-  // 내 기록을 올린다. updated 는 서버 시각으로 채운다 (규칙에서 확인)
-  async function upload(entry) {
+  // 내 기록을 올린다 (게임마다 컬렉션이 다르다: 바둑 players, 체스 chess). updated 는 서버 시각으로 채운다 (규칙에서 확인)
+  async function uploadTo(col, entry) {
     const { token, uid } = await auth();
     const fields = {};
     for (const k in entry) fields[k] = toField(entry[k]);
-    const name = `projects/${FIREBASE.projectId}/databases/(default)/documents/players/${uid}`;
+    const name = `projects/${FIREBASE.projectId}/databases/(default)/documents/${col}/${uid}`;
     const r = await fetch(`${docsUrl()}:commit`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ writes: [{ update: { name, fields }, updateTransforms: [{ fieldPath: 'updated', setToServerValue: 'REQUEST_TIME' }] }] }),
     });
     if (!r.ok) throw new Error('기록 올리기 실패 (' + r.status + ') ' + (await r.text()).slice(0, 200));
   }
-  async function remove() {
+  async function removeFrom(col) {
     const { token, uid } = await auth();
-    const r = await fetch(`${docsUrl()}/players/${uid}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch(`${docsUrl()}/${col}/${uid}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
     if (!r.ok && r.status !== 404) throw new Error('기록 지우기 실패 (' + r.status + ')');
   }
-  // 기력 높은 순(급수 숫자가 작은 순) 100명. 받은 목록은 오프라인에서 보이도록 저장해 둔다
-  async function fetchTop() {
+  // 상위 100명. 받은 목록은 오프라인에서도 보이도록 cacheKey 로 저장해 둔다
+  async function fetchTopFrom(col, field, direction, cacheKey) {
     const r = await fetch(`${docsUrl()}:runQuery`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'players' }], orderBy: [{ field: { fieldPath: 'kyu' }, direction: 'ASCENDING' }], limit: 100 } }),
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: col }], orderBy: [{ field: { fieldPath: field }, direction }], limit: 100 } }),
     });
     if (!r.ok) throw new Error('순위표 받기 실패 (' + r.status + ')');
     const rows = (await r.json()).filter(x => x.document).map(x => {
-      const f = x.document.fields || {};
-      return { uid: x.document.name.split('/').pop(), name: fromField(f.name), kyu: fromField(f.kyu), weak: fromField(f.weak), strong: fromField(f.strong), games: fromField(f.games), updated: fromField(f.updated) };
+      const f = x.document.fields || {}, row = { uid: x.document.name.split('/').pop() };
+      for (const k in f) row[k] = fromField(f[k]);
+      return row;
     });
-    set({ cache: rows, cacheAt: Date.now() });
+    set({ [cacheKey]: rows, [cacheKey + 'At']: Date.now() });
     return rows;
   }
-  return { configured, upload, remove, fetchTop, state, set };
+  // 바둑: 기력 높은 순(급수 숫자가 작은 순)
+  const upload = entry => uploadTo('players', entry);
+  const remove = () => removeFrom('players');
+  const fetchTop = () => fetchTopFrom('players', 'kyu', 'ASCENDING', 'cache');
+  return { configured, upload, remove, fetchTop, uploadTo, removeFrom, fetchTopFrom, state, set };
 })();
