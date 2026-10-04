@@ -405,6 +405,83 @@ const RJ = (() => {
     return { move: best === undefined ? -1 : best, value: bestV, depth: reached, nodes: ctx.nodes, ms: Date.now() - t0 };
   }
 
+  // 빠른 가상 대국용 착수: 5목·막기는 꼭 하고, 나머지는 공격+수비 점수 상위 몇 수 중 무작위
+  function quickMove(g, temp) {
+    const c = g.turn, opp = 3 - c;
+    const mine = g.fivePoints(c).filter(q => g.legal(q, c));
+    if (mine.length) return mine[0];
+    const theirs = g.fivePoints(opp);
+    if (theirs.length) { const b = theirs.filter(q => g.legal(q, c)); return b.length ? b[0] : -1; }
+    const cand = [];
+    for (let q = 0; q < NN; q++) if (g.b[q] === EMPTY && g.near[q]) cand.push([q, g.ps[c][q] + g.ps[opp][q] * 0.85]);
+    cand.sort((a, b) => b[1] - a[1]);
+    const top = Math.max(1, cand.length ? cand[0][1] : 1), pool = [];
+    for (const e of cand) { if (pool.length >= 6) break; if (g.legal(e[0], c)) pool.push(e); }
+    if (!pool.length) return -1;
+    const ws = pool.map(e => Math.exp((e[1] / top - 1) / temp));
+    let r = Math.random() * ws.reduce((s, v) => s + v, 0);
+    for (let i = 0; i < pool.length; i++) { r -= ws[i]; if (r <= 0) return pool[i][0]; }
+    return pool[0][0];
+  }
+  // 가상 대국 k판으로 두는 쪽 승률(0~1)
+  function rolloutWinrate(g, k, temp = 0.12) {
+    const side = g.turn, base = g.moves.length;
+    let score = 0;
+    for (let t = 0; t < k; t++) {
+      let winner = 0;
+      while (g.moves.length < NN) {
+        const m = quickMove(g, temp);
+        if (m < 0) { winner = 3 - g.turn; break; }
+        g.play(m);
+        if (g.isWin(m)) { winner = g.b[m]; break; }
+      }
+      while (g.moves.length > base) g.undo();
+      score += winner === side ? 1 : winner === 0 ? 0.5 : 0;
+    }
+    return score / k;
+  }
+
+  // 대국 후 분석: 두는 쪽 승률 p (0~1)와 forced (1: 두는 쪽 필승 수순 있음, -1: 막을 수 없이 짐, 0: 그 밖)
+  //  - 바로 5목 / 연속 4(VCF)로 이기면 1, 상대 4를 막을 수 없으면 0
+  //  - 그 밖에는 가상 대국 96판의 승률을 보정해 쓴다. 보정식은 AI끼리 둔 40판(1703국면)의
+  //    실제 결과에 맞춘 것: p = σ(0.893 + 0.778·logit(가상 승률) − 1.705·[흑 차례])
+  function analyzePosition(moves) {
+    if (!moves.length) return { p: 1 - analyzePosition([CENTER]).p, forced: 0 };
+    const g = Game.from(moves), c = g.turn, opp = 3 - c;
+    if (g.isWin(moves[moves.length - 1])) return { p: 0, forced: -1 };
+    if (g.fivePoints(c).some(q => g.legal(q, c))) return { p: 1, forced: 1 };
+    const theirs = g.fivePoints(opp), canBlock = theirs.filter(q => g.legal(q, c));
+    if (theirs.length && (theirs.length > 1 || !canBlock.length)) return { p: 0, forced: -1 };
+    if (!theirs.length && vcf(g, c, 12, Date.now() + 80)) return { p: 1, forced: 1 };
+    const K = 96, roll = Math.min(1 - 1 / (2 * K), Math.max(1 / (2 * K), rolloutWinrate(g, K, 0.25)));
+    const z = 0.893 + 0.778 * Math.log(roll / (1 - roll)) - (c === BLACK ? 1.705 : 0);
+    return { p: 1 / (1 + Math.exp(-z)), forced: 0 };
+  }
+
+  // 대국 후 분석용: 두는 쪽 기준 평가값(v)과 최선의 수(best)
+  //  - 바로 5목이나 연속 4(VCF)로 이기면 ±WIN, 아니면 짧은 알파베타의 평가값
+  function evaluatePosition(moves, time = 250) {
+    const g = Game.from(moves), c = g.turn;
+    if (!moves.length) return { v: 0, best: CENTER };
+    if (g.isWin(moves[moves.length - 1])) return { v: -WIN, best: -1 };
+    const myFive = g.fivePoints(c).filter(q => g.legal(q, c));
+    if (myFive.length) return { v: WIN, best: myFive[0] };
+    const t0 = Date.now();
+    const w = vcf(g, c, 14, t0 + time * 0.4);
+    if (w) return { v: WIN - 1, best: w - 1 };
+    const ctx = { deadline: t0 + time, stop: false, nodes: 0, tt: new Map(), width: 10, rootWidth: 14, best: -1 };
+    const first = candidates(g, c, 1);
+    let v = first.length ? 0 : -WIN, best = first.length ? first[0] : -1;
+    for (let d = 2; d <= 4 && first.length; d += 2) {
+      ctx.best = -1;
+      const r = search(g, d, -Infinity, Infinity, 0, ctx);
+      if (ctx.stop) break;
+      v = r; if (ctx.best >= 0) best = ctx.best;
+      if (Math.abs(r) > WIN / 2) break;
+    }
+    return { v, best };
+  }
+
   // 흑 금수 자리 전체 (화면 표시용)
   function forbiddenPoints(moves) {
     const g = Game.from(moves), out = [];
@@ -426,11 +503,15 @@ const RJ = (() => {
     return null;
   }
 
-  return { N, NN, EMPTY, BLACK, WHITE, CENTER, LEVELS, Game, isForbidden, makesFive, foursDir, chooseMove, forbiddenPoints, winLine, vcf };
+  return { N, NN, EMPTY, BLACK, WHITE, CENTER, LEVELS, Game, isForbidden, makesFive, foursDir, chooseMove, evaluatePosition, analyzePosition, rolloutWinrate, forbiddenPoints, winLine, vcf, WIN };
 })();
 
-// Web Worker 로 쓰일 때: {id, moves, level} → {id, move, ...}
+// Web Worker 로 쓰일 때: {id, moves, level} → {id, move, ...},  type:'analyze' → {id, p},  type:'eval' → {id, v, best}
 if (typeof window === 'undefined' && typeof self !== 'undefined') {
-  self.onmessage = e => { const { id, moves, level } = e.data; self.postMessage(Object.assign({ id }, RJ.chooseMove(moves, level))); };
+  self.onmessage = e => {
+    const { id, moves, level, type } = e.data;
+    const r = type === 'analyze' ? RJ.analyzePosition(moves) : type === 'eval' ? RJ.evaluatePosition(moves) : RJ.chooseMove(moves, level);
+    self.postMessage(Object.assign({ id }, r));
+  };
 }
 if (typeof module !== 'undefined') module.exports = RJ;

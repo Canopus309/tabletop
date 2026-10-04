@@ -64,12 +64,15 @@
       <h3 id="resTitle"></h3>
       <p id="resDetail"></p>
       <p class="rating-change" id="ratingChange"></p>
+      <div class="graph-wrap"><canvas id="wrGraph" aria-label="수마다 흑 승률 그래프. 눌러서 그 수로 이동"></canvas></div>
+      <p id="anaText" class="ana"></p>
       <div class="review">
         <button id="rvPrev" aria-label="이전 수">‹</button>
         <input type="range" id="rvRange" min="0" max="0" value="0" aria-label="복기">
         <button id="rvNext" aria-label="다음 수">›</button>
         <span id="rvText"></span>
       </div>
+      <button class="mistake-btn hidden" id="nextMistake"></button>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
     </div>
 
@@ -177,6 +180,14 @@ function aiMove(moves,level){
     else setTimeout(()=>res(RJ.chooseMove(moves,level)),30);
   });
 }
+// 분석 요청: type 'analyze' → {p: 두는 쪽 승률}, 'eval' → {best: AI 추천 수}
+function aiEval(moves,type){
+  const id=++reqId;
+  return new Promise(res=>{
+    if(worker){waiters.set(id,res);worker.postMessage({id,moves,type});}
+    else setTimeout(()=>res(type==='analyze'?RJ.analyzePosition(moves):RJ.evaluatePosition(moves)),10);
+  });
+}
 function cancelAI(){if(worker&&waiters.size){worker.terminate();waiters.clear();initWorker();}}
 
 // ---------- 게임 ----------
@@ -230,6 +241,7 @@ function endGame(winner,how){
   game.result={winner,how,youWin,draw:winner===0};
   forbid=[];view=game.moves.length;
   updateRating();save();sound(winner===0?'pass':youWin?'win':'pass');ui();draw();
+  analyzeGame();
 }
 function undo(){
   if(!game.moves.length)return;
@@ -237,7 +249,7 @@ function undo(){
   const mv=game.moves.slice();
   do{mv.pop();}while(mv.length&&turnOf(mv.length)!==game.human);
   if(game.ratingApplied==null)game.assisted=true;
-  game.moves=mv;game.over=false;game.result=null;view=null;hint=-1;pending=-1;
+  game.moves=mv;game.over=false;game.result=null;game.evals=null;game.evalsDone=false;view=null;hint=-1;pending=-1;
   rebuild();save();maybeAI();
 }
 async function showHint(){
@@ -256,6 +268,80 @@ function updateRating(){
   const r=RB.apply(game.level,game.result.draw?0.5:game.result.youWin?1:0,game.id);
   game.ratingApplied={before:Math.round(r.before),after:Math.round(r.after)};
 }
+
+// ---------- 대국 후 분석 (수마다 흑 승률) ----------
+// 국면마다 엔진(analyzePosition)이 주는 두는 쪽 승률을 흑 기준으로 모으고, 내 실수에만 AI 추천 수를 찾는다
+let analyzing=false;
+async function analyzeGame(){
+  if(!game.over||analyzing||game.evalsDone)return;
+  const n=game.moves.length,ev=game.evals||(game.evals=[]);
+  analyzing=true;ui();const ep=epoch;
+  for(let i=0;i<=n;i++){
+    if(ev[i])continue;
+    // ev[i] = [흑 승률, AI 추천 수, 두는 쪽 필승(1)/필패(-1)/그 밖(0)]
+    let pct,forced=0;
+    if(i===n&&game.result.draw)pct=50;
+    else if(i===n&&game.result.winner&&game.result.how!=='기권'){pct=game.result.winner===BLACK?100:0;forced=-1;}
+    else{const r=await aiEval(game.moves.slice(0,i),'analyze');if(ep!==epoch){analyzing=false;return;}pct=(turnOf(i)===BLACK?r.p:1-r.p)*100;forced=r.forced||0;}
+    ev[i]=[+pct.toFixed(1),-1,forced];
+    if(i%5===0){ui();drawGraph();}
+  }
+  for(const m of mistakes().filter(m=>m.mover===game.human)){
+    if(ev[m.i-1][1]>=0)continue;
+    const r=await aiEval(game.moves.slice(0,m.i-1),'eval');if(ep!==epoch){analyzing=false;return;}
+    ev[m.i-1][1]=r.best;
+  }
+  game.evalsDone=true;analyzing=false;save();ui();drawGraph();draw();
+}
+// i번째 수(1부터)를 둔 쪽 기준 승률 변화
+// 실수 판정
+//  - 블런더: 필승 수순을 놓치거나(연속 4 탐색으로 정확히 판정), 아직 승률 10% 이상일 때 상대에게 필승 수순을 내준 수, 또는 승률 50%p 이상 하락
+//  - 실수: 승률 20%p 이상 하락, 또는 10%p 이상 떨어지면서 남은 승률이 절반 아래로 줄어든 수 (이미 불리한 쪽은 20%p 를 잃을 여지가 없어서)
+function moveDelta(i){
+  const ev=game.evals;if(!ev||!ev[i]||!ev[i-1])return null;
+  const mover=turnOf(i-1),s=mover===BLACK?1:-1,before=ev[i-1][2]||0,after=ev[i][2]||0;
+  const pb=mover===BLACK?ev[i-1][0]:100-ev[i-1][0],pa=mover===BLACK?ev[i][0]:100-ev[i][0];
+  let tactic=null;
+  if(before===1&&after!==-1)tactic='이기는 수순을 놓침';
+  else if(after===1&&before!==-1&&pb>=10)tactic='상대에게 이기는 수순을 내줌';
+  return{mover,dw:pa-pb,pb,pa,tactic};
+}
+const isBlunder=d=>!!d.tactic||d.dw<=-50;
+const isMistake=d=>isBlunder(d)||d.dw<=-20||(d.dw<=-10&&d.pa<d.pb/2);
+function mistakes(){const out=[];if(!game.evals)return out;for(let i=1;i<=game.moves.length;i++){const d=moveDelta(i);if(d&&isMistake(d))out.push({i,mover:d.mover,loss:isBlunder(d)?50:-d.dw});}return out;}
+const pname=p=>COLS[p%N]+(N-((p/N)|0));
+function reviewText(vi){
+  const ev=game.evals&&game.evals[vi];
+  if(!ev)return analyzing?'수마다 승률 분석 중…':'';
+  let t=vi?`<b>${vi}수</b> ${NAME[turnOf(vi-1)]} ${pname(game.moves[vi-1])} · `:'<b>시작</b> · ';
+  t+=`흑 승률 ${Math.round(ev[0])}%`;
+  const d=vi?moveDelta(vi):null;
+  if(d){
+    const dw=Math.round(d.dw);t+=` · 이 수 ${dw>=0?'+':''}${dw}%p`;
+    if(isMistake(d)){t+=` <span class="bad">${isBlunder(d)?'블런더':'실수'}${d.tactic?' · '+d.tactic:''}</span>`;const b=game.evals[vi-1][1];if(b>=0&&b!==game.moves[vi-1])t+=` · AI 추천 <b>${pname(b)}</b> (판에 ☆)`;}
+  }
+  return t;
+}
+const gcv=$('#wrGraph');
+function drawGraph(){
+  if(!game||!game.over)return;
+  const w=gcv.clientWidth,h=gcv.clientHeight;if(!w||!h)return;
+  const dpr=window.devicePixelRatio||1;gcv.width=Math.round(w*dpr);gcv.height=Math.round(h*dpr);
+  const gx=gcv.getContext('2d');gx.setTransform(dpr,0,0,dpr,0,0);
+  const n=Math.max(1,game.moves.length),ev=game.evals||[],pad=3,Xg=i=>pad+i/n*(w-2*pad),Yg=v=>pad+(1-v/100)*(h-2*pad);
+  gx.fillStyle='#f0efe9';gx.fillRect(0,0,w,h);
+  let last=-1;while(last+1<=game.moves.length&&ev[last+1])last++;
+  if(last>=0){gx.beginPath();gx.moveTo(Xg(0),h);for(let i=0;i<=last;i++)gx.lineTo(Xg(i),Yg(ev[i][0]));gx.lineTo(Xg(last),h);gx.closePath();gx.fillStyle='#1d1f23';gx.fill();}
+  gx.strokeStyle='rgba(128,128,128,.7)';gx.setLineDash([3,3]);gx.beginPath();gx.moveTo(0,Yg(50));gx.lineTo(w,Yg(50));gx.stroke();gx.setLineDash([]);
+  for(const m of mistakes()){gx.fillStyle=m.loss>=50?'#e0463f':'#f0a020';gx.beginPath();gx.arc(Xg(m.i),Yg(ev[m.i][0]),m.mover===game.human?4:2.5,0,7);gx.fill();}
+  const vi=view!==null?view:game.moves.length;
+  gx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2f6f5e';gx.lineWidth=2;gx.beginPath();gx.moveTo(Xg(vi),0);gx.lineTo(Xg(vi),h);gx.stroke();
+}
+function graphPick(e){const r=gcv.getBoundingClientRect();setView(Math.round((e.clientX-r.left)/r.width*game.moves.length));}
+gcv.addEventListener('pointerdown',e=>{if(!game||!game.over)return;try{gcv.setPointerCapture(e.pointerId);}catch(_){}graphPick(e);});
+gcv.addEventListener('pointermove',e=>{if(e.buttons&&game&&game.over)graphPick(e);});
+new ResizeObserver(()=>drawGraph()).observe(gcv);
+$('#nextMistake').onclick=()=>{const mine=mistakes().filter(m=>m.mover===game.human);if(!mine.length)return;const cur=view??game.moves.length;setView((mine.find(m=>m.i>cur)||mine[0]).i);};
 
 // ---------- 그리기 ----------
 const cv=$('#board'),ctx=cv.getContext('2d'),wrap=$('#boardWrap');
@@ -306,6 +392,14 @@ function draw(){
   }
   // 힌트
   if(hint>=0&&len===game.moves.length){const x=X(hint%N),y=X((hint/N)|0);ctx.fillStyle='rgba(47,140,110,.9)';ctx.beginPath();ctx.arc(x,y,r*0.85,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font=`700 ${cell*0.4}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('★',x,y+cell*0.02);}
+  // 복기 중 실수한 수: 그 직전 국면에서 AI가 추천한 자리
+  if(game.over&&game.evals&&len>0){
+    const d=moveDelta(len),b=game.evals[len-1]&&game.evals[len-1][1];
+    if(d&&isMistake(d)&&b>=0&&b!==game.moves[len-1]&&boardAt(len).b[b]===EMPTY){
+      const x=X(b%N),y=X((b/N)|0);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=Math.max(2,cell*0.08);ctx.beginPath();ctx.arc(x,y,r*0.9,0,7);ctx.stroke();
+      ctx.fillStyle='rgba(47,140,110,.95)';ctx.font=`700 ${cell*0.5}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('☆',x,y+cell*0.02);
+    }
+  }
   // 미리보기
   if(!game.over&&!thinking&&view===null&&g.turn===game.human){
     const p=pending>=0?pending:hover;
@@ -364,6 +458,10 @@ function ui(){
     if(ra){const d=ra.after-ra.before;rc.innerHTML=`내 급수 ${omokRank(ra.before)} → ${RB.text(RB.get())} <span class="${d>=0?'up':'down'}">(레이팅 ${d>=0?'+':''}${d})</span>`;}
     else rc.textContent=game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
+    $('#anaText').innerHTML=reviewText(len);
+    const mine=mistakes().filter(m=>m.mover===game.human),mb=$('#nextMistake');
+    mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`내 실수 ${mine.length}개 · 다음 실수 보기 ›`:'큰 실수 없음';
+    drawGraph();
   }
   $('#metaText').textContent=`15×15 · 렌주 · AI ${lv} (${omokRank(LEVEL_RATING[game.level])})`+(worker?'':' · 계산: 화면');
 }
@@ -413,7 +511,7 @@ initWorker();
   const saved=load('omok-game',null);
   if(saved&&Array.isArray(saved.moves)){
     game=saved;view=game.over?game.moves.length:null;rebuild();
-    if(!game.over){toast('이어서 둡니다');maybeAI();}
+    if(!game.over){toast('이어서 둡니다');maybeAI();}else analyzeGame();
   }else{
     game={id:Date.now(),human:BLACK,level:2,moves:[],over:false,result:null};
     rebuild();openNew();
