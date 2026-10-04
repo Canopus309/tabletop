@@ -1,37 +1,17 @@
 {
-  "name": "바둑 AI",
-  "short_name": "바둑 AI",
-  "description": "오프라인에서 동작하는 인공지능 바둑",
-  "start_url": "./index.html",
+  "name": "Table Top",
+  "short_name": "Table Top",
+  "description": "인터넷 없이 두는 AI 보드게임 — 바둑, 오목, 체스",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f1ea",
   "theme_color": "#f4f1ea",
   "lang": "ko",
   "icons": [
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

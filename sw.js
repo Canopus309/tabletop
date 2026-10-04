@@ -1,14 +1,22 @@
-// 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다.
-const CACHE = 'baduk-ai-v6';
-const FILES = ['./', './index.html', './katago.js', './leaderboard.js', './manifest.webmanifest', './icon.svg',
+// 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
+const CACHE = 'tabletop-v1';
+const FILES = [
+  './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
-  './vendor/tf.min.js', './vendor/tf-backend-webgpu.min.js', './vendor/tf-backend-wasm.min.js',
-  './vendor/tfjs-backend-wasm.wasm', './vendor/tfjs-backend-wasm-simd.wasm', './vendor/tfjs-backend-wasm-threaded-simd.wasm',
-  './models/g170e-b10c128.bin.gz'];
+  './common/base.css', './common/ui.js', './common/leaderboard.js',
+  // 바둑
+  './go/', './go/index.html', './go/katago.js',
+  './go/vendor/tf.min.js', './go/vendor/tf-backend-webgpu.min.js', './go/vendor/tf-backend-wasm.min.js',
+  './go/vendor/tfjs-backend-wasm.wasm', './go/vendor/tfjs-backend-wasm-simd.wasm', './go/vendor/tfjs-backend-wasm-threaded-simd.wasm',
+  './go/models/g170e-b10c128.bin.gz',
+  // 오목
+  './omok/', './omok/index.html', './omok/renju.js',
+];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
+  // 예전 바둑 AI 시절 캐시(baduk-ai-*)도 함께 정리
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {

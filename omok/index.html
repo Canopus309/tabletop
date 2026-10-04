@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>오목 · Table Top</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../common/base.css">
+<style>
+#boardWrap{background:radial-gradient(120% 90% at 30% 20%,rgba(255,255,255,.2),transparent 60%),linear-gradient(135deg,#ecd3a0,#dcb877)}
+.badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--muted)}
+.rule-note{font-size:12.5px;color:var(--muted);line-height:1.6;margin:10px 2px 0}
+.rule-note b{color:var(--danger)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../" title="Table Top 홈" aria-label="Table Top 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#e2c38a"/><g fill="#151515"><circle cx="9" cy="23" r="3.6"/><circle cx="14" cy="18" r="3.6"/><circle cx="19" cy="13" r="3.6"/></g><g fill="#fafafa" stroke="#aaa" stroke-width=".6"><circle cx="19" cy="20" r="3.6"/><circle cx="24" cy="13" r="3.6"/></g></svg>
+    오목 <span class="badge">렌주</span>
+  </div>
+  <div class="hbtns">
+    <button class="icon-btn" id="btnNew" title="새 게임" aria-label="새 게임"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="icon-btn" id="btnSettings" title="설정" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  </div>
+</header>
+
+<main class="app">
+  <div class="board-col"><div id="boardWrap"><canvas id="board" aria-label="오목판"></canvas></div></div>
+
+  <aside class="panel">
+    <div class="card">
+      <div class="players">
+        <div class="player" id="pB"><div class="top"><span class="dot b"></span><span class="name">흑</span><span class="thinking"><i></i><i></i><i></i></span></div><div class="sub"><span class="who"></span></div></div>
+        <div class="player" id="pW"><div class="top"><span class="dot w"></span><span class="name">백</span><span class="thinking"><i></i><i></i><i></i></span></div><div class="sub"><span class="who"></span></div></div>
+      </div>
+      <div class="status"><span id="statusText"></span><span id="moveText">0수</span></div>
+      <p class="rule-note" id="ruleNote">렌주 룰: 흑은 <b>33 · 44 · 장목(6목 이상)</b>을 둘 수 없고 정확히 5목이어야 이깁니다. 백은 제한 없이 5목 이상이면 이깁니다.</p>
+    </div>
+
+    <div class="card" id="playCard">
+      <div class="actions">
+        <button class="act" id="aUndo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>무르기</button>
+        <button class="act" id="aHint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>힌트</button>
+        <button class="act danger" id="aResign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4M4 4h12l-2 4 2 4H4"/></svg>기권</button>
+      </div>
+    </div>
+
+    <div class="card result hidden" id="resultCard">
+      <h3 id="resTitle"></h3>
+      <p id="resDetail"></p>
+      <div class="review">
+        <button id="rvPrev" aria-label="이전 수">‹</button>
+        <input type="range" id="rvRange" min="0" max="0" value="0" aria-label="복기">
+        <button id="rvNext" aria-label="다음 수">›</button>
+        <span id="rvText"></span>
+      </div>
+      <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
+    </div>
+
+    <div class="meta" id="metaText"></div>
+  </aside>
+</main>
+
+<dialog id="dlgNew">
+  <div class="dlg">
+    <h2>새 게임 · 오목 (렌주)</h2>
+    <div class="field"><span class="flabel">내 돌</span>
+      <div class="seg">
+        <input type="radio" name="color" id="cB" value="1" checked><label for="cB">흑 (먼저)</label>
+        <input type="radio" name="color" id="cW" value="2"><label for="cW">백</label>
+        <input type="radio" name="color" id="cR" value="0"><label for="cR">무작위</label>
+      </div></div>
+    <div class="field"><span class="flabel">AI 난이도</span>
+      <div class="seg" id="segLevel"></div>
+      <div class="lvdesc" id="lvDesc"></div></div>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">대국 시작</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgSettings">
+  <div class="dlg">
+    <h2>설정</h2>
+    <label class="toggle"><div>흑 금수 자리 표시<small>흑 차례에 둘 수 없는 자리에 ✕ 표시</small></div><span class="sw"><input type="checkbox" id="optForbid"><span></span></span></label>
+    <label class="toggle"><div>좌표 표시</div><span class="sw"><input type="checkbox" id="optCoords"><span></span></span></label>
+    <label class="toggle"><div>수순 번호</div><span class="sw"><input type="checkbox" id="optNumbers"><span></span></span></label>
+    <label class="toggle"><div>착수 확인<small>한 번 눌러 위치 확인, 다시 눌러 착수 (실수 방지)</small></div><span class="sw"><input type="checkbox" id="optConfirm"><span></span></span></label>
+    <label class="toggle"><div>효과음 · 진동</div><span class="sw"><input type="checkbox" id="optSound"><span></span></span></label>
+    <div class="dlg-actions" style="margin-top:14px"><button type="button" class="primary" data-close="ok">닫기</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgConfirm">
+  <div class="dlg">
+    <h2 id="cfTitle"></h2>
+    <p id="cfText" style="margin:0 0 16px;color:var(--muted);font-size:14px"></p>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="no">취소</button><button type="button" class="primary" data-close="yes" id="cfYes"></button></div>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="renju.js"></script>
+<script src="../common/ui.js"></script>
+<script>
+"use strict";
+const {N,BLACK,WHITE,EMPTY,CENTER}=RJ;
+const NAME={1:'흑',2:'백'};
+const COLS='ABCDEFGHIJKLMNO';
+const LEVEL_DESC=[
+  '오목을 처음 두는 분께. 수를 대충 보고 가끔 큰 위협도 놓칩니다.',
+  '기본은 지키지만 열린 3을 가끔 놓칩니다.',
+  '두 수 앞을 읽고, 4로 몰아붙이는 수순(VCF)을 찾습니다.',
+  '네 수 앞을 읽고, 더 긴 연속 4 수순을 찾습니다.',
+  '한 수에 최대 3.5초 동안 깊게 읽습니다. 백일 때는 흑을 금수 자리로 몰아넣습니다.',
+];
+const settings=load('omok-settings',{forbid:true,coords:true,numbers:false,sound:true,confirm:matchMedia('(pointer:coarse)').matches});
+function soundEnabled(){return settings.sound;}
+
+let game=null,g=null,view=null,thinking=false,epoch=0,hint=-1,pending=-1,hover=-1,forbid=[],winLine=null;
+
+// ---------- AI 계산 (Web Worker, 안 되면 화면에서 직접) ----------
+let worker=null,reqId=0;const waiters=new Map();
+function initWorker(){
+  try{
+    if(!location.protocol.startsWith('http'))throw 0;
+    worker=new Worker('renju.js');
+    worker.onmessage=e=>{const f=waiters.get(e.data.id);if(f){waiters.delete(e.data.id);f(e.data);}};
+    worker.onerror=()=>{worker=null;};
+  }catch(e){worker=null;}
+}
+function aiMove(moves,level){
+  const id=++reqId;
+  return new Promise(res=>{
+    if(worker){waiters.set(id,res);worker.postMessage({id,moves,level});}
+    else setTimeout(()=>res(RJ.chooseMove(moves,level)),30);
+  });
+}
+function cancelAI(){if(worker&&waiters.size){worker.terminate();waiters.clear();initWorker();}}
+
+// ---------- 게임 ----------
+const turnOf=len=>len%2===0?BLACK:WHITE;
+function newGame(o){
+  cancelAI();epoch++;thinking=false;
+  const human=o.color===0?(Math.random()<.5?BLACK:WHITE):o.color;
+  game={id:Date.now(),human,level:o.level,moves:[],over:false,result:null};
+  view=null;hint=-1;pending=-1;
+  rebuild();save();
+  toast(`${NAME[human]}으로 시작합니다 · ${RJ.LEVELS[o.level].name}`);
+  maybeAI();
+}
+function rebuild(){g=RJ.Game.from(game.moves);winLine=null;
+  if(game.over&&game.moves.length){const last=game.moves[game.moves.length-1];if(g.isWin(last))winLine=RJ.winLine(g.b,last);}
+  updateForbid();resize();ui();}
+function save(){store('omok-game',game);}
+function updateForbid(){forbid=!game.over&&settings.forbid&&g.turn===BLACK?RJ.forbiddenPoints(game.moves):[];}
+
+function playMove(p){
+  g.play(p);game.moves.push(p);
+  hint=-1;pending=-1;
+  sound('stone');if(settings.sound&&navigator.vibrate)try{navigator.vibrate(12);}catch(e){}
+  if(g.isWin(p)){winLine=RJ.winLine(g.b,p);endGame(g.b[p],'5목 완성');return;}
+  if(game.moves.length>=N*N){endGame(0,'판이 가득 찼습니다');return;}
+  updateForbid();save();draw();ui();
+  maybeAI();
+}
+async function maybeAI(){
+  if(game.over||g.turn===game.human)return;
+  const ep=epoch,t0=performance.now();
+  thinking=true;ui();
+  const r=await aiMove(game.moves.slice(),game.level);
+  const wait=380-(performance.now()-t0);if(wait>0)await sleep(wait);
+  if(ep!==epoch)return;
+  thinking=false;
+  if(r.move<0||g.b[r.move]!==EMPTY){endGame(game.human,'AI가 둘 곳이 없습니다');return;}
+  playMove(r.move);
+}
+function humanPlay(p){
+  if(game.over||thinking||view!==null||g.turn!==game.human)return;
+  if(g.b[p]!==EMPTY)return;
+  if(!game.moves.length&&p!==CENTER){toast('렌주 룰: 흑의 첫 수는 판 가운데(천원)입니다');sound('bad');pending=-1;draw();return;}
+  if(g.turn===BLACK&&RJ.isForbidden(g.b,p)){toast('금수입니다. 흑은 33 · 44 · 장목 자리에 둘 수 없습니다');sound('bad');return;}
+  if(settings.confirm&&pending!==p){pending=p;draw();return;}
+  playMove(p);
+}
+function endGame(winner,how){
+  game.over=true;thinking=false;
+  const youWin=winner===game.human;
+  game.result={winner,how,youWin,draw:winner===0};
+  forbid=[];view=game.moves.length;
+  recordResult();save();sound(winner===0?'pass':youWin?'win':'pass');ui();draw();
+}
+function undo(){
+  if(!game.moves.length)return;
+  cancelAI();epoch++;thinking=false;
+  const mv=game.moves.slice();
+  do{mv.pop();}while(mv.length&&turnOf(mv.length)!==game.human);
+  game.moves=mv;game.over=false;game.result=null;view=null;hint=-1;pending=-1;
+  rebuild();save();maybeAI();
+}
+async function showHint(){
+  if(game.over||thinking||g.turn!==game.human)return;
+  if(hint>=0){hint=-1;draw();ui();return;}
+  const ep=epoch;thinking=true;ui();
+  const r=await aiMove(game.moves.slice(),3);
+  if(ep!==epoch)return;
+  thinking=false;hint=r.move;draw();ui();
+}
+// 전적 (단계별 승·패) → 홈 화면 요약
+function recordResult(){
+  const rec=load('omok-record',{}),k=String(game.level);
+  rec[k]=rec[k]||{w:0,l:0,d:0};
+  if(game.result.draw)rec[k].d++;else if(game.result.youWin)rec[k].w++;else rec[k].l++;
+  store('omok-record',rec);
+  let w=0,l=0;for(const v of Object.values(rec)){w+=v.w;l+=v.l;}
+  try{const s=JSON.parse(localStorage.getItem('tt-summary'))||{};s.omok=`전적 ${w}승 ${l}패`;localStorage.setItem('tt-summary',JSON.stringify(s));}catch(e){}
+}
+
+// ---------- 그리기 ----------
+const cv=$('#board'),ctx=cv.getContext('2d'),wrap=$('#boardWrap');
+let G={s:0,cell:0,m:0,dpr:1};
+function resize(){
+  if(!game)return;
+  const s=wrap.clientWidth,dpr=window.devicePixelRatio||1,k=settings.coords?0.95:0.6;
+  cv.width=Math.round(s*dpr);cv.height=Math.round(s*dpr);
+  const cell=s/(N-1+2*k);G={s,cell,m:cell*k,dpr};draw();
+}
+const X=i=>G.m+i*G.cell;
+function boardAt(len){return len===game.moves.length?g:RJ.Game.from(game.moves.slice(0,len));}
+function draw(){
+  if(!game||!G.s)return;
+  const len=view!==null?view:game.moves.length,b=boardAt(len),{cell,s,dpr}=G,r=cell*0.46;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,s,s);
+  ctx.strokeStyle='rgba(60,42,14,.78)';ctx.lineWidth=Math.max(1,cell*0.03);
+  ctx.beginPath();
+  for(let i=0;i<N;i++){const v=Math.round(X(i)*dpr)/dpr+0.5/dpr;ctx.moveTo(X(0),v);ctx.lineTo(X(N-1),v);ctx.moveTo(v,X(0));ctx.lineTo(v,X(N-1));}
+  ctx.stroke();
+  ctx.lineWidth=Math.max(1.5,cell*0.05);ctx.strokeRect(X(0),X(0),X(N-1)-X(0),X(N-1)-X(0));
+  ctx.fillStyle='rgba(60,42,14,.9)';
+  for(const [x,y] of [[3,3],[11,3],[7,7],[3,11],[11,11]]){ctx.beginPath();ctx.arc(X(x),X(y),Math.max(2,cell*0.1),0,7);ctx.fill();}
+  if(settings.coords){
+    ctx.fillStyle='rgba(80,56,18,.75)';ctx.font=`500 ${Math.max(8,cell*0.34)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    const o=G.m*0.5;
+    for(let i=0;i<N;i++){ctx.fillText(COLS[i],X(i),o);ctx.fillText(COLS[i],X(i),s-o);ctx.fillText(String(N-i),o,X(i));ctx.fillText(String(N-i),s-o,X(i));}
+  }
+  // 흑 금수 자리
+  if(len===game.moves.length&&forbid.length&&game.human===BLACK&&!thinking){
+    ctx.strokeStyle='rgba(200,50,40,.85)';ctx.lineWidth=Math.max(1.5,cell*0.07);const q=cell*0.17;
+    for(const p of forbid){const x=X(p%N),y=X((p/N)|0);ctx.beginPath();ctx.moveTo(x-q,y-q);ctx.lineTo(x+q,y+q);ctx.moveTo(x+q,y-q);ctx.lineTo(x-q,y+q);ctx.stroke();}
+  }
+  // 돌
+  const nums=settings.numbers?new Map(game.moves.slice(0,len).map((m,i)=>[m,i+1])):null;
+  for(let p=0;p<N*N;p++){
+    const v=b.b[p];if(v===EMPTY)continue;
+    const x=X(p%N),y=X((p/N)|0);drawStone(x,y,r,v,1);
+    if(nums&&nums.has(p)){const t=String(nums.get(p));ctx.fillStyle=v===BLACK?'#f2f2f2':'#1a1a1a';ctx.font=`600 ${cell*(t.length>2?0.32:0.42)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,x,y+cell*0.02);}
+  }
+  // 마지막 수
+  if(len&&!nums){const p=game.moves[len-1],x=X(p%N),y=X((p/N)|0);ctx.fillStyle=b.b[p]===BLACK?'#fff':'#222';ctx.beginPath();ctx.arc(x,y,r*0.26,0,7);ctx.fill();}
+  // 5목 선
+  if(winLine&&len===game.moves.length){
+    const pts=winLine.map(p=>[X(p%N),X((p/N)|0)]).sort((a,c)=>a[0]-c[0]||a[1]-c[1]);
+    ctx.strokeStyle='rgba(224,70,63,.9)';ctx.lineWidth=Math.max(2,cell*0.12);ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[pts.length-1][0],pts[pts.length-1][1]);ctx.stroke();ctx.lineCap='butt';
+  }
+  // 힌트
+  if(hint>=0&&len===game.moves.length){const x=X(hint%N),y=X((hint/N)|0);ctx.fillStyle='rgba(47,140,110,.9)';ctx.beginPath();ctx.arc(x,y,r*0.85,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font=`700 ${cell*0.4}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('★',x,y+cell*0.02);}
+  // 미리보기
+  if(!game.over&&!thinking&&view===null&&g.turn===game.human){
+    const p=pending>=0?pending:hover;
+    if(p>=0&&g.b[p]===EMPTY){const x=X(p%N),y=X((p/N)|0);drawStone(x,y,r,game.human,pending>=0?0.7:0.4);
+      if(pending>=0){ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,r*1.1,0,7);ctx.stroke();}}
+    if(!game.moves.length&&game.human===BLACK){const x=X(7),y=X(7);ctx.strokeStyle='rgba(47,140,110,.9)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(x,y,r*1.15,0,7);ctx.stroke();ctx.setLineDash([]);}
+  }
+}
+function drawStone(x,y,r,col,alpha){
+  ctx.save();ctx.globalAlpha=alpha;
+  if(alpha===1){ctx.beginPath();ctx.arc(x+r*0.07,y+r*0.12,r,0,7);ctx.fillStyle='rgba(0,0,0,.28)';ctx.fill();}
+  const gr=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.08,x,y,r);
+  if(col===BLACK){gr.addColorStop(0,'#5d5d5d');gr.addColorStop(.55,'#202020');gr.addColorStop(1,'#060606');}
+  else{gr.addColorStop(0,'#ffffff');gr.addColorStop(.65,'#eeeeec');gr.addColorStop(1,'#c4c4c0');}
+  ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=gr;ctx.fill();ctx.restore();
+}
+
+// ---------- 입력 ----------
+function pointAt(e){
+  const rc=cv.getBoundingClientRect(),x=Math.round((e.clientX-rc.left-G.m)/G.cell),y=Math.round((e.clientY-rc.top-G.m)/G.cell);
+  if(x<0||y<0||x>=N||y>=N)return -1;
+  const dx=e.clientX-rc.left-X(x),dy=e.clientY-rc.top-X(y);
+  return dx*dx+dy*dy>(G.cell*0.55)**2?-1:y*N+x;
+}
+cv.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;const p=pointAt(e);if(p!==hover){hover=p;draw();}});
+cv.addEventListener('pointerleave',()=>{hover=-1;draw();});
+cv.addEventListener('click',e=>{const p=pointAt(e);if(p>=0)humanPlay(p);else if(pending>=0){pending=-1;draw();}});
+new ResizeObserver(resize).observe(wrap);
+
+// ---------- 화면 상태 ----------
+function ui(){
+  if(!game)return;
+  const len=view!==null?view:game.moves.length,lv=RJ.LEVELS[game.level].name;
+  for(const col of [BLACK,WHITE]){
+    const el=col===BLACK?$('#pB'):$('#pW');
+    el.querySelector('.who').textContent=col===game.human?'나':'AI · '+lv;
+    el.classList.toggle('active',!game.over&&g.turn===col);
+    el.classList.toggle('think',thinking&&col!==game.human&&g.turn===col);
+  }
+  const st=$('#statusText');
+  if(game.over)st.innerHTML='<b>대국 종료</b>';
+  else if(thinking)st.innerHTML=g.turn===game.human?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
+  else st.innerHTML=`<b>${NAME[g.turn]}</b> 차례${g.turn===game.human?' · 내 차례':''}`;
+  $('#moveText').textContent=len+'수';
+  const myTurn=!game.over&&!thinking&&g.turn===game.human;
+  $('#aUndo').disabled=!game.moves.length;$('#aHint').disabled=!myTurn&&hint<0;$('#aResign').disabled=game.over;
+  $('#aHint').classList.toggle('on',hint>=0);
+  $('#playCard').classList.toggle('hidden',game.over);
+  $('#resultCard').classList.toggle('hidden',!game.over);
+  if(game.over&&game.result){
+    const r=game.result;
+    $('#resTitle').textContent=r.draw?'무승부':(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
+    $('#resDetail').textContent=r.how;
+    const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
+  }
+  $('#metaText').textContent=`15×15 · 렌주 · AI ${lv}`+(worker?'':' · 계산: 화면');
+}
+
+// ---------- 버튼 ----------
+$('#aUndo').onclick=undo;$('#resUndo').onclick=undo;$('#aHint').onclick=showHint;
+$('#aResign').onclick=async()=>{if(game.over)return;if(await ask('기권할까요?','이번 대국을 AI의 승리로 끝냅니다.','기권')){cancelAI();epoch++;endGame(3-game.human,'기권');}};
+const setView=v=>{view=Math.max(0,Math.min(game.moves.length,v));draw();ui();};
+$('#rvRange').oninput=e=>setView(+e.target.value);
+$('#rvPrev').onclick=()=>setView((view??game.moves.length)-1);
+$('#rvNext').onclick=()=>setView((view??game.moves.length)+1);
+document.addEventListener('keydown',e=>{
+  if(document.querySelector('dialog[open]'))return;
+  if(game&&game.over&&(e.key==='ArrowLeft'||e.key==='ArrowRight'))setView((view??game.moves.length)+(e.key==='ArrowLeft'?-1:1));
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();}
+  if(e.key==='Escape'&&pending>=0){pending=-1;draw();}
+});
+
+// 새 게임 대화상자
+const segL=$('#segLevel');
+RJ.LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}</label>`));
+const lastOpt=load('omok-newopts',{color:1,level:1});
+function lvDesc(){$('#lvDesc').textContent=LEVEL_DESC[+document.querySelector('input[name=level]:checked').value];}
+segL.addEventListener('change',lvDesc);
+function openNew(){
+  document.querySelector(`input[name=color][value="${lastOpt.color}"]`).checked=true;
+  document.querySelector(`input[name=level][value="${lastOpt.level}"]`).checked=true;
+  lvDesc();openDlg($('#dlgNew'),v=>{
+    if(v!=='ok')return;
+    const o={color:+document.querySelector('input[name=color]:checked').value,level:+document.querySelector('input[name=level]:checked').value};
+    Object.assign(lastOpt,o);store('omok-newopts',lastOpt);newGame(o);
+  });
+}
+$('#btnNew').onclick=openNew;$('#resNew').onclick=openNew;
+
+// 설정
+const OPT={forbid:'#optForbid',coords:'#optCoords',numbers:'#optNumbers',confirm:'#optConfirm',sound:'#optSound'};
+$('#btnSettings').onclick=()=>{for(const k in OPT)$(OPT[k]).checked=settings[k];openDlg($('#dlgSettings'));};
+for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('omok-settings',settings);pending=-1;updateForbid();resize();ui();};
+
+// ---------- 시작 ----------
+initWorker();
+(function start(){
+  const saved=load('omok-game',null);
+  if(saved&&Array.isArray(saved.moves)){
+    game=saved;view=game.over?game.moves.length:null;rebuild();
+    if(!game.over){toast('이어서 둡니다');maybeAI();}
+  }else{
+    game={id:Date.now(),human:BLACK,level:1,moves:[],over:false,result:null};
+    rebuild();openNew();
+  }
+})();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
+</script>
+</body>
+</html>
