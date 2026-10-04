@@ -99,6 +99,18 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .rank-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);font-size:13px;align-items:center}
 .rank-row .d{color:var(--muted)}
 .rank-row .w{font-weight:700;color:var(--accent)}.rank-row .l{font-weight:700;color:var(--danger)}
+#dlgRank .dlg{max-height:calc(100dvh - 40px);overflow:auto}
+.lb-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px;margin-bottom:8px}
+.lb-head span{font-size:12px;color:var(--muted);text-align:right}
+.lb-name{display:flex;gap:8px;margin-bottom:8px}
+.lb-name input{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit}
+.lb-name button{padding:0 16px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700;cursor:pointer}
+.lb-list{max-height:240px;overflow:auto;border-top:1px solid var(--line)}
+.lb-row{display:grid;grid-template-columns:2.2em 1fr auto auto;gap:10px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px;align-items:center}
+.lb-row .no{color:var(--muted);font-weight:700;text-align:right}
+.lb-row .g{color:var(--muted);font-size:12px}
+.lb-row.me{background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:700}
+.lb-empty{padding:12px 2px;color:var(--muted);font-size:13px}
 .review input{flex:1;accent-color:var(--accent)}
 .review button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
 .review span{font-size:12.5px;color:var(--muted);min-width:48px;text-align:right}
@@ -253,6 +265,12 @@ select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--li
     <h2>내 기력</h2>
     <div class="rank-big" id="rkBig">–</div>
     <p class="rank-sub" id="rkSub"></p>
+    <div class="lb">
+      <div class="lb-head"><b>온라인 순위표</b><span id="lbStatus"></span></div>
+      <div class="lb-name"><input id="lbName" maxlength="12" placeholder="닉네임을 정하면 참가합니다" autocomplete="off"><button type="button" id="lbSave">참가</button></div>
+      <div class="lb-list" id="lbList"></div>
+    </div>
+    <div class="lb-head" style="margin-top:14px"><b>내 대국 기록</b></div>
     <div class="rank-list" id="rkList"></div>
     <p class="credit">내가 둔 수가 AI 추천 순위에서 몇 번째였는지를 모아, 급수별 AI(KaTrain 보정 방식)와 비교해 가장 그럴듯한 급수를 찾습니다. 19줄 기준으로 보정되어 9·13줄에서는 오차가 크고, 여러 판 둘수록 정확해집니다.</p>
     <div class="dlg-actions"><button type="button" class="ghost" id="rkReset">기록 지우기</button><button type="button" class="primary" data-close="ok">닫기</button></div>
@@ -517,6 +535,7 @@ self.onmessage=e=>self.postMessage(handleMessage(e.data));
 </script>
 
 <script src="katago.js"></script>
+<script src="leaderboard.js"></script>
 
 <!-- ================= APP ================= -->
 <script>
@@ -666,6 +685,7 @@ function recordGameRank(){
     const list=loadRating().filter(r=>r.id!==game.id);
     list.push({id:game.id||Date.now(),date:new Date().toISOString().slice(0,10),n:game.n,level:game.level,win:!!game.result.youWin,rank:game.myRank,s:s.map(v=>v.mq)});
     store('baduk-rating',list.slice(-30));
+    LB.set({pending:true});lbSync();
   }
   save();ui();
 }
@@ -686,8 +706,60 @@ function showRank(){
   $('#rkList').innerHTML=list.map(r=>`<div class="rank-row"><span class="d">${r.date.slice(5)}</span><span>${r.n}줄 · ${LEVELS[r.level]?LEVELS[r.level].name:''}</span><span class="${r.win?'w':'l'}">${r.win?'승':'패'}</span><span>${rankText(r.rank).replace('약 ','')}</span></div>`).join('');
   openDlg($('#dlgRank'));
 }
-$('#btnRank').onclick=showRank;
-$('#rkReset').onclick=async()=>{closeDlg($('#dlgRank'),'x');if(await ask('기력 기록을 지울까요?','지금까지 측정한 대국 기록이 모두 지워집니다.','지우기')){try{localStorage.removeItem('baduk-rating');}catch(e){}toast('기력 기록을 지웠습니다');}};
+// ---------- 온라인 순위표 ----------
+// 대국 결과는 폰에 저장되고, 온라인이 되면(앱 시작·연결·대국 종료 때) 최근 10판 기력을 올린다
+let lbBusy=false;
+async function lbSync(){
+  if(lbBusy||!LB.configured()||!navigator.onLine)return;
+  const s=LB.state();if(!s.name||!s.pending)return;
+  const{rank,games}=overallRank();
+  lbBusy=true;
+  try{
+    if(rank&&games>=3){
+      await LB.upload({name:s.name,kyu:rank.kyu,weak:rank.weak,strong:rank.strong,games,moves:rank.n,model:String(curModel()).slice(0,8)});
+      LB.set({pending:false,uploaded:true,lastSync:Date.now()});
+    }else{
+      if(s.uploaded)await LB.remove(); // 기록을 지웠거나 판 수가 모자라면 순위표에서 내린다
+      LB.set({pending:false,uploaded:false,lastSync:Date.now()});
+    }
+  }catch(e){console.warn('[순위표]',e);}
+  finally{lbBusy=false;if($('#dlgRank').open)renderLb();}
+}
+window.addEventListener('online',()=>{lbSync();if($('#dlgRank').open)refreshLb();});
+function lbStatusText(){
+  const s=LB.state();
+  if(!LB.configured())return '순위표 서버 준비 중';
+  if(!s.name)return '닉네임을 정하면 내 기력이 올라갑니다';
+  const{rank,games}=overallRank();
+  if(!rank||games<3)return `3판 이상 두면 올라갑니다 (지금 ${games}판)`;
+  if(s.pending)return navigator.onLine?'올리는 중…':'오프라인 · 연결되면 자동으로 올립니다';
+  return s.cacheAt?'갱신 '+new Date(s.cacheAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+}
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderLb(){
+  const s=LB.state(),rows=s.cache||[];
+  $('#lbStatus').textContent=lbStatusText();
+  if(document.activeElement!==$('#lbName'))$('#lbName').value=s.name||'';
+  $('#lbSave').textContent=s.name?'변경':'참가';
+  if(!LB.configured()){$('#lbList').innerHTML='<div class="lb-empty">순위표 서버가 아직 연결되지 않았습니다.</div>';return;}
+  if(!rows.length){$('#lbList').innerHTML=`<div class="lb-empty">${navigator.onLine?'아직 순위표에 아무도 없습니다.':'오프라인입니다. 연결되면 순위표를 받아옵니다.'}</div>`;return;}
+  $('#lbList').innerHTML=rows.map((r,i)=>`<div class="lb-row${r.uid===s.uid?' me':''}"><span class="no">${i+1}</span><span>${esc(r.name||'')}</span><span>${esc(rankText(r).replace('약 ','').replace(/ \(.*\)/,''))}</span><span class="g">${r.games}판</span></div>`).join('');
+}
+async function refreshLb(){
+  renderLb();
+  if(!LB.configured()||!navigator.onLine)return;
+  try{await LB.fetchTop();}catch(e){console.warn('[순위표]',e);}
+  renderLb();
+}
+$('#lbSave').onclick=async()=>{
+  const name=$('#lbName').value.trim().slice(0,12);
+  if(!name){toast('닉네임을 입력하세요');return;}
+  LB.set({name,pending:true});renderLb();
+  toast(navigator.onLine?'순위표에 참가했습니다':'저장했습니다. 연결되면 순위표에 올라갑니다');
+  await lbSync();await refreshLb();
+};
+$('#btnRank').onclick=()=>{showRank();refreshLb();};
+$('#rkReset').onclick=async()=>{closeDlg($('#dlgRank'),'x');if(await ask('기력 기록을 지울까요?','지금까지 측정한 대국 기록이 모두 지워지고, 순위표에서도 내려갑니다.','지우기')){try{localStorage.removeItem('baduk-rating');}catch(e){}LB.set({pending:true});lbSync();toast('기력 기록을 지웠습니다');}};
 
 // KaTrain(MIT)의 급수 보정 봇: 급수에 맞춘 개수만큼 수를 무작위로 골라, 그중 신경망이 가장 좋아하는 수를 둔다
 function rankNMoves(kyu,legal,squares){
@@ -1248,7 +1320,7 @@ async function switchModel(key){
 for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('baduk-settings',settings);pending=0;resize();ui();};
 
 // ---------- 시작 ----------
-initWorker();startKata();
+initWorker();startKata();setTimeout(lbSync,3000);
 (function start(){
   const saved=load('baduk-game',null);
   if(saved&&saved.n&&Array.isArray(saved.moves)){
