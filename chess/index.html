@@ -31,7 +31,10 @@
 .sq .rk{left:4%;top:3%}.sq .fl{right:5%;bottom:2%}
 .sq.l .rk,.sq.l .fl{color:#739552}.sq.d .rk,.sq.d .fl{color:#ebecd0}
 .drag-ghost{position:fixed;pointer-events:none;z-index:60;transform:translate(-50%,-50%)}
-.player .mat{font-size:12px;font-weight:700;color:var(--muted);margin-left:4px}
+.capt{display:flex;flex-wrap:wrap;align-items:center;min-height:20px;margin-top:5px;row-gap:2px}
+.capt img{width:19px;height:19px;margin-right:-6px}
+.capt .gap{width:9px}
+.capt b{font-size:12px;font-weight:700;color:var(--muted);margin-left:10px}
 .moves{display:grid;grid-template-columns:2.4em 1fr 1fr;gap:2px 6px;max-height:190px;overflow:auto;margin-top:10px;font-size:13.5px;font-variant-numeric:tabular-nums;border-top:1px solid var(--line);padding-top:8px}
 .moves .n{color:var(--muted);text-align:right}
 .moves .m{padding:2px 6px;border-radius:6px;cursor:pointer}
@@ -65,8 +68,8 @@
   <aside class="panel">
     <div class="card">
       <div class="players">
-        <div class="player" id="pW"><div class="top"><span class="dot w"></span><span class="name">백</span><span class="mat"></span><span class="thinking"><i></i><i></i><i></i></span></div><div class="sub"><span class="who"></span></div></div>
-        <div class="player" id="pB"><div class="top"><span class="dot b"></span><span class="name">흑</span><span class="mat"></span><span class="thinking"><i></i><i></i><i></i></span></div><div class="sub"><span class="who"></span></div></div>
+        <div class="player" id="pW"><div class="top"><span class="dot w"></span><span class="name">백</span><span class="thinking"><i></i><i></i><i></i></span></div><div class="sub"><span class="who"></span></div><div class="capt"></div></div>
+        <div class="player" id="pB"><div class="top"><span class="dot b"></span><span class="name">흑</span><span class="thinking"><i></i><i></i><i></i></span></div><div class="sub"><span class="who"></span></div><div class="capt"></div></div>
       </div>
       <div class="status"><span id="statusText"></span><span id="moveText"></span></div>
       <div class="moves" id="moveList"></div>
@@ -332,27 +335,43 @@ $('#nextMistake').onclick=()=>{const mine=mistakes().filter(m=>m.mover===game.hu
 // ---------- 판 그리기 ----------
 const cb=$('#cb'),FILES='abcdefgh';
 function squareOrder(){const out=[];for(let r=0;r<8;r++)for(let f=0;f<8;f++){const rank=game.human==='w'?8-r:r+1,file=game.human==='w'?f:7-f;out.push(FILES[file]+rank);}return out;}
+// 64칸은 한 번만 만들고(방향·좌표 설정이 바뀔 때만 다시), 그 뒤로는 바뀐 칸의 표시만 고친다
+let cells=null,builtKey='';
+function buildBoard(){
+  const order=squareOrder();cells={};cb.textContent='';
+  order.forEach((s,i)=>{
+    const f=FILES.indexOf(s[0]),r=+s[1],el=document.createElement('div');
+    el.className='sq '+((f+r)%2===1?'l':'d');el.dataset.sq=s;
+    const img=document.createElement('img');img.alt='';img.draggable=false;img.style.visibility='hidden';
+    const mark=document.createElement('span');
+    el.append(img,mark);
+    if(settings.coords){if(i%8===0)el.insertAdjacentHTML('beforeend',`<span class="rk">${s[1]}</span>`);if(i>=56)el.insertAdjacentHTML('beforeend',`<span class="fl">${s[0]}</span>`);}
+    cb.appendChild(el);cells[s]={el,img,mark,src:'',cls:''};
+  });
+}
 function render(){
   if(!game)return;
+  const key=game.human+(settings.coords?'c':'');
+  if(!cells||builtKey!==key){buildBoard();builtKey=key;}
   const len=view!==null?view:game.moves.length,c=len===game.moves.length?ch:replay(len);
   const last=len?game.moves[len-1]:null,targets=new Map();
   if(sel&&len===game.moves.length)for(const m of ch.moves({square:sel,verbose:true}))targets.set(m.to,!!m.captured);
   let checkSq=null;
-  if(c.inCheck())for(const s of squareOrder()){const p=c.get(s);if(p&&p.type==='k'&&p.color===c.turn())checkSq=s;}
-  const order=squareOrder();
-  cb.innerHTML=order.map((s,i)=>{
-    const f=FILES.indexOf(s[0]),r=+s[1],light=(f+r)%2===1,p=c.get(s);
-    const cls=['sq',light?'l':'d'];
-    if(last&&(s===last.slice(0,2)||s===last.slice(2,4)))cls.push('last');
-    if(s===sel)cls.push('sel');
-    if(hintMv&&len===game.moves.length&&(s===hintMv.slice(0,2)||s===hintMv.slice(2,4)))cls.push('hint');
-    if(s===checkSq)cls.push('check');
-    let inner=p?`<img src="${pieceImg(p)}" alt="">`:'';
-    if(settings.dots&&targets.has(s))inner+=targets.get(s)?'<span class="ring"></span>':'<span class="dot"></span>';
-    if(settings.coords){if(i%8===0)inner+=`<span class="rk">${s[1]}</span>`;if(i>=56)inner+=`<span class="fl">${s[0]}</span>`;}
-    return `<div class="${cls.join(' ')}" data-sq="${s}">${inner}</div>`;
-  }).join('');
+  if(c.inCheck())for(const s in cells){const p=c.get(s);if(p&&p.type==='k'&&p.color===c.turn())checkSq=s;}
+  for(const s in cells){
+    const cell=cells[s],p=c.get(s),src=p?pieceImg(p):'';
+    if(cell.src!==src){cell.src=src;if(src){cell.img.src=src;cell.img.style.visibility='';}else cell.img.style.visibility='hidden';}
+    cell.img.style.opacity='';
+    const extra=(last&&(s===last.slice(0,2)||s===last.slice(2,4))?' last':'')+(s===sel?' sel':'')
+      +(hintMv&&len===game.moves.length&&(s===hintMv.slice(0,2)||s===hintMv.slice(2,4))?' hint':'')+(s===checkSq?' check':'');
+    if(cell.cls!==extra){cell.el.classList.remove('last','sel','hint','check');if(extra)cell.el.classList.add(...extra.trim().split(' '));cell.cls=extra;}
+    const mk=settings.dots&&targets.has(s)?(targets.get(s)?'ring':'dot'):'';
+    if(cell.mark.className!==mk)cell.mark.className=mk;
+  }
 }
+// 말 그림을 미리 읽어 두어 처음 나타날 때도 비지 않게
+const PIECE_CACHE=[];
+for(const c of ['w','b'])for(const t of ['K','Q','R','B','N','P']){const im=new Image();im.src=`pieces/${c}${t}.svg`;if(im.decode)im.decode().catch(()=>{});PIECE_CACHE.push(im);}
 
 // ---------- 입력: 눌러서 고르고 누르기, 또는 끌어서 놓기 ----------
 let drag=null;
@@ -385,15 +404,26 @@ cb.addEventListener('pointerup',e=>{
 cb.addEventListener('pointercancel',()=>{if(drag){drag.img.remove();drag=null;render();}});
 
 // ---------- 화면 상태 ----------
+// 그 수까지 각 색이 잡은 상대 기물 (가치 높은 순)
+function capturedUpTo(len){
+  const c=new Chess(),out={w:[],b:[]};
+  for(const u of game.moves.slice(0,len)){const m=c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]});if(m.captured)out[m.color].push(m.captured);}
+  const order='qrbnp';for(const k of ['w','b'])out[k].sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+  return out;
+}
 function material(c){let w=0,b=0;for(const row of c.board())for(const p of row)if(p){if(p.color==='w')w+=VAL[p.type];else b+=VAL[p.type];}return w-b;}
 function ui(){
   if(!game)return;
   const len=view!==null?view:game.moves.length,c=len===game.moves.length?ch:replay(len),L=LEVELS[game.level],R=loadRating();
-  const diff=material(c);
+  const diff=material(c),caps=capturedUpTo(len);
   for(const col of ['w','b']){
     const el=col==='w'?$('#pW'):$('#pB');
     el.querySelector('.who').textContent=col===game.human?`나 · ${ratingText(R)}`:`Stockfish · ${L.name} ${L.elo}`;
-    const adv=col==='w'?diff:-diff;el.querySelector('.mat').textContent=adv>0?'+'+adv:'';
+    const adv=col==='w'?diff:-diff,opp=col==='w'?'b':'w';
+    let ch2='',prev='';
+    for(const t of caps[col]){if(prev&&prev!==t)ch2+='<span class="gap"></span>';ch2+=`<img src="pieces/${opp}${t.toUpperCase()}.svg" alt="">`;prev=t;}
+    if(adv>0)ch2+=`<b>+${adv}</b>`;
+    const capEl=el.querySelector('.capt');if(capEl.dataset.k!==ch2){capEl.innerHTML=ch2;capEl.dataset.k=ch2;}
     el.classList.toggle('active',!game.over&&ch.turn()===col);
     el.classList.toggle('think',thinking&&col!==game.human&&ch.turn()===col);
   }
