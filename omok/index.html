@@ -19,6 +19,9 @@
 .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--muted)}
 .rule-note{font-size:12.5px;color:var(--muted);line-height:1.6;margin:10px 2px 0}
 .rule-note b{color:var(--danger)}
+.assist-note{font-size:12px;color:var(--muted);margin:10px 2px 0;line-height:1.5}
+.rating-change{font-size:15px;font-weight:700;margin:-4px 0 10px}
+.rating-change .up{color:var(--accent)}.rating-change .down{color:var(--danger)}
 </style>
 </head>
 <body>
@@ -29,6 +32,7 @@
     오목 <span class="badge">렌주</span>
   </div>
   <div class="hbtns">
+    <button class="icon-btn" id="btnRank" title="내 급수" aria-label="내 급수"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg></button>
     <button class="icon-btn" id="btnNew" title="새 게임" aria-label="새 게임"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     <button class="icon-btn" id="btnSettings" title="설정" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
   </div>
@@ -53,11 +57,13 @@
         <button class="act" id="aHint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>힌트</button>
         <button class="act danger" id="aResign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4M4 4h12l-2 4 2 4H4"/></svg>기권</button>
       </div>
+      <p class="assist-note" id="assistNote"></p>
     </div>
 
     <div class="card result hidden" id="resultCard">
       <h3 id="resTitle"></h3>
       <p id="resDetail"></p>
+      <p class="rating-change" id="ratingChange"></p>
       <div class="review">
         <button id="rvPrev" aria-label="이전 수">‹</button>
         <input type="range" id="rvRange" min="0" max="0" value="0" aria-label="복기">
@@ -82,8 +88,26 @@
       </div></div>
     <div class="field"><span class="flabel">AI 난이도</span>
       <div class="seg" id="segLevel"></div>
-      <div class="lvdesc" id="lvDesc"></div></div>
+      <div class="lvdesc" id="lvDesc"></div>
+      <div class="lvdesc rec" id="recLevel"></div></div>
     <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">대국 시작</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgRank">
+  <div class="dlg">
+    <h2>내 급수 · 오목</h2>
+    <div class="rank-big" id="rkBig">–</div>
+    <p class="rank-sub" id="rkSub"></p>
+    <div class="lb">
+      <div class="lb-head"><b>온라인 순위표</b><span id="lbStatus"></span></div>
+      <div class="lb-name"><input id="lbName" maxlength="12" placeholder="닉네임을 정하면 참가합니다" autocomplete="off"><button type="button" id="lbSave">참가</button></div>
+      <div class="lb-list" id="lbList"></div>
+    </div>
+    <div class="lb-head" style="margin-top:14px"><b>내 대국 기록</b></div>
+    <div class="rank-list" id="rkList"></div>
+    <p class="credit">AI 단계와 둔 결과로 레이팅(Glicko-2)을 계산해 급수로 보여 줍니다. 급수는 앱 자체 척도입니다: AI 단계끼리 대국해 실력 차이를 재고, 입문을 18급으로 두어 80점을 1급으로 환산했습니다. 무르기나 힌트를 쓴 대국은 반영하지 않습니다.</p>
+    <div class="dlg-actions"><button type="button" class="ghost" id="rkReset">기록 지우기</button><button type="button" class="primary" data-close="ok">닫기</button></div>
   </div>
 </dialog>
 
@@ -111,11 +135,16 @@
 
 <script src="renju.js"></script>
 <script src="../common/ui.js"></script>
+<script src="../common/leaderboard.js"></script>
+<script src="../common/rating.js"></script>
 <script>
 "use strict";
 const {N,BLACK,WHITE,EMPTY,CENTER}=RJ;
 const NAME={1:'흑',2:'백'};
 const COLS='ABCDEFGHIJKLMNO';
+const LEVEL_RATING=[600,1080,1320,1500,2050];
+// 레이팅 → 급수 (입문 600 = 18급, 80점 = 1급, 0급 이하는 단)
+function omokRank(r){const k=Math.min(30,Math.round(18-(r-600)/80));return k>=1?k+'급':(1-k)+'단';}
 const LEVEL_DESC=[
   '오목을 처음 두는 분께. 수를 대충 보고 가끔 큰 위협도 놓칩니다.',
   '기본은 지키지만 열린 3을 가끔 놓칩니다.',
@@ -152,7 +181,7 @@ const turnOf=len=>len%2===0?BLACK:WHITE;
 function newGame(o){
   cancelAI();epoch++;thinking=false;
   const human=o.color===0?(Math.random()<.5?BLACK:WHITE):o.color;
-  game={id:Date.now(),human,level:o.level,moves:[],over:false,result:null};
+  game={id:Date.now(),human,level:o.level,moves:[],over:false,result:null,assisted:false};
   view=null;hint=-1;pending=-1;
   rebuild();save();
   toast(`${NAME[human]}으로 시작합니다 · ${RJ.LEVELS[o.level].name}`);
@@ -197,13 +226,14 @@ function endGame(winner,how){
   const youWin=winner===game.human;
   game.result={winner,how,youWin,draw:winner===0};
   forbid=[];view=game.moves.length;
-  recordResult();save();sound(winner===0?'pass':youWin?'win':'pass');ui();draw();
+  updateRating();save();sound(winner===0?'pass':youWin?'win':'pass');ui();draw();
 }
 function undo(){
   if(!game.moves.length)return;
   cancelAI();epoch++;thinking=false;
   const mv=game.moves.slice();
   do{mv.pop();}while(mv.length&&turnOf(mv.length)!==game.human);
+  if(game.ratingApplied==null)game.assisted=true;
   game.moves=mv;game.over=false;game.result=null;view=null;hint=-1;pending=-1;
   rebuild();save();maybeAI();
 }
@@ -213,16 +243,15 @@ async function showHint(){
   const ep=epoch;thinking=true;ui();
   const r=await aiMove(game.moves.slice(),3);
   if(ep!==epoch)return;
-  thinking=false;hint=r.move;draw();ui();
+  thinking=false;hint=r.move;game.assisted=true;save();draw();ui();
 }
-// 전적 (단계별 승·패) → 홈 화면 요약
-function recordResult(){
-  const rec=load('omok-record',{}),k=String(game.level);
-  rec[k]=rec[k]||{w:0,l:0,d:0};
-  if(game.result.draw)rec[k].d++;else if(game.result.youWin)rec[k].w++;else rec[k].l++;
-  store('omok-record',rec);
-  let w=0,l=0;for(const v of Object.values(rec)){w+=v.w;l+=v.l;}
-  try{const s=JSON.parse(localStorage.getItem('tt-summary'))||{};s.omok=`전적 ${w}승 ${l}패`;localStorage.setItem('tt-summary',JSON.stringify(s));}catch(e){}
+// ---------- 급수 (Glicko-2 레이팅을 급수로 표시, 순위표: common/rating.js) ----------
+const RB=ratingBoard({game:'omok',start:LEVEL_RATING[1],levels:RJ.LEVELS.map((l,i)=>({name:l.name,rating:LEVEL_RATING[i]})),fmt:omokRank,prefix:'급수 ',
+  sub:R=>`대국 ${R.games}판 · 레이팅 ${Math.round(R.rating)} ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`});
+function updateRating(){
+  if(game.assisted||game.ratingApplied!=null||(game.moves.length<6&&!game.result.youWin&&game.result.how!=='기권'))return;
+  const r=RB.apply(game.level,game.result.draw?0.5:game.result.youWin?1:0,game.id);
+  game.ratingApplied={before:Math.round(r.before),after:Math.round(r.after)};
 }
 
 // ---------- 그리기 ----------
@@ -309,7 +338,7 @@ function ui(){
   const len=view!==null?view:game.moves.length,lv=RJ.LEVELS[game.level].name;
   for(const col of [BLACK,WHITE]){
     const el=col===BLACK?$('#pB'):$('#pW');
-    el.querySelector('.who').textContent=col===game.human?'나':'AI · '+lv;
+    el.querySelector('.who').textContent=col===game.human?'나 · '+RB.text(RB.get()):`AI · ${lv} (${omokRank(LEVEL_RATING[game.level])})`;
     el.classList.toggle('active',!game.over&&g.turn===col);
     el.classList.toggle('think',thinking&&col!==game.human&&g.turn===col);
   }
@@ -321,15 +350,19 @@ function ui(){
   const myTurn=!game.over&&!thinking&&g.turn===game.human;
   $('#aUndo').disabled=!game.moves.length;$('#aHint').disabled=!myTurn&&hint<0;$('#aResign').disabled=game.over;
   $('#aHint').classList.toggle('on',hint>=0);
+  $('#assistNote').textContent=game.assisted?'무르기나 힌트를 써서 이 대국은 급수에 반영되지 않습니다.':'무르기나 힌트를 쓰면 이 대국은 급수에 반영되지 않습니다.';
   $('#playCard').classList.toggle('hidden',game.over);
   $('#resultCard').classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
     const r=game.result;
     $('#resTitle').textContent=r.draw?'무승부':(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
     $('#resDetail').textContent=r.how;
+    const rc=$('#ratingChange'),ra=game.ratingApplied;
+    if(ra){const d=ra.after-ra.before;rc.innerHTML=`내 급수 ${omokRank(ra.before)} → ${RB.text(RB.get())} <span class="${d>=0?'up':'down'}">(레이팅 ${d>=0?'+':''}${d})</span>`;}
+    else rc.textContent=game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
   }
-  $('#metaText').textContent=`15×15 · 렌주 · AI ${lv}`+(worker?'':' · 계산: 화면');
+  $('#metaText').textContent=`15×15 · 렌주 · AI ${lv} (${omokRank(LEVEL_RATING[game.level])})`+(worker?'':' · 계산: 화면');
 }
 
 // ---------- 버튼 ----------
@@ -348,9 +381,12 @@ document.addEventListener('keydown',e=>{
 
 // 새 게임 대화상자
 const segL=$('#segLevel');
-RJ.LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}</label>`));
+RJ.LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${omokRank(LEVEL_RATING[i])}</small></label>`));
 const lastOpt=load('omok-newopts',{color:1,level:1});
-function lvDesc(){$('#lvDesc').textContent=LEVEL_DESC[+document.querySelector('input[name=level]:checked').value];}
+function lvDesc(){
+  const i=+document.querySelector('input[name=level]:checked').value;$('#lvDesc').textContent=`기력 약 ${omokRank(LEVEL_RATING[i])} · ${LEVEL_DESC[i]}`;
+  const rec=RB.recommend();$('#recLevel').textContent=rec>=0?`내 급수 ${RB.text(RB.get())} → 추천 난이도: ${RJ.LEVELS[rec].name}`:'';
+}
 segL.addEventListener('change',lvDesc);
 function openNew(){
   document.querySelector(`input[name=color][value="${lastOpt.color}"]`).checked=true;

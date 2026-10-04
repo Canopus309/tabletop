@@ -18,7 +18,9 @@
 ### 오목 (`omok/`, 렌주 룰)
 - 15×15, 흑 첫 수는 천원. 흑은 33 · 44 · 장목 금수 (거짓 3 판정 포함), 백은 제한 없음
 - 흑 차례에 금수 자리 표시, 5목 승리선 표시, 복기
-- AI 5단계: 패턴 평가 + 알파베타 탐색 + 연속 4 승리 수순(VCF) 탐색. 백일 때는 흑을 금수 자리로 몰아넣는 수도 노림
+- AI 5단계: 패턴 평가 + 알파베타 탐색 + 연속 4 승리 수순(VCF) 탐색. 백일 때는 흑을 금수 자리로 몰아넣는 수도 노림. 초반 몇 수는 무작위로 변화
+- 급수: 입문 18급 · 초급 12급 · 중급 9급 · 고급 7급 · 최강 1단. 앱 자체 척도로, AI 단계끼리 대국해 잰 레이팅 차이를 입문=18급, 80점=1급으로 환산
+- 내 급수(Glicko-2 레이팅을 급수로 표시, 무르기·힌트 쓴 대국 제외)와 온라인 순위표
 
 ### 체스 (`chess/`)
 - Stockfish 19 Lite (WASM, 1.8MB) 를 Web Worker 로 실행. 규칙은 chess.js
@@ -28,7 +30,7 @@
 
 ## 구조
 - `index.html` 홈 (게임 고르기), `sw.js` 오프라인 캐시, `manifest.webmanifest`
-- `common/` 공통 스타일·대화상자·효과음 (`base.css`, `ui.js`), 온라인 순위표 (`leaderboard.js`: Firebase 익명 로그인 + Firestore, 규칙은 `firestore.rules`)
+- `common/` 공통 스타일·대화상자·효과음 (`base.css`, `ui.js`), 온라인 순위표 (`leaderboard.js`: Firebase 익명 로그인 + Firestore, 규칙은 `firestore.rules`), 체스·오목 레이팅과 레이팅 순위표 (`rating.js`)
 
 ## 사용한 오픈소스
 

@@ -1,8 +1,8 @@
-/* 체스 AI(Stockfish) 연결과 레이팅 계산.
+/* 체스 AI(Stockfish) 연결.
  * - Stockfish 19 Lite WASM (GPL-3.0, github.com/nmrugg/stockfish.js) 을 Web Worker 로 띄워 UCI 로 대화한다
  * - AI 단계: 1320 이상은 Stockfish 의 UCI_Elo(레이팅 보정 기능), 그보다 약한 단계는
  *   여러 후보 수(MultiPV)를 얕게 읽고 일부러 덜 좋은 수도 고르게 해서 만든다 (레이팅은 1320 단계와 대국해 추정)
- * - 내 레이팅: Glicko-2 (한 판마다 갱신)
+ * - 내 레이팅(Glicko-2)은 common/rating.js
  */
 
 // 단계: elo 는 화면에 보이는 레이팅 (Stockfish UCI_Elo 척도).
@@ -84,33 +84,3 @@ export class Engine {
   // 힌트·분석용 (전력)
   async best(moves, depth = 14) { return this.analyse(moves, { depth }); }
 }
-
-// ---------- Glicko-2 ----------
-// 한 판(상대 1명)마다 갱신. 상대(AI)는 레이팅이 정해져 있다고 보고 편차를 작게 둔다
-export function glicko2(me, oppRating, score, oppRd = 60) {
-  const S = 173.7178, tau = 0.5;
-  const mu = (me.rating - 1500) / S, phi = me.rd / S, sigma = me.vol;
-  const muj = (oppRating - 1500) / S, phij = oppRd / S;
-  const g = 1 / Math.sqrt(1 + 3 * phij * phij / (Math.PI * Math.PI));
-  const E = 1 / (1 + Math.exp(-g * (mu - muj)));
-  const v = 1 / (g * g * E * (1 - E));
-  const delta = v * g * (score - E);
-  // 변동성 갱신 (Illinois 방법)
-  const a = Math.log(sigma * sigma);
-  const f = x => { const ex = Math.exp(x); return ex * (delta * delta - phi * phi - v - ex) / (2 * Math.pow(phi * phi + v + ex, 2)) - (x - a) / (tau * tau); };
-  let A = a, B;
-  if (delta * delta > phi * phi + v) B = Math.log(delta * delta - phi * phi - v);
-  else { let k = 1; while (f(a - k * tau) < 0) k++; B = a - k * tau; }
-  let fA = f(A), fB = f(B);
-  for (let i = 0; i < 60 && Math.abs(B - A) > 1e-6; i++) {
-    const C = A + (A - B) * fA / (fB - fA), fC = f(C);
-    if (fC * fB <= 0) { A = B; fA = fB; } else fA /= 2;
-    B = C; fB = fC;
-  }
-  const sigma2 = Math.exp(A / 2);
-  const phiStar = Math.sqrt(phi * phi + sigma2 * sigma2);
-  const phi2 = 1 / Math.sqrt(1 / (phiStar * phiStar) + 1 / v);
-  const mu2 = mu + phi2 * phi2 * g * (score - E);
-  return { rating: S * mu2 + 1500, rd: Math.max(30, S * phi2), vol: sigma2 };
-}
-export const NEW_RATING = { rating: 1200, rd: 350, vol: 0.06, games: 0 };

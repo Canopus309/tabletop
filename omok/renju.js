@@ -381,6 +381,13 @@ const RJ = (() => {
       return { move: cand[0][0] };
     }
     const deadline = t0 + L.time;
+    // 초반 몇 수는 비슷하게 좋은 수 중에서 무작위로 골라 매 판 같은 수순이 되지 않게 한다
+    if (moves.length < 4) {
+      const cand = candidates(g, c, 6);
+      const top = Math.max(1, g.ps[c][cand[0]] + g.ps[opp][cand[0]] * 0.85);
+      const pool = cand.filter(q => g.ps[c][q] + g.ps[opp][q] * 0.85 >= top * 0.7).slice(0, 3);
+      if (pool.length) return { move: pool[(Math.random() * pool.length) | 0], note: 'opening' };
+    }
     // 3) 연속 4로 이길 수 있으면 그대로
     const win = vcf(g, c, L.vcf, t0 + L.time * 0.3);
     if (win) return { move: win - 1, note: 'vcf' };

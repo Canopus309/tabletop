@@ -168,9 +168,10 @@
 
 <script src="../common/ui.js"></script>
 <script src="../common/leaderboard.js"></script>
+<script src="../common/rating.js"></script>
 <script type="module">
 import { Chess } from './vendor/chess.js';
-import { Engine, LEVELS, winPct, glicko2, NEW_RATING } from './engine.js';
+import { Engine, LEVELS, winPct } from './engine.js';
 
 const NAME={w:'백',b:'흑'};
 const VAL={p:1,n:3,b:3,r:5,q:9,k:0};
@@ -267,19 +268,15 @@ async function hint(){
   thinking=false;game.assisted=true;hintMv=r.best&&r.best!=='(none)'?r.best:null;save();render();ui();
 }
 
-// ---------- 레이팅 ----------
-function loadRating(){return load('chess-rating',{...NEW_RATING,history:[]});}
-const ratingText=r=>Math.round(r.rating)+(r.rd>110?'?':'');
+// ---------- 레이팅 (Glicko-2, 순위표: common/rating.js) ----------
+const RB=ratingBoard({game:'chess',start:1200,levels:LEVELS.map(l=>({name:l.name,rating:l.elo})),fmt:r=>String(Math.round(r)),prefix:'레이팅 ',
+  sub:R=>`레이팅 대국 ${R.games}판 · 편차 ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`});
+const loadRating=RB.get,ratingText=RB.text;
 function updateRating(){
   if(game.assisted||game.ratingApplied!=null||game.moves.length<4&&!game.result.winner)return;
-  const R=loadRating(),score=game.result.draw?0.5:game.result.youWin?1:0;
-  const before=R.rating,nr=glicko2(R,LEVELS[game.level].elo,score);
-  Object.assign(R,nr);R.games=(R.games||0)+1;
-  R.history=(R.history||[]).concat({id:game.id,date:new Date().toISOString().slice(0,10),level:game.level,score,before:Math.round(before),after:Math.round(nr.rating)}).slice(-30);
-  store('chess-rating',R);game.ratingApplied=Math.round(nr.rating)-Math.round(before);
-  saveSummary();LB.set({chessPending:true});lbSync();
+  const r=RB.apply(game.level,game.result.draw?0.5:game.result.youWin?1:0,game.id);
+  game.ratingApplied=Math.round(r.after)-Math.round(r.before);
 }
-function saveSummary(){try{const s=JSON.parse(localStorage.getItem('tt-summary'))||{},R=loadRating();s.chess=R.games?'레이팅 '+ratingText(R):null;localStorage.setItem('tt-summary',JSON.stringify(s));}catch(e){}}
 
 // ---------- 대국 후 분석 (수마다 백 승률) ----------
 async function analyzeGame(){
@@ -500,47 +497,6 @@ const OPT={dots:'#optDots',coords:'#optCoords',sound:'#optSound'};
 $('#btnSettings').onclick=()=>{for(const k in OPT)$(OPT[k]).checked=settings[k];openDlg($('#dlgSettings'));};
 for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('chess-settings',settings);render();};
 
-// ---------- 내 레이팅 · 온라인 순위표 ----------
-let lbBusy=false;
-async function lbSync(){
-  if(lbBusy||!LB.configured()||!navigator.onLine)return;
-  const s=LB.state();if(!s.name||!s.chessPending)return;
-  const R=loadRating();lbBusy=true;
-  try{
-    if(R.games>=3){await LB.uploadTo('chess',{name:s.name,rating:Math.round(R.rating),rd:Math.round(R.rd),games:R.games});LB.set({chessPending:false,chessUploaded:true});}
-    else{if(s.chessUploaded)await LB.removeFrom('chess');LB.set({chessPending:false,chessUploaded:false});}
-  }catch(e){console.warn('[순위표]',e);}
-  finally{lbBusy=false;if($('#dlgRank').open)renderLb();}
-}
-window.addEventListener('online',()=>{lbSync();if($('#dlgRank').open)refreshLb();});
-const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function renderLb(){
-  const s=LB.state(),rows=s.chessCache||[],R=loadRating();
-  let status='';
-  if(!LB.configured())status='순위표 서버 준비 중';
-  else if(!s.name)status='닉네임을 정하면 내 레이팅이 올라갑니다';
-  else if(R.games<3)status=`레이팅 대국 3판 이상이면 올라갑니다 (지금 ${R.games||0}판)`;
-  else if(s.chessPending)status=navigator.onLine?'올리는 중…':'오프라인 · 연결되면 자동으로 올립니다';
-  else if(s.chessCacheAt)status='갱신 '+new Date(s.chessCacheAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
-  $('#lbStatus').textContent=status;
-  if(document.activeElement!==$('#lbName'))$('#lbName').value=s.name||'';
-  $('#lbSave').textContent=s.name?'변경':'참가';
-  $('#lbList').innerHTML=rows.length?rows.map((r,i)=>`<div class="lb-row${r.uid===s.uid?' me':''}"><span class="no">${i+1}</span><span>${esc(r.name||'')}</span><span>${Math.round(r.rating)}${r.rd>110?'?':''}</span><span class="g">${r.games}판</span></div>`).join('')
-    :`<div class="lb-empty">${navigator.onLine?'아직 순위표에 아무도 없습니다.':'오프라인입니다. 연결되면 순위표를 받아옵니다.'}</div>`;
-}
-async function refreshLb(){renderLb();if(!LB.configured()||!navigator.onLine)return;try{await LB.fetchTopFrom('chess','rating','DESCENDING','chessCache');}catch(e){console.warn('[순위표]',e);}renderLb();}
-function showRank(){
-  const R=loadRating(),list=(R.history||[]).slice().reverse();
-  $('#rkBig').textContent=R.games?ratingText(R):'1200?';
-  $('#rkSub').textContent=R.games?`레이팅 대국 ${R.games}판 · 편차 ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`:'아직 레이팅 대국이 없습니다. 무르기·힌트 없이 끝까지 두면 반영됩니다.';
-  $('#rkList').innerHTML=list.map(h=>`<div class="rank-row"><span class="d">${h.date.slice(5)}</span><span>${LEVELS[h.level].name} (${LEVELS[h.level].elo})</span><span class="${h.score===1?'w':h.score===0?'l':''}">${h.score===1?'승':h.score===0?'패':'무'}</span><span>${h.before} → ${h.after}</span></div>`).join('');
-  openDlg($('#dlgRank'));refreshLb();
-}
-$('#btnRank').onclick=showRank;
-$('#lbSave').onclick=async()=>{const name=$('#lbName').value.trim().slice(0,12);if(!name){toast('닉네임을 입력하세요');return;}
-  LB.set({name,chessPending:true,pending:true});renderLb();toast(navigator.onLine?'순위표에 참가했습니다':'저장했습니다. 연결되면 순위표에 올라갑니다');await lbSync();await refreshLb();};
-$('#rkReset').onclick=async()=>{closeDlg($('#dlgRank'),'x');if(await ask('레이팅 기록을 지울까요?','레이팅이 1200으로 돌아가고, 순위표에서도 내려갑니다.','지우기')){try{localStorage.removeItem('chess-rating');}catch(e){}LB.set({chessPending:true});lbSync();saveSummary();toast('레이팅 기록을 지웠습니다');}};
-
 // ---------- 시작 ----------
 (function start(){
   const saved=load('chess-game',null);
@@ -551,7 +507,6 @@ $('#rkReset').onclick=async()=>{closeDlg($('#dlgRank'),'x');if(await ask('레이
     game={id:Date.now(),human:'w',level:1,moves:[],sans:[],over:false,result:null,assisted:false,evals:null};
     ch=new Chess();render();ui();openNew();
   }
-  saveSummary();setTimeout(lbSync,3000);
 })();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
 </script>
