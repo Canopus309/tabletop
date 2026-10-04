@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>바둑 학습 · Table Top</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../common/base.css">
+<style>
+.wrap{max-width:1120px;margin:0 auto;padding:6px 16px 28px;padding-bottom:max(28px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+/* 목록 */
+.tabs{display:flex;gap:6px;margin:6px 0 16px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:9px 16px;border-radius:99px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:14px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.set-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 2px 4px}
+.set-head h2{margin:0;font-size:20px;letter-spacing:-.02em}
+.set-head span{font-size:13px;color:var(--muted);white-space:nowrap}
+.set-desc{margin:0 2px 16px;color:var(--muted);font-size:13.5px;line-height:1.6}
+.lv{margin:0 0 18px}
+.lv h3{margin:0 2px 8px;font-size:14px;color:var(--muted);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.tile{position:relative;min-width:0;overflow:hidden;aspect-ratio:1;border-radius:14px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px}
+.tile b{font-size:19px;letter-spacing:-.02em}
+.tile small{font-size:10.5px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile:hover{border-color:var(--muted)}
+.tile.clean{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tile.clean small{color:inherit;opacity:.8}
+.tile.help{border-color:var(--accent);border-width:2px;color:var(--accent)}
+.tile.clean::after,.tile.help::after{content:"✓";position:absolute;top:5px;right:8px;font-size:11px;font-weight:800}
+.rows{display:flex;flex-direction:column;gap:8px}
+.jrow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);cursor:pointer;text-align:left}
+.jrow:hover{border-color:var(--muted)}
+.jrow .no{flex:none;width:32px;height:32px;border-radius:10px;background:var(--chip);display:grid;place-items:center;font-weight:700;font-size:14px}
+.jrow.done .no{background:var(--accent);color:var(--accent-ink)}
+.jrow .t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.jrow .t b{font-size:15px}
+.jrow .t small{font-size:12.5px;color:var(--muted);line-height:1.45}
+/* 문제 화면 */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+@media (max-width:860px){.stage{grid-template-columns:1fr;gap:14px}}
+.board-col{display:flex;justify-content:center}
+#bw{position:relative;width:100%;border-radius:8px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;
+  background:radial-gradient(120% 90% at 30% 20%,rgba(255,255,255,.18),transparent 60%),linear-gradient(135deg,var(--wood1),var(--wood2));
+  box-shadow:0 2px 0 rgba(0,0,0,.08),0 14px 40px rgba(60,40,10,.25)}
+#cv{position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+.ptitle{font-size:13px;color:var(--muted);font-weight:600;margin:0 0 4px}
+.prompt{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;letter-spacing:-.02em;margin:0}
+.msg{margin:12px 0 0;font-size:14px;line-height:1.6;min-height:22px}
+.msg.ok{color:var(--accent);font-weight:600}
+.msg.bad{color:var(--danger);font-weight:600}
+.note{margin:8px 0 0;font-size:13.5px;line-height:1.65;color:var(--text)}
+.note:empty{display:none}
+.btns{display:flex;gap:8px}
+.btns .act{flex:1}
+.btns .act{padding:10px 4px}
+.nav2{display:flex;gap:8px;margin-top:10px}
+.nav2 .ghost{flex:1}.nav2 .primary{flex:2}
+.steps{display:flex;align-items:center;gap:8px;margin-top:12px}
+.steps button{width:42px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:16px}
+.steps button:disabled{opacity:.4;cursor:default}
+.steps span{flex:1;text-align:center;font-size:13px;color:var(--muted)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tags span{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--chip);color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" id="back" href="../" title="바둑으로" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#d9a956"/><circle cx="12" cy="13" r="7" fill="#151515"/><circle cx="20.5" cy="19.5" r="7" fill="#fafafa" stroke="#bbb"/></svg>
+    <span id="hTitle">바둑 학습</span>
+  </div>
+  <div class="hbtns">
+    <a class="icon-btn" href="../" title="대국하기" aria-label="대국하기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="listView">
+    <nav class="tabs" id="tabs"></nav>
+    <div id="setBody"></div>
+  </section>
+
+  <section id="probView" class="stage hidden">
+    <div class="board-col"><div id="bw"><canvas id="cv" aria-label="문제 바둑판"></canvas></div></div>
+    <aside class="panel">
+      <div class="card">
+        <p class="ptitle" id="pTitle"></p>
+        <p class="prompt" id="pPrompt"></p>
+        <div class="tags" id="pTags"></div>
+        <p class="msg" id="pMsg"></p>
+        <p class="note" id="pNote"></p>
+        <div class="steps hidden" id="pSteps"><button id="stPrev" aria-label="이전 수">‹</button><span id="stText"></span><button id="stNext" aria-label="다음 수">›</button></div>
+      </div>
+      <div class="card">
+        <div class="btns" id="pBtns">
+          <button class="act" id="bRetry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>다시</button>
+          <button class="act" id="bHint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>힌트</button>
+          <button class="act" id="bShow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span id="bShowT">정답</span></button>
+        </div>
+        <div class="nav2"><button class="ghost" id="bList">목록</button><button class="primary" id="bNext">다음 문제 ›</button></div>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<div id="toast"></div>
+<script src="../../common/ui.js"></script>
+<script src="../board.js"></script>
+<script src="problems.js"></script>
+<script>
+'use strict';
+const settings=load('baduk-settings',{sound:true});
+function soundEnabled(){return settings.sound!==false;}
+const LV=['입문','초급','중급'];
+const SETS=LEARN.sets;
+const byId=new Map();SETS.forEach(s=>s.items.forEach((it,i)=>{it.set=s;it.idx=i;byId.set(it.id,it);}));
+// 푼 기록: 1 = 한 번에 맞힘, 2 = 힌트·정답 보기·실패 뒤에 맞힘
+const prog=load('go-learn',{done:{},tab:'ld'});
+const saveProg=()=>store('go-learn',prog);
+
+// ---------- 좌표 ----------
+const sgP=(b,s)=>s?b.pt(s.charCodeAt(0)-97,s.charCodeAt(1)-97):PASS;
+const sgS=(b,p)=>{if(p===PASS)return '';const [x,y]=b.xy(p);return String.fromCharCode(97+x,97+y);};
+const COLS='ABCDEFGHJKLMNOPQRST';
+const nameOf=(b,p)=>{const [x,y]=b.xy(p);return COLS[x]+(b.n-y);};
+
+// ---------- 목록 ----------
+function setOf(key){return SETS.find(s=>s.key===key)||SETS[0];}
+function renderTabs(){
+  $('#tabs').innerHTML='';
+  for(const s of SETS){
+    const b=document.createElement('button');b.className='tab'+(s.key===prog.tab?' on':'');b.textContent=s.name;
+    b.onclick=()=>{prog.tab=s.key;saveProg();renderList();};
+    $('#tabs').appendChild(b);
+  }
+}
+function renderList(){
+  renderTabs();
+  const s=setOf(prog.tab),body=$('#setBody');
+  const done=s.items.filter(it=>prog.done[it.id]).length;
+  body.innerHTML=`<div class="set-head"><h2>${s.name}</h2><span>${done} / ${s.items.length}</span></div><p class="set-desc">${s.desc}</p>`;
+  if(s.kind==='joseki'){
+    const rows=document.createElement('div');rows.className='rows';
+    s.items.forEach((it,i)=>{
+      const r=document.createElement('button');r.className='jrow'+(prog.done[it.id]?' done':'');
+      r.innerHTML=`<span class="no">${prog.done[it.id]?'✓':i+1}</span><span class="t"><b>${it.title}</b><small>${it.desc}</small></span>`;
+      r.onclick=()=>go(it.id);rows.appendChild(r);
+    });
+    body.appendChild(rows);return;
+  }
+  for(let lv=0;lv<LV.length;lv++){
+    const items=s.items.filter(it=>it.lv===lv);if(!items.length)continue;
+    const box=document.createElement('div');box.className='lv';
+    box.innerHTML=`<h3>${LV[lv]}</h3>`;
+    const tiles=document.createElement('div');tiles.className='tiles';
+    items.forEach(it=>{
+      const d=prog.done[it.id],t=document.createElement('button');
+      t.className='tile'+(d===1?' clean':d===2?' help':'');
+      t.innerHTML=`<b>${it.idx+1}</b><small>${it.title||''}</small>`;
+      t.onclick=()=>go(it.id);tiles.appendChild(t);
+    });
+    box.appendChild(tiles);body.appendChild(box);
+  }
+}
+
+// ---------- 화면 전환 (주소의 #문제번호) ----------
+function go(id){location.hash=id?'#'+id:'';}
+function route(){
+  const id=decodeURIComponent(location.hash.slice(1)),it=byId.get(id);
+  stopDemo();
+  if(!it){
+    $('#probView').classList.add('hidden');$('#listView').classList.remove('hidden');
+    $('#hTitle').textContent='바둑 학습';$('#back').href='../';$('#back').onclick=null;
+    renderList();window.scrollTo(0,0);return;
+  }
+  prog.tab=it.set.key;saveProg();
+  $('#listView').classList.add('hidden');$('#probView').classList.remove('hidden');
+  $('#hTitle').textContent=it.set.name;
+  $('#back').href='#';
+  openItem(it);
+}
+window.addEventListener('hashchange',route);
+
+// ---------- 판 그리기 (일부만 잘라 보여 줄 수 있다) ----------
+const cv=$('#cv'),ctx=cv.getContext('2d'),bw=$('#bw');
+let V={x0:0,y0:0,x1:8,y1:8,n:9},G={cell:0,ox:0,oy:0,w:0,h:0,dpr:1};
+// 화면 상태: 판, 표시(번호·힌트·표적·틀린 수)
+let D={b:null,nums:new Map(),hints:[],targets:[],bad:0,good:[],last:0};
+function setView(n,x0,y0,x1,y1){
+  V={n,x0:Math.max(0,x0),y0:Math.max(0,y0),x1:Math.min(n-1,x1),y1:Math.min(n-1,y1)};
+  const k=0.62,c=0.5;
+  const ml=V.x0===0?k:c,mr=V.x1===n-1?k:c,mt=V.y0===0?k:c,mb=V.y1===n-1?k:c;
+  V.m={ml,mr,mt,mb};
+  bw.style.aspectRatio=`${V.x1-V.x0+ml+mr} / ${V.y1-V.y0+mt+mb}`;
+  resize();
+}
+function resize(){
+  const w=bw.clientWidth;if(!w)return;
+  // 화면 높이를 넘지 않게 너비를 줄인다
+  const ar=(V.x1-V.x0+V.m.ml+V.m.mr)/(V.y1-V.y0+V.m.mt+V.m.mb);
+  const maxH=Math.max(260,window.innerHeight-(window.innerWidth<=860?300:110));
+  bw.style.maxWidth=Math.round(maxH*ar)+'px';
+  const ww=bw.clientWidth,hh=ww/ar,dpr=window.devicePixelRatio||1;
+  cv.width=Math.round(ww*dpr);cv.height=Math.round(hh*dpr);
+  const cell=ww/(V.x1-V.x0+V.m.ml+V.m.mr);
+  G={cell,ox:V.m.ml*cell,oy:V.m.mt*cell,w:ww,h:hh,dpr};draw();
+}
+new ResizeObserver(resize).observe(bw);
+const PX=x=>G.ox+(x-V.x0)*G.cell,PY=y=>G.oy+(y-V.y0)*G.cell;
+const STAR={19:[3,9,15],13:[3,6,9],9:[2,4,6]};
+function draw(){
+  const b=D.b;if(!b||!G.cell)return;
+  const {cell,w,h,dpr}=G,r=cell*0.48,n=V.n;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='rgba(40,28,10,.82)';ctx.lineWidth=Math.max(1,cell*0.03);
+  ctx.beginPath();
+  const lx0=V.x0===0?PX(0):0,lx1=V.x1===n-1?PX(n-1):w,ly0=V.y0===0?PY(0):0,ly1=V.y1===n-1?PY(n-1):h;
+  for(let y=V.y0;y<=V.y1;y++){const v=Math.round(PY(y)*dpr)/dpr+0.5/dpr;ctx.moveTo(lx0,v);ctx.lineTo(lx1,v);}
+  for(let x=V.x0;x<=V.x1;x++){const v=Math.round(PX(x)*dpr)/dpr+0.5/dpr;ctx.moveTo(v,ly0);ctx.lineTo(v,ly1);}
+  ctx.stroke();
+  // 판 가장자리는 굵게
+  ctx.lineWidth=Math.max(1.5,cell*0.055);ctx.beginPath();
+  if(V.y0===0){ctx.moveTo(lx0,PY(0));ctx.lineTo(lx1,PY(0));}
+  if(V.y1===n-1){ctx.moveTo(lx0,PY(n-1));ctx.lineTo(lx1,PY(n-1));}
+  if(V.x0===0){ctx.moveTo(PX(0),ly0);ctx.lineTo(PX(0),ly1);}
+  if(V.x1===n-1){ctx.moveTo(PX(n-1),ly0);ctx.lineTo(PX(n-1),ly1);}
+  ctx.stroke();
+  ctx.fillStyle='rgba(40,28,10,.9)';
+  for(const x of STAR[n]||[])for(const y of STAR[n]||[])if(x>=V.x0&&x<=V.x1&&y>=V.y0&&y<=V.y1){ctx.beginPath();ctx.arc(PX(x),PY(y),Math.max(2,cell*0.1),0,7);ctx.fill();}
+  for(let y=V.y0;y<=V.y1;y++)for(let x=V.x0;x<=V.x1;x++){
+    const p=b.pt(x,y),v=b.c[p];if(v===EMPTY)continue;
+    drawStone(PX(x),PY(y),r,v,1);
+    if(D.nums.has(p)){
+      ctx.fillStyle=v===BLACK?'#f2f2f2':'#1a1a1a';const t=String(D.nums.get(p));
+      ctx.font=`600 ${cell*(t.length>1?0.4:0.46)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(t,PX(x),PY(y)+cell*0.02);
+    }else if(D.targets.includes(p)){
+      ctx.fillStyle='#e0463f';const q=cell*0.17;ctx.beginPath();ctx.moveTo(PX(x),PY(y)-q);ctx.lineTo(PX(x)+q*0.95,PY(y)+q*0.65);ctx.lineTo(PX(x)-q*0.95,PY(y)+q*0.65);ctx.closePath();ctx.fill();
+    }
+  }
+  if(D.last&&b.c[D.last]!==EMPTY&&!D.nums.has(D.last)){
+    const [x,y]=b.xy(D.last);ctx.strokeStyle=b.c[D.last]===BLACK?'#fff':'#222';ctx.lineWidth=Math.max(1.5,cell*0.06);
+    ctx.beginPath();ctx.arc(PX(x),PY(y),r*0.42,0,7);ctx.stroke();
+  }
+  if(D.bad&&b.c[D.bad]!==EMPTY){const [x,y]=b.xy(D.bad);ctx.strokeStyle='#e0463f';ctx.lineWidth=Math.max(2,cell*0.08);ctx.beginPath();ctx.arc(PX(x),PY(y),r*1.02,0,7);ctx.stroke();}
+  for(const p of D.hints){const [x,y]=b.xy(p);ctx.fillStyle='rgba(47,140,110,.85)';ctx.beginPath();ctx.arc(PX(x),PY(y),r*0.55,0,7);ctx.fill();}
+  for(const p of D.good){const [x,y]=b.xy(p);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=Math.max(2,cell*0.08);ctx.beginPath();ctx.arc(PX(x),PY(y),r*0.9,0,7);ctx.stroke();
+    if(b.c[p]===EMPTY){ctx.fillStyle='rgba(47,140,110,.95)';ctx.font=`700 ${cell*0.5}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('☆',PX(x),PY(y)+cell*0.02);}}
+}
+function drawStone(x,y,r,col,alpha){
+  ctx.save();ctx.globalAlpha=alpha;
+  if(alpha===1){ctx.beginPath();ctx.arc(x+r*0.07,y+r*0.12,r,0,7);ctx.fillStyle='rgba(0,0,0,.28)';ctx.fill();}
+  const g=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.08,x,y,r);
+  if(col===BLACK){g.addColorStop(0,'#5d5d5d');g.addColorStop(.55,'#202020');g.addColorStop(1,'#060606');}
+  else{g.addColorStop(0,'#ffffff');g.addColorStop(.65,'#eeeeec');g.addColorStop(1,'#c4c4c0');}
+  ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=g;ctx.fill();
+  ctx.restore();
+}
+function pointAt(e){
+  const rc=cv.getBoundingClientRect(),fx=(e.clientX-rc.left-G.ox)/G.cell+V.x0,fy=(e.clientY-rc.top-G.oy)/G.cell+V.y0;
+  const x=Math.round(fx),y=Math.round(fy);
+  if(x<V.x0||x>V.x1||y<V.y0||y>V.y1)return 0;
+  if((fx-x)**2+(fy-y)**2>0.3)return 0;
+  return D.b.pt(x,y);
+}
+cv.addEventListener('click',e=>{const p=pointAt(e);if(p&&onBoard)onBoard(p);});
+let onBoard=null;
+
+// ---------- 공통 화면 ----------
+let cur=null,demoT=0,demoGen=0;
+function stopDemo(){demoGen++;clearTimeout(demoT);}
+const wait=ms=>{const g=demoGen;return new Promise((res,rej)=>{demoT=setTimeout(()=>g===demoGen?res():rej('stop'),ms);});};
+function msg(t,cls){const m=$('#pMsg');m.innerHTML=t;m.className='msg'+(cls?' '+cls:'');}
+function mark(it,v){const o=prog.done[it.id];if(!o||v<o)prog.done[it.id]=v;saveProg();summary();}
+// 홈 화면 카드에 보일 요약
+function summary(){
+  try{const s=JSON.parse(localStorage.getItem('tt-summary'))||{};let n=0,t=0;
+    SETS.forEach(st=>st.items.forEach(it=>{t++;if(prog.done[it.id])n++;}));
+    if(n)s.learn=`${n} / ${t} 완료`;else delete s.learn;localStorage.setItem('tt-summary',JSON.stringify(s));}catch(e){}
+}
+function playStone(b,p){const cap=b.play(p);sound(cap?'cap':'stone',cap);return cap;}
+const turnName=c=>c===BLACK?'흑':'백';
+const dot=c=>`<span class="dot ${c===BLACK?'b':'w'}"></span>`;
+function openItem(it){
+  cur={it};
+  $('#pTags').innerHTML='';$('#pNote').textContent='';$('#pSteps').classList.add('hidden');
+  $('#pBtns').classList.remove('hidden');$('#bHint').classList.remove('hidden');
+  const nx=it.set.items[it.idx+1];
+  $('#bNext').textContent=nx?(it.set.kind==='joseki'?'다음 정석 ›':'다음 문제 ›'):'목록으로';
+  $('#bNext').onclick=()=>go(nx?nx.id:'');
+  $('#bList').onclick=()=>go('');
+  if(it.set.kind==='tsumego')openTsumego(it);
+  else if(it.set.kind==='yose')openYose(it);
+  else openJoseki(it);
+}
+
+// ---------- 사활 · 맥 ----------
+// 문제 그림: X 흑, O 백, x·o 목표 돌, . , 빈칸
+function diagramBoard(it){
+  const b=new Board(19),at=it.at||[0,0];
+  it.rows.forEach((row,y)=>[...row].forEach((ch,x)=>{
+    const p=b.pt(at[0]+x,at[1]+y);
+    if(ch==='X'||ch==='x')b.place(p,BLACK);else if(ch==='O'||ch==='o')b.place(p,WHITE);
+  }));
+  b.turn=BLACK;return b;
+}
+function targetsOf(it,b){
+  // 맥 문제는 잡아야 할 백 그룹에 표시
+  if(it.goal!=='capture')return [];
+  const at=it.at||[0,0];let t=0;
+  it.rows.forEach((row,y)=>[...row].forEach((ch,x)=>{if(ch==='o')t=b.pt(at[0]+x,at[1]+y);}));
+  const out=[],st=[t],seen=new Set(st);
+  while(st.length){const q=st.pop();out.push(q);for(const d of b.d){const r=q+d;if(b.c[r]===WHITE&&!seen.has(r)){seen.add(r);st.push(r);}}}
+  return out;
+}
+const GOAL={kill:'백을 잡으세요',live:'흑을 살리세요',capture:'▲ 백을 잡으세요'};
+function openTsumego(it){
+  const b=diagramBoard(it),at=it.at||[0,0],w=Math.max(...it.rows.map(r=>r.length)),h=it.rows.length;
+  // 그림보다 한 줄씩 넓게, 너무 좁지 않게
+  let x0=at[0]-1,x1=at[0]+w,y0=at[1]-1,y1=at[1]+h;
+  while(x1-x0<6){if(x0>0)x0--;if(x1-x0<6&&x1<18)x1++;}
+  while(y1-y0<4){if(y1<18)y1++;}
+  cur.b0=b;cur.targets=targetsOf(it,b);
+  $('#pTitle').textContent=`${it.set.name} · ${LV[it.lv]} ${it.idx+1}${it.title?' · '+it.title:''}`;
+  $('#pPrompt').innerHTML=`${dot(BLACK)} 흑 차례 · ${GOAL[it.goal]}`;
+  if(it.tags&&it.tags.length)$('#pTags').innerHTML=it.tags.map(t=>`<span>${t}</span>`).join('');
+  $('#bShowT').textContent='정답';
+  $('#bRetry').onclick=()=>{stopDemo();resetT(false);};
+  $('#bHint').onclick=()=>{if(cur.state!=='play')return;cur.helped=true;D.hints=Object.keys(cur.node.ok).map(k=>sgP(D.b,k));draw();msg('초록 점이 정답 자리입니다.');};
+  $('#bShow').onclick=()=>showAnswer();
+  setView(19,x0,y0,x1,y1);
+  cur.helped=false;cur.failed=false;
+  resetT(true);
+}
+function resetT(first){
+  const b=new Board(19);b.copyFrom(cur.b0);
+  cur.node=cur.it.tree;cur.state='play';cur.moveNo=0;
+  D={b,nums:new Map(),hints:[],targets:cur.targets,bad:0,good:[],last:0};
+  msg(first?'정답이라고 생각하는 곳에 두세요.':'처음부터 다시 풀어 보세요.');
+  $('#pNote').textContent='';
+  onBoard=tPlay;draw();
+}
+async function tPlay(p){
+  if(cur.state!=='play')return;
+  const b=D.b;
+  if(!b.isLegal(p,b.turn)){toast(b.c[p]===EMPTY?'둘 수 없는 자리입니다':'이미 돌이 있습니다');return;}
+  const k=sgS(b,p),node=cur.node,ok=node.ok[k];
+  const ref=ok?null:(k in node.bad?node.bad[k]:node.pass);
+  // 정답은 아니지만 지지도 않는 수 (상대에게 반박이 없음): 무르고 다시 고르게 한다
+  if(!ok&&!ref){toast('그보다 더 확실한 수가 있습니다');return;}
+  D.hints=[];D.bad=0;
+  playStone(b,p);D.last=p;cur.moveNo++;D.nums.set(p,cur.moveNo);
+  if(ok){
+    const [reply,next]=ok;
+    if(!reply){return solved();}
+    cur.state='wait';draw();msg('…');
+    const g=demoGen;await sleep(380);if(g!==demoGen)return;
+    const rp=sgP(b,reply);playStone(b,rp);D.last=rp;cur.moveNo++;D.nums.set(rp,cur.moveNo);
+    cur.node=next;cur.state='play';draw();msg('좋습니다. 계속 두세요.');
+    return;
+  }
+  // 오답: 상대의 반박
+  cur.failed=true;cur.state='wrong';D.bad=p;draw();
+  if(ref==='ko'){sound('bad');msg('패가 나는 수입니다. 패 없이 해결하는 수가 있어요.','bad');return;}
+  const g=demoGen;await sleep(380);if(g!==demoGen)return;
+  const rp=sgP(b,ref);if(b.isLegal(rp,b.turn)){playStone(b,rp);D.last=rp;cur.moveNo++;D.nums.set(rp,cur.moveNo);}
+  sound('bad');draw();
+  const it=cur.it;
+  msg(it.goal==='live'?'실패 — 백이 이 수로 흑을 잡습니다.':it.goal==='kill'?'실패 — 백이 이 수로 삽니다.':'실패 — 백이 빠져나갑니다.','bad');
+}
+function solved(){
+  cur.state='solved';D.good=[];draw();
+  const it=cur.it;mark(it,cur.helped||cur.failed?2:1);
+  sound('win');msg('정답입니다!','ok');$('#pNote').textContent=it.note||'';
+}
+// 정답 수순을 처음부터 천천히 보여 준다
+async function showAnswer(){
+  stopDemo();cur.helped=true;
+  const b=new Board(19);b.copyFrom(cur.b0);
+  D={b,nums:new Map(),hints:[],targets:cur.targets,bad:0,good:[],last:0};cur.state='demo';
+  msg('정답 수순');$('#pNote').textContent=cur.it.note||'';draw();
+  let node=cur.it.tree,no=0;
+  try{
+    while(node){
+      await wait(no?700:300);
+      const k=Object.keys(node.ok)[0],[reply,next]=node.ok[k];
+      const p=sgP(b,k);playStone(b,p);D.nums.set(p,++no);D.last=p;draw();
+      if(!reply)break;
+      await wait(700);
+      const rp=sgP(b,reply);playStone(b,rp);D.nums.set(rp,++no);D.last=rp;draw();
+      node=next;
+    }
+    msg('정답 수순 · <b>다시</b>를 눌러 직접 풀어 보세요.');
+  }catch(e){}
+}
+
+// ---------- 끝내기 ----------
+function openYose(it){
+  const n=it.size,b=new Board(n);
+  for(const s of it.moves)b.play(s==='tt'?PASS:sgP(b,s));
+  cur.b0=b;cur.toPlay=b.turn;
+  $('#pTitle').textContent=`${it.set.name} · ${LV[it.lv]} ${it.idx+1}`;
+  $('#pPrompt').innerHTML=`${dot(b.turn)} ${turnName(b.turn)} 차례 · 가장 큰 곳은?`;
+  $('#bShowT').textContent='정답';
+  $('#bHint').classList.add('hidden');
+  $('#bRetry').onclick=()=>{stopDemo();resetY();};
+  $('#bShow').onclick=()=>{cur.helped=true;revealY(null);};
+  setView(n,0,0,n-1,n-1);
+  cur.helped=false;cur.failed=false;
+  resetY(true);
+}
+function resetY(first){
+  const b=new Board(cur.b0.n);b.copyFrom(cur.b0);
+  D={b,nums:new Map(),hints:[],targets:[],bad:0,good:[],last:cur.b0.last>0?cur.b0.last:0};
+  cur.state='play';$('#pNote').textContent='';
+  msg(first?`집이 가장 많이 나는 ${turnName(b.turn)}의 한 수를 찾아 두세요.`:'다시 골라 보세요.');
+  onBoard=yPlay;draw();
+}
+function yPlay(p){
+  if(cur.state!=='play')return;
+  const b=D.b,it=cur.it;
+  if(!b.isLegal(p,b.turn)){toast(b.c[p]===EMPTY?'둘 수 없는 자리입니다':'이미 돌이 있습니다');return;}
+  const k=sgS(b,p),loss=it.best.includes(k)?0:(k in it.loss?it.loss[k]:it.maxLoss);
+  if(loss<=it.okLoss){mark(it,cur.helped||cur.failed?2:1);sound('win');
+    revealY(p,'정답입니다!'+(it.best.length>1||loss>0?' (최선과 거의 같은 수)':''),'ok');return;}
+  cur.failed=true;sound('bad');
+  revealY(p,`아쉬워요 — 최선의 수보다 약 <b>${loss>=it.maxLoss?it.maxLoss+'집 이상':fmt(loss)+'집'}</b> 손해입니다.`,'bad');
+}
+const fmt=v=>(Math.round(v*2)/2).toFixed(1).replace(/\.0$/,'');
+// 둔 수와 정답 자리(☆)를 보여 준 뒤, 정답에서 이어지는 수순을 번호와 함께 둔다
+async function revealY(played,text,cls){
+  stopDemo();const it=cur.it;cur.state='done';
+  const b=new Board(cur.b0.n);b.copyFrom(cur.b0);
+  const good=it.best.map(k=>sgP(b,k));
+  D={b,nums:new Map(),hints:[],targets:[],bad:0,good,last:0};
+  if(played&&!good.includes(played)){b.play(played);D.bad=played;}
+  draw();
+  const head=text||'☆ 표시가 가장 큰 곳입니다.';
+  msg(head,cls);$('#pNote').textContent=it.note||'';
+  try{
+    await wait(played?1400:1000);
+    b.copyFrom(cur.b0);D.good=[];D.bad=0;
+    let no=0;
+    for(const s of it.pv){const p=sgP(b,s);if(!b.isLegal(p,b.turn))break;playStone(b,p);D.nums.set(p,++no);D.last=p;draw();await wait(650);}
+    msg(head+'<br><span style="color:var(--muted);font-weight:500">☆ 자리에서 이어지는 수순입니다. <b>다시</b>를 누르면 처음 장면으로 돌아갑니다.</span>',cls);
+  }catch(e){}
+}
+
+// ---------- 정석 ----------
+function openJoseki(it){
+  $('#pTitle').textContent=`${it.set.name} ${it.idx+1}`;
+  $('#pPrompt').textContent=it.title;
+  $('#bHint').classList.add('hidden');
+  $('#bShowT').textContent='연습';
+  $('#bRetry').onclick=()=>{stopDemo();jStep(0);};
+  $('#bShow').onclick=()=>jPractice();
+  $('#stPrev').onclick=()=>jStep(cur.step-1);
+  $('#stNext').onclick=()=>jStep(cur.step+1);
+  $('#pSteps').classList.remove('hidden');
+  // 수순이 놓이는 귀 부분만 (가장자리에서 두 줄 여유, 최소 8줄)
+  const b=new Board(19);let mx=18,my=0;
+  for(const s of it.moves){const [x,y]=b.xy(sgP(b,s));mx=Math.min(mx,x);my=Math.max(my,y);}
+  setView(19,Math.min(mx-2,11),0,18,Math.max(my+2,7));
+  jStep(0);
+}
+function jBoard(k){
+  const it=cur.it,b=new Board(19),nums=new Map();
+  for(let i=0;i<k;i++){const p=sgP(b,it.moves[i]);b.play(p);nums.set(p,i+1);}
+  for(const [p] of nums)if(b.c[p]===EMPTY)nums.delete(p);
+  return {b,nums};
+}
+function jStep(k){
+  const it=cur.it;k=Math.max(0,Math.min(it.moves.length,k));
+  cur.step=k;cur.state='view';onBoard=null;
+  const {b,nums}=jBoard(k);
+  D={b,nums,hints:[],targets:[],bad:0,good:[],last:0};draw();
+  $('#stPrev').disabled=k===0;$('#stNext').disabled=k===it.moves.length;
+  $('#stText').textContent=`${k} / ${it.moves.length}`;
+  if(k===0){msg(it.desc);$('#pNote').textContent='› 를 눌러 한 수씩 보세요.';}
+  else{const c=k%2===1?it.first:3-it.first,[lab,txt]=it.notes[k-1];msg(`<b>${k}.</b> ${turnName(c)} · ${lab}`);$('#pNote').textContent=txt;}
+  if(k===it.moves.length&&k>0)$('#pNote').textContent+=(it.end?' '+it.end:'');
+}
+// 연습: 정석 수순을 직접 둔다 (두 번 틀리면 자리를 알려 준다)
+function jPractice(){
+  stopDemo();
+  const b=new Board(19);
+  cur.step=0;cur.state='practice';cur.miss=0;
+  D={b,nums:new Map(),hints:[],targets:[],bad:0,good:[],last:0};draw();
+  $('#stPrev').disabled=true;$('#stNext').disabled=true;$('#stText').textContent=`0 / ${cur.it.moves.length}`;
+  msg(`연습 · 1수부터 ${turnName(cur.it.first)}의 정석 수를 두세요.`);$('#pNote').textContent='';
+  onBoard=jPlay;
+}
+function jPlay(p){
+  if(cur.state!=='practice')return;
+  const it=cur.it,b=D.b,want=sgP(b,it.moves[cur.step]);
+  if(p!==want){
+    cur.miss++;sound('bad');
+    if(cur.miss>=2){D.hints=[want];draw();msg('초록 점 자리가 정석입니다.','bad');}
+    else msg('정석 수가 아닙니다. 다시 생각해 보세요.','bad');
+    return;
+  }
+  cur.miss=0;D.hints=[];playStone(b,p);D.nums.set(p,++cur.step);D.last=p;
+  for(const [q] of D.nums)if(b.c[q]===EMPTY)D.nums.delete(q);
+  $('#stText').textContent=`${cur.step} / ${it.moves.length}`;
+  draw();
+  $('#pNote').textContent=it.notes[cur.step-1][0]+' — '+it.notes[cur.step-1][1];
+  if(cur.step===it.moves.length){cur.state='done';mark(it,1);sound('win');msg('정석을 끝까지 두었습니다!','ok');$('#pNote').textContent=it.end||'';return;}
+  const c=cur.step%2===0?it.first:3-it.first;
+  msg(`${cur.step+1}수 · ${turnName(c)} 차례`);
+}
+
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
+summary();
+route();
+</script>
+</body>
+</html>

@@ -55,8 +55,22 @@
         <g fill="url(#sw)"><circle cx="70" cy="50" r="9"/><circle cx="90" cy="50" r="9"/><circle cx="90" cy="30" r="9"/><circle cx="50" cy="70" r="9"/></g>
       </svg></span>
       <h2>바둑</h2>
-      <p>KataGo 신경망 AI · 18급부터 고단자까지 · 수마다 승률 분석과 기력 측정</p>
+      <p>KataGo 신경망 AI · 18급부터 고단자까지 · 수마다 승률 분석과 기력 측정 · 사활·맥·끝내기·정석 학습</p>
       <div class="me" id="meGo"></div>
+    </a>
+
+    <a class="game" href="go/learn/">
+      <span class="art"><svg viewBox="0 0 160 100" aria-hidden="true">
+        <rect width="160" height="100" fill="url(#wd)"/>
+        <g stroke="#3a2a10" stroke-width=".8" opacity=".55"><path d="M14 14v86M34 14v86M54 14v86M74 14v86M94 14v86M114 14v86M134 14v86M154 14v86M14 14h146M14 34h146M14 54h146M14 74h146M14 94h146"/></g>
+        <path d="M14 14h146M14 14v86" stroke="#3a2a10" stroke-width="2" opacity=".7"/>
+        <g fill="url(#sw)"><circle cx="14" cy="14" r="8.5"/><circle cx="14" cy="34" r="8.5"/><circle cx="34" cy="34" r="8.5"/><circle cx="54" cy="34" r="8.5"/><circle cx="74" cy="34" r="8.5"/><circle cx="94" cy="14" r="8.5"/><circle cx="94" cy="34" r="8.5"/></g>
+        <g fill="url(#sb)"><circle cx="14" cy="54" r="8.5"/><circle cx="34" cy="54" r="8.5"/><circle cx="54" cy="54" r="8.5"/><circle cx="74" cy="54" r="8.5"/><circle cx="94" cy="54" r="8.5"/><circle cx="114" cy="34" r="8.5"/><circle cx="114" cy="14" r="8.5"/></g>
+        <circle cx="54" cy="14" r="8.5" fill="none" stroke="#2f8c6e" stroke-width="2.6"/><text x="54" y="19" text-anchor="middle" font-size="13" font-weight="700" fill="#2f8c6e">★</text>
+      </svg></span>
+      <h2>바둑 학습</h2>
+      <p>사활 · 맥 · 끝내기 문제와 기본 정석 · 정답과 오답을 끝까지 읽어 확인한 문제</p>
+      <div class="me" id="meLearn"></div>
     </a>
 
     <a class="game" href="omok/">
@@ -96,6 +110,7 @@ try{
   if(s.go)document.getElementById('meGo').textContent='내 기력 '+s.go;
   if(s.omok)document.getElementById('meOmok').textContent=s.omok;
   if(s.chess)document.getElementById('meChess').textContent=s.chess;
+  if(s.learn)document.getElementById('meLearn').textContent=s.learn;
 }catch(e){}
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
