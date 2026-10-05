@@ -38,6 +38,7 @@
 - AI 7단계를 레이팅으로 표시: 입문 600 · 초보 800 · 초급 1050 · 중급 1400 · 고급 1800 · 상급 2200 · 최강 2800 (1320 이상은 Stockfish 의 UCI_Elo, 그 아래는 1400 단계와 대국해 추정)
 - 내 레이팅: Glicko-2 (무르기·힌트를 쓴 대국은 미반영), 온라인 순위표는 레이팅 순
 - 눌러서/끌어서 두기, 갈 수 있는 칸·체크 표시, 프로모션, 기보, 대국 후 수마다 승률 분석·실수 찾기
+- 체스 퍼즐 (`chess/learn/`): Lichess 퍼즐 데이터베이스(CC0)에서 고른 652개. 내 레이팅에 맞춰 나오는 레이팅 퍼즐 460개(Glicko-2 퍼즐 레이팅, 처음 푼 결과만 반영)와 주제별 퍼즐(1·2·3수 메이트, 포크, 핀·스큐어, 디스커버드 어택, 희생, 엔드게임 각 24개). 모든 수를 chess.js 로 검증했고, 마지막 수는 다른 수라도 체크메이트면 정답
 
 ## 구조
 - `index.html` 홈 (게임 고르기), `sw.js` 오프라인 캐시, `manifest.webmanifest`
@@ -56,6 +57,7 @@
 | [KaTrain](https://github.com/sanderland/katrain)의 급수 보정 봇 공식 (`rankNMoves`, `rankMove`) | MIT |
 | [Stockfish](https://github.com/official-stockfish/Stockfish) 19 Lite WASM ([nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js)) (`chess/vendor/`) | GPL-3.0 |
 | [chess.js](https://github.com/jhlywa/chess.js) 1.4.0 (`chess/vendor/chess.js`) | BSD-2-Clause |
+| [Lichess 퍼즐 데이터베이스](https://database.lichess.org/#puzzles) (`chess/learn/problems.js`, 652개 발췌) | CC0 |
 | cburnett 체스 말 그림 (`chess/pieces/`, lichess) | GPL-2.0+ |
 
 바둑 엔진의 입력 특징·축 판독·모델 형식은 KataGo의 `nninputs.cpp`, `board.cpp`, `desc.cpp`를 따랐고, 브라우저 구현은 [web-katrain](https://github.com/Sir-Teo/web-katrain)(MIT)을 참고했습니다. 오목 엔진은 직접 작성했습니다.

@@ -28,6 +28,7 @@ function renderList(){
   const s=setOf(prog.tab),body=$('#setBody');
   const done=s.items.filter(it=>prog.done[it.id]).length;
   body.innerHTML=`<div class="set-head"><h2>${s.name}</h2><span>${done} / ${s.items.length}</span></div><p class="set-desc">${s.desc}</p>`;
+  if(LC.renderSet&&LC.renderSet(s,body))return; // 페이지가 직접 그리는 목록
   if((LC.rowKinds||[]).includes(s.kind)){
     const rows=document.createElement('div');rows.className='rows';
     s.items.forEach((it,i)=>{
@@ -71,7 +72,8 @@ function route(){
 window.addEventListener('hashchange',route);
 
 // ---------- 판 그리기 (일부만 잘라 보여 줄 수 있다) ----------
-const cv=$('#cv'),ctx=cv.getContext('2d'),bw=$('#bw');
+// (체스처럼 칸에 두는 판은 페이지가 직접 그리므로 캔버스가 없을 수 있다)
+const cv=$('#cv'),ctx=cv?cv.getContext('2d'):null,bw=$('#bw');
 let V={x0:0,y0:0,x1:8,y1:8,n:9},G={cell:0,ox:0,oy:0,w:0,h:0,dpr:1};
 // 화면 상태: 판, 표시(번호·힌트·표적·틀린 수·좋은 자리·금수·5목 선). 점이 없으면 -1
 let D={b:null,nums:new Map(),hints:[],targets:[],bad:-1,good:[],last:-1,forbid:[],line:null};
@@ -85,7 +87,7 @@ function setView(n,x0,y0,x1,y1){
   resize();
 }
 function resize(){
-  const w=bw.clientWidth;if(!w||!V.m)return;
+  if(!ctx)return;const w=bw.clientWidth;if(!w||!V.m)return;
   // 화면 높이를 넘지 않게 너비를 줄인다
   const ar=(V.x1-V.x0+V.m.ml+V.m.mr)/(V.y1-V.y0+V.m.mt+V.m.mb);
   const maxH=Math.max(260,window.innerHeight-(window.innerWidth<=860?300:110));
@@ -95,10 +97,10 @@ function resize(){
   const cell=ww/(V.x1-V.x0+V.m.ml+V.m.mr);
   G={cell,ox:V.m.ml*cell,oy:V.m.mt*cell,w:ww,h:hh,dpr};draw();
 }
-new ResizeObserver(resize).observe(bw);
+if(ctx)new ResizeObserver(resize).observe(bw);
 const PX=x=>G.ox+(x-V.x0)*G.cell,PY=y=>G.oy+(y-V.y0)*G.cell;
 function draw(){
-  const b=D.b;if(!b||!G.cell)return;
+  const b=D.b;if(!ctx||!b||!G.cell)return;
   const {cell,w,h,dpr}=G,r=cell*0.48,n=V.n;
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
   ctx.strokeStyle='rgba(40,28,10,.82)';ctx.lineWidth=Math.max(1,cell*0.03);
@@ -158,7 +160,7 @@ function pointAt(e){
   return D.b.pt(x,y);
 }
 let onBoard=null;
-cv.addEventListener('click',e=>{const p=pointAt(e);if(p>=0&&onBoard)onBoard(p);});
+if(cv)cv.addEventListener('click',e=>{const p=pointAt(e);if(p>=0&&onBoard)onBoard(p);});
 
 // ---------- 공통 화면 ----------
 let cur=null,demoT=0,demoGen=0;

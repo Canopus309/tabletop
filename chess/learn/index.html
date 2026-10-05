@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>체스 퍼즐 · Table Top</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../common/base.css">
+<link rel="stylesheet" href="../../common/learn.css">
+<style>
+#bw{aspect-ratio:1;max-width:min(100%,calc(100vh - 110px));max-width:min(100%,calc(100dvh - 110px));background:none;overflow:hidden;box-shadow:0 2px 0 rgba(0,0,0,.08),0 14px 40px rgba(40,50,30,.25)}
+@media (max-width:860px){#bw{max-width:min(100%,calc(100dvh - 300px));min-width:min(100%,300px)}}
+.cb{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);touch-action:none}
+.sq{position:relative;user-select:none;-webkit-user-select:none;cursor:pointer}
+.sq.l{background:#ebecd0}.sq.d{background:#739552}
+.sq::before{content:'';position:absolute;inset:0;pointer-events:none}
+.sq.last::before{background:rgba(255,214,0,.42)}
+.sq.sel::before{background:rgba(255,214,0,.62)}
+.sq.hint::before{background:rgba(47,140,110,.6)}
+.sq.wrong::before{background:rgba(224,70,63,.55)}
+.sq.check::before{background:radial-gradient(circle,rgba(255,40,30,.9) 0%,rgba(255,40,30,.45) 45%,transparent 75%)}
+.sq img{position:absolute;inset:3%;width:94%;height:94%;pointer-events:none;-webkit-user-drag:none}
+.sq .mv{position:absolute;left:36%;top:36%;width:28%;height:28%;border-radius:50%;background:rgba(20,30,20,.24);pointer-events:none}
+.sq .cap{position:absolute;inset:3%;border-radius:50%;box-shadow:inset 0 0 0 5px rgba(20,30,20,.26);pointer-events:none}
+.sq .rk,.sq .fl{position:absolute;font-size:clamp(8px,1.8vmin,12px);font-weight:700;pointer-events:none}
+.sq .rk{left:4%;top:3%}.sq .fl{right:5%;bottom:2%}
+.sq.l .rk,.sq.l .fl{color:#739552}.sq.d .rk,.sq.d .fl{color:#ebecd0}
+.drag-ghost{position:fixed;pointer-events:none;z-index:60;transform:translate(-50%,-50%)}
+.promo{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.promo button{aspect-ratio:1;border-radius:12px;border:1px solid var(--line);background:#ebecd0;cursor:pointer;padding:6px}
+.promo img{width:100%;height:100%}
+.rcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow);text-align:center;margin-bottom:14px}
+.rcard .big{font-size:42px;font-weight:800;letter-spacing:-.03em;margin:2px 0}
+.rcard .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.rcard .primary{max-width:320px}
+.hist{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.hist div{display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:13.5px;cursor:pointer}
+.hist .w{color:var(--accent);font-weight:700}.hist .l{color:var(--danger);font-weight:700}
+.rline{font-size:14px;font-weight:700;margin:8px 0 0}
+.rline .up{color:var(--accent)}.rline .down{color:var(--danger)}
+.credit{font-size:12px;color:var(--muted);margin:10px 2px 0;line-height:1.6}
+.credit a{color:inherit}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" id="back" href="../" title="체스로" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <img class="logo" src="../pieces/wN.svg" alt="" style="background:#739552;border-radius:8px">
+    <span id="hTitle">체스 퍼즐</span>
+  </div>
+  <div class="hbtns">
+    <a class="icon-btn" href="../../rules/#chess" title="규칙" aria-label="규칙"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.2a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6M12 16.8h.01"/></svg></a>
+    <a class="icon-btn" href="../" title="대국하기" aria-label="대국하기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="listView">
+    <nav class="tabs" id="tabs"></nav>
+    <div id="setBody"></div>
+  </section>
+
+  <section id="probView" class="stage hidden">
+    <div class="board-col"><div id="bw"><div class="cb" id="cb" aria-label="퍼즐 체스판"></div></div></div>
+    <aside class="panel">
+      <div class="card">
+        <p class="ptitle" id="pTitle"></p>
+        <p class="prompt" id="pPrompt"></p>
+        <div class="tags" id="pTags"></div>
+        <p class="msg" id="pMsg"></p>
+        <p class="note" id="pNote"></p>
+        <p class="rline" id="pRating"></p>
+        <div class="steps hidden" id="pSteps"><button id="stPrev" aria-label="이전 수">‹</button><span id="stText"></span><button id="stNext" aria-label="다음 수">›</button></div>
+      </div>
+      <div class="card">
+        <div class="btns" id="pBtns">
+          <button class="act" id="bRetry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>다시</button>
+          <button class="act" id="bHint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>힌트</button>
+          <button class="act" id="bShow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span id="bShowT">정답</span></button>
+        </div>
+        <div class="nav2"><button class="ghost" id="bList">목록</button><button class="primary" id="bNext">다음 문제 ›</button></div>
+      </div>
+      <p class="credit">퍼즐: <a href="https://database.lichess.org/#puzzles" target="_blank" rel="noopener">Lichess 퍼즐 데이터베이스</a> (CC0) · 퍼즐 레이팅은 Lichess 기준</p>
+    </aside>
+  </section>
+</main>
+
+<dialog id="dlgPromo">
+  <div class="dlg">
+    <h2>프로모션</h2>
+    <div class="promo" id="promoBtns"></div>
+  </div>
+</dialog>
+
+<div id="toast"></div>
+<script src="../../common/ui.js"></script>
+<script src="../../common/rating.js"></script>
+<script src="problems.js"></script>
+<script src="../../common/learn.js"></script>
+<script type="module">
+import { Chess } from '../vendor/chess.js';
+const settings=load('chess-settings',{dots:true,coords:true,sound:true});
+window.soundEnabled=()=>settings.sound;
+const LV=['입문','초급','중급','고급'],NAME={w:'백',b:'흑'},FILES='abcdefgh';
+
+// ---------- 퍼즐 레이팅 (Glicko-2, 처음 푼 결과만) ----------
+const PR_KEY='chess-puzzle';
+const getPR=()=>load(PR_KEY,{rating:1500,rd:350,vol:0.06,n:0,tried:{},hist:[]});
+const prText=R=>Math.round(R.rating)+(R.rd>110?'?':'');
+function prSummary(){try{const s=JSON.parse(localStorage.getItem('tt-summary'))||{},R=getPR();if(R.n)s.chessPuzzle=prText(R);else delete s.chessPuzzle;localStorage.setItem('tt-summary',JSON.stringify(s));}catch(e){}}
+// 퍼즐 하나의 첫 결과를 반영 (score 1: 실수·힌트 없이 풂, 0: 틀림·힌트·정답 보기)
+function rate(it,score){
+  const R=getPR(),key=it.id.replace(/^[^-]*-|^r/,'');
+  if(R.tried[key])return;
+  const before=R.rating,nr=glicko2(R,it.r,score,80);
+  Object.assign(R,nr);R.n++;R.tried[key]=score?1:-1;
+  R.hist=(R.hist||[]).concat({id:it.id,r:it.r,s:score,d:Math.round(nr.rating)-Math.round(before)}).slice(-40);
+  store(PR_KEY,R);prSummary();
+  const d=Math.round(nr.rating)-Math.round(before);
+  $('#pRating').innerHTML=`퍼즐 레이팅 ${Math.round(before)} → ${prText(R)} <span class="${d>=0?'up':'down'}">(${d>=0?'+':''}${d})</span>`;
+}
+const triedKey=it=>it.id.replace(/^[^-]*-|^r/,'');
+
+// ---------- 판 ----------
+const cb=$('#cb');
+let cells=null,builtKey='',ch=null;
+let M={last:null,sel:null,hint:[],wrong:null};
+const pieceImg=p=>`../pieces/${p.color}${p.type.toUpperCase()}.svg`;
+function buildBoard(bottom){
+  const out=[];for(let r=0;r<8;r++)for(let f=0;f<8;f++){const rank=bottom==='w'?8-r:r+1,file=bottom==='w'?f:7-f;out.push(FILES[file]+rank);}
+  cells={};cb.textContent='';
+  out.forEach((s,i)=>{
+    const fi=FILES.indexOf(s[0]),r=+s[1],el=document.createElement('div');
+    el.className='sq '+((fi+r)%2===0?'l':'d');el.dataset.sq=s;
+    const img=document.createElement('img');img.alt='';img.draggable=false;img.style.visibility='hidden';
+    const mark=document.createElement('span');el.append(img,mark);
+    if(settings.coords){if(i%8===0)el.insertAdjacentHTML('beforeend',`<span class="rk">${s[1]}</span>`);if(i>=56)el.insertAdjacentHTML('beforeend',`<span class="fl">${s[0]}</span>`);}
+    cb.appendChild(el);cells[s]={el,img,mark,src:'',cls:''};
+  });
+}
+function render(){
+  if(!ch||!cur)return;
+  const key=cur.me+(settings.coords?'c':'');
+  if(!cells||builtKey!==key){buildBoard(cur.me);builtKey=key;}
+  const targets=new Map();
+  if(M.sel&&cur.state==='play')for(const m of ch.moves({square:M.sel,verbose:true}))targets.set(m.to,!!m.captured);
+  let checkSq=null;
+  if(ch.inCheck())for(const s in cells){const p=ch.get(s);if(p&&p.type==='k'&&p.color===ch.turn())checkSq=s;}
+  for(const s in cells){
+    const c=cells[s],p=ch.get(s),src=p?pieceImg(p):'';
+    if(c.src!==src){c.src=src;if(src){c.img.src=src;c.img.style.visibility='';}else c.img.style.visibility='hidden';}
+    c.img.style.opacity='';
+    const extra=(M.last&&(s===M.last[0]||s===M.last[1])?' last':'')+(s===M.sel?' sel':'')+(M.hint.includes(s)?' hint':'')+(s===M.wrong?' wrong':'')+(s===checkSq?' check':'');
+    if(c.cls!==extra){c.el.classList.remove('last','sel','hint','wrong','check');if(extra)c.el.classList.add(...extra.trim().split(' '));c.cls=extra;}
+    const mk=settings.dots&&targets.has(s)?(targets.get(s)?'cap':'mv'):'';
+    if(c.mark.className!==mk)c.mark.className=mk;
+  }
+}
+const PIECE_CACHE=[];for(const c of ['w','b'])for(const t of ['K','Q','R','B','N','P']){const im=new Image();im.src=`../pieces/${c}${t}.svg`;PIECE_CACHE.push(im);}
+function playUci(u){const m=ch.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]});M.last=[m.from,m.to];sound(ch.inCheck()||m.captured?'cap':'stone',1);return m;}
+
+// ---------- 입력: 눌러서 고르고 누르기, 또는 끌어서 놓기 ----------
+let drag=null;
+const sqAt=(x,y)=>{const el=document.elementFromPoint(x,y);const s=el&&el.closest&&el.closest('.sq');return s?s.dataset.sq:null;};
+cb.addEventListener('pointerdown',e=>{
+  const s=e.target.closest('.sq');if(!s||!cur||cur.state!=='play')return;const sq=s.dataset.sq;
+  const p=ch.get(sq),me=ch.turn();
+  if(M.sel&&M.sel!==sq&&!(p&&p.color===me)){tryMove(M.sel,sq);return;}
+  if(p&&p.color===me){
+    M.sel=sq;render();
+    const img=document.createElement('img');img.src=pieceImg(p);img.className='drag-ghost';const size=s.getBoundingClientRect().width;img.style.width=img.style.height=size+'px';
+    drag={from:sq,img,moved:false,x:e.clientX,y:e.clientY};
+    try{cb.setPointerCapture(e.pointerId);}catch(_){}
+  }else{M.sel=null;render();}
+});
+cb.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  if(!drag.moved&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6)return;
+  if(!drag.moved){drag.moved=true;document.body.appendChild(drag.img);const fromEl=cb.querySelector(`[data-sq="${drag.from}"] img`);if(fromEl)fromEl.style.opacity='.25';}
+  drag.img.style.left=e.clientX+'px';drag.img.style.top=e.clientY+'px';
+});
+cb.addEventListener('pointerup',e=>{
+  if(!drag)return;const d=drag;drag=null;d.img.remove();
+  if(!d.moved)return;
+  const to=sqAt(e.clientX,e.clientY);
+  if(to&&to!==d.from)tryMove(d.from,to);else render();
+});
+cb.addEventListener('pointercancel',()=>{if(drag){drag.img.remove();drag=null;render();}});
+function askPromo(color){
+  return new Promise(res=>{
+    const box=$('#promoBtns');box.innerHTML='';
+    for(const t of ['q','r','b','n']){const b=document.createElement('button');b.type='button';b.innerHTML=`<img src="../pieces/${color}${t.toUpperCase()}.svg" alt="${t}">`;b.onclick=()=>closeDlg($('#dlgPromo'),t);box.appendChild(b);}
+    openDlg($('#dlgPromo'),v=>res(['q','r','b','n'].includes(v)?v:null));
+  });
+}
+
+// ---------- 퍼즐 ----------
+function goalOf(it){const m=it.th.find(t=>/^\d수 메이트$/.test(t));return m?`${m.replace(' 메이트','')} 만에 메이트하세요`:'가장 좋은 수를 찾으세요';}
+function openPuzzle(it){
+  const mv=it.mv.split(' ');
+  cur.mv=mv;cur.me=new Chess(it.fen).turn()==='w'?'b':'w';
+  $('#pTitle').textContent=it.set.kind==='rated'?`레이팅 퍼즐 · ${it.r}`:`${it.set.name} · ${LV[it.lv]} ${it.idx+1} · 레이팅 ${it.r}`;
+  $('#pPrompt').innerHTML=`${dot(cur.me==='w'?2:1)} ${NAME[cur.me]} 차례 · ${goalOf(it)}`;
+  $('#bShowT').textContent='정답';
+  $('#bRetry').onclick=()=>{stopDemo();start(false);};
+  $('#bHint').onclick=hint;
+  $('#bShow').onclick=showAnswer;
+  if(it.set.kind==='rated'){$('#bNext').textContent='다음 퍼즐 ›';$('#bNext').onclick=()=>pickNext();}
+  const R=getPR();
+  $('#pRating').innerHTML=R.tried[triedKey(it)]?'':`퍼즐 레이팅 ${prText(R)} · 처음 풀 때만 반영 (힌트·정답을 보면 실패로 계산)`;
+  cur.helped=false;cur.failed=false;
+  start(true);
+}
+async function start(first){
+  const it=cur.it;
+  ch=new Chess(it.fen);cur.i=1;cur.state='intro';cur.hintN=0;
+  M={last:null,sel:null,hint:[],wrong:null};
+  $('#pTags').innerHTML='';$('#pNote').textContent='';
+  msg(first?'상대가 먼저 한 수 둡니다…':'처음부터 다시 풀어 보세요.');
+  render();
+  try{
+    await wait(first?650:450);
+    playUci(cur.mv[0]);cur.state='play';render();
+    msg(`${NAME[cur.me]}의 가장 좋은 수를 두세요.`);
+  }catch(e){}
+}
+async function tryMove(from,to){
+  const it=cur.it,legal=ch.moves({square:from,verbose:true}).filter(m=>m.to===to);
+  M.sel=null;
+  if(!legal.length){render();return;}
+  let promo='';
+  if(legal.some(m=>m.promotion)){promo=await askPromo(ch.turn());if(!promo){render();return;}}
+  const u=from+to+promo,want=cur.mv[cur.i],lastMove=cur.i===cur.mv.length-1;
+  let ok=u===want;
+  // 마지막 수는 다른 수라도 체크메이트면 정답 (Lichess 규칙)
+  if(!ok&&lastMove){const t=new Chess(ch.fen());t.move({from,to,promotion:promo||undefined});if(t.isCheckmate())ok=true;}
+  M.hint=[];M.wrong=null;
+  if(!ok){
+    cur.failed=true;rate(it,0);
+    const m=ch.move({from,to,promotion:promo||undefined});M.last=[m.from,m.to];M.wrong=m.to;sound('bad');cur.state='wait';render();
+    msg('틀렸습니다 — 더 좋은 수가 있습니다. 다시 생각해 보세요.','bad');
+    try{await wait(900);}catch(e){return;}
+    ch.undo();M.wrong=null;M.last=prevLast();cur.state='play';render();
+    return;
+  }
+  playUci(u);cur.i++;render();
+  if(cur.i>=cur.mv.length)return solved();
+  cur.state='wait';msg('좋습니다!','ok');
+  try{await wait(450);}catch(e){return;}
+  playUci(cur.mv[cur.i]);cur.i++;cur.state='play';render();
+  msg('계속 두세요.');
+}
+// 되돌린 뒤 마지막 수 표시는 직전 수로
+function prevLast(){const h=ch.history({verbose:true});const m=h[h.length-1];if(m)return [m.from,m.to];const u=cur.mv[cur.i-1];return u?[u.slice(0,2),u.slice(2,4)]:null;}
+function solved(){
+  const it=cur.it;cur.state='solved';
+  mark(it,cur.helped||cur.failed?2:1);if(!cur.helped&&!cur.failed)rate(it,1);
+  sound('win');msg(ch.isCheckmate()?'정답입니다! 체크메이트':'정답입니다!','ok');
+  $('#pTags').innerHTML=it.th.map(t=>`<span>${t}</span>`).join('');
+  $('#pNote').innerHTML=`<a href="https://lichess.org/training/${triedKey(it)}" target="_blank" rel="noopener" style="color:var(--muted);font-size:12.5px">Lichess에서 이 퍼즐 보기</a>`;
+  render();
+}
+function hint(){
+  if(cur.state!=='play')return;
+  const u=cur.mv[cur.i];cur.helped=true;rate(cur.it,0);
+  cur.hintN++;M.hint=cur.hintN===1?[u.slice(0,2)]:[u.slice(0,2),u.slice(2,4)];render();
+  msg(cur.hintN===1?'초록 칸의 기물을 움직이세요. 한 번 더 누르면 갈 칸도 보여 줍니다.':'초록 칸에서 초록 칸으로 옮기세요.');
+}
+async function showAnswer(){
+  if(cur.state==='intro')return;
+  stopDemo();cur.helped=true;rate(cur.it,0);
+  ch=new Chess(cur.it.fen);M={last:null,sel:null,hint:[],wrong:null};playUci(cur.mv[0]);cur.state='demo';render();
+  msg('정답 수순');
+  try{
+    for(let i=1;i<cur.mv.length;i++){await wait(750);playUci(cur.mv[i]);render();}
+    msg('정답 수순 · <b>다시</b>를 눌러 직접 풀어 보세요.');
+    $('#pTags').innerHTML=cur.it.th.map(t=>`<span>${t}</span>`).join('');cur.state='done';
+  }catch(e){}
+}
+// 레이팅 퍼즐: 아직 안 푼 것 중 내 레이팅에 가까운 것
+function pickNext(){
+  const R=getPR(),pool=SETS.find(s=>s.kind==='rated').items.filter(it=>!R.tried[triedKey(it)]);
+  if(!pool.length){toast('레이팅 퍼즐을 모두 풀었습니다');go('');return;}
+  pool.sort((a,b)=>Math.abs(a.r-R.rating)-Math.abs(b.r-R.rating));
+  const near=pool.slice(0,8);go(near[Math.floor(Math.random()*near.length)].id);
+}
+// 레이팅 탭: 내 레이팅 · 시작 버튼 · 최근 기록
+function renderRated(s,body){
+  if(s.kind!=='rated')return false;
+  const R=getPR(),byKey=new Map(s.items.map(it=>[it.id,it]));
+  const box=document.createElement('div');
+  box.innerHTML=`<div class="rcard"><div class="sub">내 퍼즐 레이팅</div><div class="big">${prText(R)}</div><p class="sub">${R.n?`푼 퍼즐 ${R.n}개 · 편차 ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`:'처음에는 1500에서 시작합니다'}</p><button class="primary" id="startRated">퍼즐 시작</button></div>`+
+    (R.hist&&R.hist.length?`<div class="set-head"><h2 style="font-size:16px">최근 기록</h2><span></span></div><div class="hist">${R.hist.slice().reverse().map(h=>`<div data-id="${h.id}"><span>퍼즐 ${h.r}</span><span class="${h.s?'w':'l'}">${h.s?'성공':'실패'}</span><span>${h.d>=0?'+':''}${h.d}</span></div>`).join('')}</div>`:'');
+  body.appendChild(box);
+  box.querySelector('#startRated').onclick=pickNext;
+  box.querySelectorAll('.hist div').forEach(el=>el.onclick=()=>{if(byId.has(el.dataset.id))go(el.dataset.id);});
+  return true;
+}
+
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
+prSummary();
+startLearn({storeKey:'chess-learn',title:'체스 퍼즐',backHref:'../',levels:LV,summaryKey:'chessLearn',stars:()=>[],
+  renderSet:renderRated,nextLabel:()=>'다음 문제 ›',open:{cpz:openPuzzle,rated:openPuzzle}});
+</script>
+</body>
+</html>

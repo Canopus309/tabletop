@@ -96,7 +96,7 @@
         </g>
       </svg></span>
       <h2>체스</h2>
-      <p>Stockfish 19 AI · 레이팅 600~2800 단계 · 내 레이팅과 수마다 분석</p>
+      <p>Stockfish 19 AI · 레이팅 600~2800 단계 · 내 레이팅과 수마다 분석 · 퍼즐 650개</p>
       <div class="me" id="meChess"></div>
     </a>
   </div>
@@ -109,7 +109,7 @@ try{
   const s=JSON.parse(localStorage.getItem('tt-summary'))||{};
   if(s.go)document.getElementById('meGo').textContent='내 기력 '+s.go;
   if(s.omok||s.omokLearn)document.getElementById('meOmok').textContent=[s.omok,s.omokLearn&&'퍼즐 '+s.omokLearn].filter(Boolean).join(' · ');
-  if(s.chess)document.getElementById('meChess').textContent=s.chess;
+  if(s.chess||s.chessPuzzle)document.getElementById('meChess').textContent=[s.chess,s.chessPuzzle&&'퍼즐 '+s.chessPuzzle].filter(Boolean).join(' · ');
   if(s.learn)document.getElementById('meLearn').textContent=s.learn;
 }catch(e){}
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
