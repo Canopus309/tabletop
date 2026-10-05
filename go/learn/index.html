@@ -101,12 +101,13 @@ function targetsOf(it,b){
 const GOAL={kill:'백을 잡으세요',live:'흑을 살리세요',capture:'▲ 백을 잡으세요'};
 function openTsumego(it){
   const b=diagramBoard(it),at=it.at||[0,0],w=Math.max(...it.rows.map(r=>r.length)),h=it.rows.length;
-  // 그림보다 한 줄씩 넓게, 너무 좁지 않게
-  let x0=at[0]-1,x1=at[0]+w,y0=at[1]-1,y1=at[1]+h;
+  // 그림(과 풀이에 나오는 모든 수)보다 한 줄씩 넓게, 너무 좁지 않게
+  const bx=it.box||[at[0],at[1],at[0]+w-1,at[1]+h-1];
+  let x0=bx[0]-1,x1=bx[2]+1,y0=bx[1]-1,y1=bx[3]+1;
   while(x1-x0<6){if(x0>0)x0--;if(x1-x0<6&&x1<18)x1++;}
   while(y1-y0<4){if(y1<18)y1++;}
   cur.b0=b;cur.targets=targetsOf(it,b);
-  cur.pr=Tsumego.fromDiagram({id:it.id,rows:it.rows,at:it.at,escapeLibs:it.esc,depth:it.dp});
+  cur.pr=Tsumego.fromDiagram({id:it.id,rows:it.rows,at:it.at,escapeLibs:it.esc,depth:it.dp,ladder:it.lad});
   $('#pTitle').textContent=`${it.set.name} · ${LV[it.lv]} ${it.idx+1}${it.title?' · '+it.title:''}`;
   $('#pPrompt').innerHTML=`${dot(BLACK)} 흑 차례 · ${GOAL[it.goal]}`;
   if(it.tags&&it.tags.length)$('#pTags').innerHTML=it.tags.map(t=>`<span>${t}</span>`).join('');
@@ -156,7 +157,7 @@ async function tPlay(p){
   msg(failText()+'<br><span style="color:var(--muted);font-weight:500">계속 두어 보면 컴퓨터가 끝까지 받습니다.</span>','bad');
   cur.state='cont';onBoard=cPlay;
 }
-const failText=()=>{const g=cur.it.goal;return g==='live'?'실패 — 백이 이 수로 흑을 잡습니다.':g==='kill'?'실패 — 백이 이 수로 삽니다.':'실패 — 백이 빠져나갑니다.';};
+const failText=()=>{const g=cur.it.goal;return g==='live'?'실패 — 백이 이 수로 흑을 잡습니다.':g==='kill'||!cur.pr.escapeLibs?'실패 — 백이 이 수로 삽니다.':'실패 — 백이 빠져나갑니다.';};
 // 실패한 뒤 계속 두기: 컴퓨터(백)는 계산기로 이기는 수를 둔다. 백이 결판을 내면 끝, 흑이 해내면 성공으로 친다
 async function cPlay(p){
   if(cur.state!=='cont')return;
@@ -192,7 +193,7 @@ function quickEscape(pr,b){
 function cDone(win){
   if(win){cur.state='solved';draw();mark(cur.it,2);sound('win');msg('해냈습니다! 첫 수와는 다른 길이었지만 결과는 성공입니다.','ok');$('#pNote').textContent=cur.it.note||'';return;}
   cur.state='wrong';sound('bad');const g=cur.it.goal;
-  msg((g==='live'?'흑이 잡혔습니다.':g==='kill'?'백이 살았습니다. 더 두어도 잡을 수 없습니다.':'백이 빠져나갔습니다.')+' <b>다시</b>를 눌러 처음부터 풀어 보세요.','bad');
+  msg((g==='live'?'흑이 잡혔습니다.':g==='kill'||!cur.pr.escapeLibs?'백이 살았습니다. 더 두어도 잡을 수 없습니다.':'백이 빠져나갔습니다.')+' <b>다시</b>를 눌러 처음부터 풀어 보세요.','bad');
 }
 function solved(){
   cur.state='solved';D.good=[];draw();

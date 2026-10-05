@@ -6,8 +6,10 @@
  *  - target: 공격당하는 쪽(수비) 돌 하나의 좌표. 그 돌이 따이면 공격 성공
  *  - 수비 그룹이 무조건 삶(Benson: 계속 패스해도 잡히지 않음)이 되면 수비 성공
  *  - escapeLibs: 수비 그룹 활로가 이만큼 이상이면 탈출로 본다 (맥 문제용, 없으면 무시).
- *    이때는 넓은 곳에서 읽으므로 수를 좁힌다: 공격은 목표 활로(활로 2 이하면 그 이웃까지), 수비는 활로와 약한 공격 돌의 활로
+ *    이때는 판 전체에서 읽되 수를 좁힌다: 공격은 목표 활로(활로 2 이하면 그 이웃까지)와 목표에 붙은 약한 내 돌의 활로,
+ *    수비는 활로와 목표에 붙은 약한 공격 돌의 활로
  *  - 둘 다 연속으로 패스하면 수비 성공 (공격 쪽이 더 할 수 있는 게 없음 → 빅 포함)
+ *  - ladder: 축 판정. 판 전체에서, 공격은 활로에 단수만, 수비는 달아나기·따내기만 읽고 활로 3이면 탈출
  *  - zone: 문제 그림 안의 점들. 국면 기억표의 열쇠로 쓴다 (그림 밖은 바뀌지 않는다)
  *  - koFree: 이 색은 팻감이 끝없이 있다고 보고 패를 바로 되따낼 수 있다.
  *    문제를 푸는 쪽의 상대에게 주면 '패 없이' 해결하는 수만 정답이 된다
@@ -68,7 +70,7 @@ const Tsumego = (() => {
     const tgt = pr.target, def = 3 - pr.attacker;
     if (b.c[tgt] !== def) return true;                                  // 따임
     if (pr.escapeLibs && b.libs(tgt, pr.escapeLibs) >= pr.escapeLibs) return false; // 탈출
-    if (passAlive(b, def)[tgt]) return false;                           // 무조건 삶
+    if (!pr.escapeLibs && passAlive(b, def)[tgt]) return false;         // 무조건 삶 (따내기 문제는 활로로만 본다)
     return null;
   }
 
@@ -123,7 +125,13 @@ const Tsumego = (() => {
       for (const l of tgtLibs) for (const dd of b.d) near.add(l + dd);
       if (pr.escapeLibs) {
         only = new Set(tgtLibs);
-        if (side === pr.attacker) { if (tgtLibs.size <= 2) for (const p of near) only.add(p); } // 활로 3 이상이면 활로를 메우는 수만
+        if (side === pr.attacker && pr.ladder) { /* 축 판정: 공격은 활로에 단수만 친다 */ }
+        else if (side === pr.attacker) {
+          if (tgtLibs.size <= 2) for (const p of near) only.add(p); // 활로 3 이상이면 활로를 메우는 수만
+          // 목표에 붙은 내 돌이 약하면(활로 2 이하) 살리는 수도 본다
+          const seen = new Set();
+          for (const s of g.stones) for (const dd of b.d) { const r = s + dd; if (b.c[r] === side && !seen.has(r)) { const h = group(b, r); h.stones.forEach(v => seen.add(v)); if (h.libs.size <= 2) h.libs.forEach(v => only.add(v)); } }
+        }
         else { // 수비: 목표에 붙은 공격 돌 중 활로 2 이하의 활로 (따내기·단수)
           const seen = new Set();
           for (const s of g.stones) for (const dd of b.d) { const r = s + dd; if (b.c[r] === pr.attacker && !seen.has(r)) { const h = group(b, r); h.stones.forEach(v => seen.add(v)); if (h.libs.size <= 2) h.libs.forEach(v => only.add(v)); } }
@@ -187,10 +195,10 @@ const Tsumego = (() => {
       const score = w === 0 ? -1 : w + (settled(pr, nb, opts) ? 0.5 : 0);
       if (score < bestScore) { bestScore = score; best = m; }
     }
-    // 손 빼기도 후보로 본다
+    // 손 빼기도 후보로 본다 (어차피 지는 장면이면 두는 수를 고른다)
     if (!(pr.escapeLibs && b.turn === pr.attacker)) {
       const nb = after(pr, b, PASS);
-      if (terminal(pr, nb) === null) { const w = winningMoves(pr, nb, opts).moves.length, score = w === 0 ? -1 : w + (settled(pr, nb, opts) ? 0.5 : 0); if (score < bestScore) { bestScore = score; best = PASS; } }
+      if (terminal(pr, nb) === null && !winningMoves(pr, nb, opts).moves.length) { best = PASS; } // 손 빼기는 그것으로 버틸 수 있을 때만
     }
     return best === null ? PASS : best;
   }
@@ -210,9 +218,11 @@ const Tsumego = (() => {
       if (ch !== ',') region.push(p);
     }));
     if (target < 0) throw new Error('목표 돌(x/o)이 없습니다: ' + def.id);
+    // 따내기(맥) 문제는 그림 밖까지 판 전체에서 읽는다: 그림 끝에서 수순이 잘리면 반격(예: 막은 돌을 축으로 잡기)을 놓친다
+    if (def.escapeLibs || def.ladder) { region.length = 0; zone.length = 0; for (const p of b.pts) { region.push(p); zone.push(p); } }
     const defender = b.c[target], attacker = 3 - defender;
     b.turn = def.toPlay === 'W' ? WHITE : BLACK;
-    return { id: def.id, board: b, attacker, target, region, zone, escapeLibs: def.escapeLibs || 0, depth: def.depth || 0, toPlay: b.turn, koFree: 0 };
+    return { id: def.id, board: b, attacker, target, region, zone, ladder: !!def.ladder, escapeLibs: def.ladder ? 3 : def.escapeLibs || 0, depth: def.depth || 0, toPlay: b.turn, koFree: 0 };
   }
 
   return { passAlive, terminal, winningMoves, bestReply, status, settled, toughestReply, orderedMoves, fromDiagram };
