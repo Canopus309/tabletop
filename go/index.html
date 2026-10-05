@@ -106,7 +106,7 @@
       <div class="field"><label for="selHandi">접바둑 (흑 미리 놓기)</label>
         <select id="selHandi"><option value="0">없음 (호선)</option></select></div>
       <div class="field"><label for="selKomi">덤</label>
-        <select id="selKomi"><option value="auto">자동</option><option value="0.5">0.5</option><option value="5.5">5.5</option><option value="6.5">6.5</option><option value="7.5">7.5</option></select></div>
+        <select id="selKomi"><option value="auto">자동 (호선 7.5)</option><option value="0.5">0.5</option><option value="5.5">5.5</option><option value="6.5">6.5</option><option value="7.5">7.5</option></select></div>
     </div>
     <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">대국 시작</button></div>
   </div>
@@ -573,7 +573,8 @@ function newGame(o){
   const pvp=o.opp==='pvp',human=pvp?BLACK:o.color===0?(Math.random()<.5?1:2):o.color;
   const tmp=new Board(o.size);
   const setup=handicapPts(o.size,o.handicap).map(([x,y])=>tmp.pt(x,y));
-  const komi=o.komi==='auto'?(o.handicap>=2?0.5:6.5):+o.komi;
+  // 중국식 계가(살아 있는 돌 + 집)에 맞는 덤: 호선 7.5집, 접바둑 0.5집
+  const komi=o.komi==='auto'?(o.handicap>=2?0.5:7.5):+o.komi;
   game={id:Date.now(),n:o.size,komi,handicap:o.handicap,human,level:o.level,setup,moves:[],over:false,result:null,wr:0.5};
   if(pvp)game.pvp=true;
   resetView();rebuild();save();
@@ -1042,7 +1043,7 @@ initWorker();startKata();setTimeout(lbSync,3000);saveSummary();
     if(game.over){view=game.moves.length;if(game.moves.length>=2&&game.moves.at(-1)===PASS&&game.moves.at(-2)===PASS&&!game.result.title.includes('불계'))finishGame();ui();}
     else{toast('이어서 둡니다');maybeAI();}
   }else{
-    game={n:9,komi:6.5,handicap:0,human:1,level:2,setup:[],moves:[],over:false,result:null,wr:0.5};
+    game={n:9,komi:7.5,handicap:0,human:1,level:2,setup:[],moves:[],over:false,result:null,wr:0.5};
     rebuild();openNew();
   }
 })();
