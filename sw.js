@@ -1,5 +1,5 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
-const CACHE = 'tabletop-v11';
+const CACHE = 'tabletop-v12';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -7,7 +7,7 @@ const FILES = [
   './common/base.css', './common/learn.css', './common/learn.js', './common/ui.js', './common/leaderboard.js', './common/rating.js',
   // 바둑
   './go/', './go/index.html', './go/board.js', './go/katago.js',
-  './go/learn/', './go/learn/index.html', './go/learn/problems.js',
+  './go/learn/', './go/learn/index.html', './go/learn/problems.js', './go/learn/tsumego.js',
   './go/vendor/tf.min.js', './go/vendor/tf-backend-webgpu.min.js', './go/vendor/tf-backend-wasm.min.js',
   './go/vendor/tfjs-backend-wasm.wasm', './go/vendor/tfjs-backend-wasm-simd.wasm', './go/vendor/tfjs-backend-wasm-threaded-simd.wasm',
   './go/models/g170e-b10c128.bin.gz',

@@ -60,6 +60,7 @@
 <div id="toast"></div>
 <script src="../../common/ui.js"></script>
 <script src="../board.js"></script>
+<script src="tsumego.js"></script>
 <script src="problems.js"></script>
 <script src="../../common/learn.js"></script>
 <script>
@@ -69,12 +70,14 @@ function soundEnabled(){return settings.sound!==false;}
 const LV=['입문','초급','중급'];
 
 // ---------- 좌표 ----------
-const sgP=(b,s)=>s?b.pt(s.charCodeAt(0)-97,s.charCodeAt(1)-97):PASS;
+const sgP=(b,s)=>s&&s!=='tt'?b.pt(s.charCodeAt(0)-97,s.charCodeAt(1)-97):PASS; // 'tt' 는 손 빼기
 const sgS=(b,p)=>{if(p===PASS)return '';const [x,y]=b.xy(p);return String.fromCharCode(97+x,97+y);};
 const COLS='ABCDEFGHJKLMNOPQRST';
 const nameOf=(b,p)=>{const [x,y]=b.xy(p);return COLS[x]+(b.n-y);};
 
 function playStone(b,p){const cap=b.play(p);sound(cap?'cap':'stone',cap);return cap;}
+// 컴퓨터의 수 (손 빼기면 알리고 번호를 붙이지 않는다)
+function compMove(b,p){if(p===PASS){b.play(PASS);toast('백은 받지 않고 한 수 쉽니다 (손 빼기)');return;}playStone(b,p);D.last=p;D.nums.set(p,++cur.moveNo);}
 
 // ---------- 사활 · 맥 ----------
 // 문제 그림: X 흑, O 백, x·o 목표 돌, . , 빈칸
@@ -103,6 +106,7 @@ function openTsumego(it){
   while(x1-x0<6){if(x0>0)x0--;if(x1-x0<6&&x1<18)x1++;}
   while(y1-y0<4){if(y1<18)y1++;}
   cur.b0=b;cur.targets=targetsOf(it,b);
+  cur.pr=Tsumego.fromDiagram({id:it.id,rows:it.rows,at:it.at,escapeLibs:it.esc,depth:it.dp});
   $('#pTitle').textContent=`${it.set.name} · ${LV[it.lv]} ${it.idx+1}${it.title?' · '+it.title:''}`;
   $('#pPrompt').innerHTML=`${dot(BLACK)} 흑 차례 · ${GOAL[it.goal]}`;
   if(it.tags&&it.tags.length)$('#pTags').innerHTML=it.tags.map(t=>`<span>${t}</span>`).join('');
@@ -137,7 +141,7 @@ async function tPlay(p){
     if(!reply){return solved();}
     cur.state='wait';draw();msg('…');
     const g=demoGen;await sleep(380);if(g!==demoGen)return;
-    const rp=sgP(b,reply);playStone(b,rp);D.last=rp;cur.moveNo++;D.nums.set(rp,cur.moveNo);
+    compMove(b,sgP(b,reply));
     cur.node=next;cur.state='play';draw();msg('좋습니다. 계속 두세요.');
     return;
   }
@@ -145,10 +149,50 @@ async function tPlay(p){
   cur.failed=true;cur.state='wrong';D.bad=p;draw();
   if(ref==='ko'){sound('bad');msg('패가 나는 수입니다. 패 없이 해결하는 수가 있어요.','bad');return;}
   const g=demoGen;await sleep(380);if(g!==demoGen)return;
-  const rp=sgP(b,ref);if(b.isLegal(rp,b.turn)){playStone(b,rp);D.last=rp;cur.moveNo++;D.nums.set(rp,cur.moveNo);}
+  const rp=sgP(b,ref);if(b.isLegal(rp,b.turn))compMove(b,rp);
   sound('bad');draw();
-  const it=cur.it;
-  msg(it.goal==='live'?'실패 — 백이 이 수로 흑을 잡습니다.':it.goal==='kill'?'실패 — 백이 이 수로 삽니다.':'실패 — 백이 빠져나갑니다.','bad');
+  // 이미 결판났으면 끝, 아니면 계속 두어 볼 수 있다
+  if(cur.pr.escapeLibs?Tsumego.terminal(cur.pr,b)!==null:Tsumego.settled(cur.pr,b,{koFree:BLACK,limit:150000})){cur.state='wrong';msg(failText()+' 더 두어도 결과가 바뀌지 않습니다.','bad');return;}
+  msg(failText()+'<br><span style="color:var(--muted);font-weight:500">계속 두어 보면 컴퓨터가 끝까지 받습니다.</span>','bad');
+  cur.state='cont';onBoard=cPlay;
+}
+const failText=()=>{const g=cur.it.goal;return g==='live'?'실패 — 백이 이 수로 흑을 잡습니다.':g==='kill'?'실패 — 백이 이 수로 삽니다.':'실패 — 백이 빠져나갑니다.';};
+// 실패한 뒤 계속 두기: 컴퓨터(백)는 계산기로 이기는 수를 둔다. 백이 결판을 내면 끝, 흑이 해내면 성공으로 친다
+async function cPlay(p){
+  if(cur.state!=='cont')return;
+  const b=D.b,pr=cur.pr,T=Tsumego;
+  if(!b.isLegal(p,b.turn)){toast(b.c[p]===EMPTY?'둘 수 없는 자리입니다':'이미 돌이 있습니다');return;}
+  D.hints=[];D.bad=-1;
+  playStone(b,p);D.last=p;D.nums.set(p,++cur.moveNo);
+  const O={koFree:WHITE,limit:150000},cap=!!pr.escapeLibs;
+  if(cap?T.terminal(pr,b)===true:T.settled(pr,b,O)){draw();return cDone(true);}
+  cur.state='wait';draw();msg('…');
+  const g=demoGen;await sleep(60);if(g!==demoGen)return;
+  // 맥(따내기) 문제는 넓은 곳이라 끝까지 읽으면 느리다: 백은 활로가 가장 많아지는 쪽으로 달아난다
+  let r=cap?quickEscape(pr,b):T.bestReply(pr,b,O);
+  if(r===null)r=T.toughestReply(pr,b,O);
+  if(r!==PASS&&!b.isLegal(r,b.turn))r=PASS; // 패를 바로 되따내야 하면 (팻감을 쓴 셈으로) 한 번 쉰다
+  await sleep(260);if(g!==demoGen)return;
+  compMove(b,r);
+  const t=T.terminal(pr,b);
+  if(t!==null){draw();return cDone(t===(pr.attacker===BLACK));} // 결판: 흑이 이겼는가
+  if(!cap&&T.settled(pr,b,{...O,koFree:BLACK})){draw();return cDone(false);}
+  cur.state='cont';draw();msg(failText()+'<br><span style="color:var(--muted);font-weight:500">계속 두어 보세요.</span>','bad');
+}
+function quickEscape(pr,b){
+  let best=PASS,bs=-1;
+  for(const m of Tsumego.orderedMoves(pr,b,b.turn)){
+    const c=new Board(19);c.copyFrom(b);const got=c.play(m);
+    if(c.c[pr.target]===EMPTY)continue;
+    const s=c.libs(pr.target,8)+got*2;
+    if(s>bs){bs=s;best=m;}
+  }
+  return best;
+}
+function cDone(win){
+  if(win){cur.state='solved';draw();mark(cur.it,2);sound('win');msg('해냈습니다! 첫 수와는 다른 길이었지만 결과는 성공입니다.','ok');$('#pNote').textContent=cur.it.note||'';return;}
+  cur.state='wrong';sound('bad');const g=cur.it.goal;
+  msg((g==='live'?'흑이 잡혔습니다.':g==='kill'?'백이 살았습니다. 더 두어도 잡을 수 없습니다.':'백이 빠져나갔습니다.')+' <b>다시</b>를 눌러 처음부터 풀어 보세요.','bad');
 }
 function solved(){
   cur.state='solved';D.good=[];draw();
@@ -169,7 +213,7 @@ async function showAnswer(){
       const p=sgP(b,k);playStone(b,p);D.nums.set(p,++no);D.last=p;draw();
       if(!reply)break;
       await wait(700);
-      const rp=sgP(b,reply);playStone(b,rp);D.nums.set(rp,++no);D.last=rp;draw();
+      const rp=sgP(b,reply);if(rp===PASS){b.play(PASS);msg('정답 수순 · 백은 손을 뺍니다');}else{playStone(b,rp);D.nums.set(rp,++no);D.last=rp;}draw();
       node=next;
     }
     msg('정답 수순 · <b>다시</b>를 눌러 직접 풀어 보세요.');
@@ -192,6 +236,7 @@ function openYose(it){
   resetY(true);
 }
 function resetY(first){
+  $('#pSteps').classList.add('hidden');
   const b=new Board(cur.b0.n);b.copyFrom(cur.b0);
   setD(b,{last:cur.b0.last>0?cur.b0.last:-1});
   cur.state='play';$('#pNote').textContent='';
@@ -209,23 +254,31 @@ function yPlay(p){
   revealY(p,`아쉬워요 — 최선의 수보다 약 <b>${loss>=it.maxLoss?it.maxLoss+'집 이상':fmt(loss)+'집'}</b> 손해입니다.`,'bad');
 }
 const fmt=v=>(Math.round(v*2)/2).toFixed(1).replace(/\.0$/,'');
-// 둔 수와 정답 자리(☆)를 보여 준 뒤, 정답에서 이어지는 수순을 번호와 함께 둔다
-async function revealY(played,text,cls){
-  stopDemo();const it=cur.it;cur.state='done';
+// 둔 수와 정답 자리(☆)를 보여 주고, 정답에서 이어지는 수순은 ‹ › 로 한 수씩 넘겨 본다
+function revealY(played,text,cls){
+  stopDemo();const it=cur.it;cur.state='done';onBoard=null;
+  cur.yPlayed=played;cur.yHead=text||'☆ 표시가 가장 큰 곳입니다.';cur.yCls=cls;
+  $('#pSteps').classList.remove('hidden');
+  $('#stPrev').onclick=()=>yStep(cur.yk-1);$('#stNext').onclick=()=>yStep(cur.yk+1);
+  yStep(0);
+}
+function yStep(k){
+  const it=cur.it,n=it.pv.length;k=Math.max(0,Math.min(n,k));cur.yk=k;
   const b=new Board(cur.b0.n);b.copyFrom(cur.b0);
-  const good=it.best.map(k=>sgP(b,k));
-  setD(b,{good});
-  if(played&&!good.includes(played)){b.play(played);D.bad=played;}
+  if(k===0){
+    const good=it.best.map(s=>sgP(b,s)),played=cur.yPlayed;
+    setD(b,{good,last:cur.b0.last>0?cur.b0.last:-1});
+    if(played&&!good.includes(played)){b.play(played);D.bad=played;D.last=-1;}
+    $('#pNote').textContent=(it.note||'')+' › 를 누르면 ☆ 자리에서 이어지는 수순을 한 수씩 볼 수 있습니다.';
+  }else{
+    setD(b);
+    for(let i=0;i<k;i++){const p=sgP(b,it.pv[i]);if(!b.isLegal(p,b.turn))break;b.play(p);D.nums.set(p,i+1);D.last=p;}
+    for(const [p] of D.nums)if(b.c[p]===EMPTY)D.nums.delete(p);
+    $('#pNote').textContent=k===n?'이어지는 수순 끝입니다. ‹ 로 되돌려 볼 수 있습니다.':`${k}수째 · ${turnName(k%2===1?cur.toPlay:3-cur.toPlay)}`;
+  }
+  msg(cur.yHead,cur.yCls);
+  $('#stPrev').disabled=k===0;$('#stNext').disabled=k===n;$('#stText').textContent=`${k} / ${n}`;
   draw();
-  const head=text||'☆ 표시가 가장 큰 곳입니다.';
-  msg(head,cls);$('#pNote').textContent=it.note||'';
-  try{
-    await wait(played?1400:1000);
-    b.copyFrom(cur.b0);D.good=[];D.bad=-1;
-    let no=0;
-    for(const s of it.pv){const p=sgP(b,s);if(!b.isLegal(p,b.turn))break;playStone(b,p);D.nums.set(p,++no);D.last=p;draw();await wait(650);}
-    msg(head+'<br><span style="color:var(--muted);font-weight:500">☆ 자리에서 이어지는 수순입니다. <b>다시</b>를 누르면 처음 장면으로 돌아갑니다.</span>',cls);
-  }catch(e){}
 }
 
 // ---------- 정석 ----------

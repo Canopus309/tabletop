@@ -2,6 +2,7 @@
  * board.js 의 Board 를 쓴다.
  *
  * 문제 = { board, attacker, target, region, zone, toPlay, escapeLibs, koFree }
+ *  - region: 둘 수 있는 점 (그림의 '.' 과 돌 자리. ',' 는 영역 밖). 지금 빈 점만 실제 후보가 된다
  *  - target: 공격당하는 쪽(수비) 돌 하나의 좌표. 그 돌이 따이면 공격 성공
  *  - 수비 그룹이 무조건 삶(Benson: 계속 패스해도 잡히지 않음)이 되면 수비 성공
  *  - escapeLibs: 수비 그룹 활로가 이만큼 이상이면 탈출로 본다 (맥 문제용, 없으면 무시).
@@ -149,10 +150,12 @@ const Tsumego = (() => {
     }
     return { moves: out, nodes: stat.nodes, aborted: stat.aborted };
   }
-  // 두는 쪽이 이기는 수 하나 (없으면 null)
+  // 두는 쪽이 이기는 수 하나 (손 빼기는 PASS, 없으면 null)
   function bestReply(pr0, b, opts = {}) {
     const pr = withOpts(pr0, opts), { tt, stat, depth } = ctx(pr, opts), attackerToMove = b.turn === pr.attacker;
     for (const m of orderedMoves(pr, b, b.turn)) if (attackerWins(pr, after(pr, b, m), depth - 1, false, tt, stat) === attackerToMove) return m;
+    // 두지 않고 손을 빼는 것이 이기는 수일 수도 있다 (예: 둘 다 메울 수 없는 모양에서 수비 쪽)
+    if (!(pr.escapeLibs && attackerToMove) && attackerWins(pr, after(pr, b, PASS), depth - 1, true, tt, stat) === attackerToMove) return PASS;
     return null;
   }
   // 두는 쪽 기준 승패: 'win' | 'lose'
@@ -184,6 +187,11 @@ const Tsumego = (() => {
       const score = w === 0 ? -1 : w + (settled(pr, nb, opts) ? 0.5 : 0);
       if (score < bestScore) { bestScore = score; best = m; }
     }
+    // 손 빼기도 후보로 본다
+    if (!(pr.escapeLibs && b.turn === pr.attacker)) {
+      const nb = after(pr, b, PASS);
+      if (terminal(pr, nb) === null) { const w = winningMoves(pr, nb, opts).moves.length, score = w === 0 ? -1 : w + (settled(pr, nb, opts) ? 0.5 : 0); if (score < bestScore) { bestScore = score; best = PASS; } }
+    }
     return best === null ? PASS : best;
   }
 
@@ -198,7 +206,8 @@ const Tsumego = (() => {
       zone.push(p);
       if (ch === 'X' || ch === 'x') { b.place(p, BLACK); if (ch === 'x') target = p; }
       else if (ch === 'O' || ch === 'o') { b.place(p, WHITE); if (ch === 'o') target = p; }
-      else if (ch === '.') region.push(p);
+      // 돌 자리도 영역에 넣는다: 따인 뒤 빈칸이 되면 그 자리에 다시 둘 수 있어야 한다 (예: 네모로 먹여 따이게 한 뒤 안쪽에 두기)
+      if (ch !== ',') region.push(p);
     }));
     if (target < 0) throw new Error('목표 돌(x/o)이 없습니다: ' + def.id);
     const defender = b.c[target], attacker = 3 - defender;
