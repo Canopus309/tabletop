@@ -75,6 +75,7 @@
         <span id="rvText"></span>
       </div>
       <button class="mistake-btn hidden" id="nextMistake"></button>
+      <div class="res-links"><button type="button" id="resDl">기보 내려받기</button><a href="../records/#omok">지난 대국 모두 보기 ›</a></div>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
     </div>
 
@@ -146,6 +147,7 @@
 <script src="renju.js"></script>
 <script src="../common/ui.js"></script>
 <script src="../common/leaderboard.js"></script>
+<script src="../common/records.js"></script>
 <script src="../common/rating.js"></script>
 <script>
 "use strict";
@@ -169,6 +171,7 @@ const settings=load('omok-settings',{forbid:true,coords:true,numbers:false,sound
 function soundEnabled(){return settings.sound;}
 
 let game=null,g=null,view=null,thinking=false,epoch=0,hint=-1,pending=-1,hover=-1,forbid=[],winLine=null;
+let recView=null; // 지난 대국 보는 중: 기록의 원래 {over, result}
 
 // ---------- AI 계산 (Web Worker, 안 되면 화면에서 직접) ----------
 let worker=null,reqId=0;const waiters=new Map();
@@ -202,6 +205,7 @@ const turnOf=len=>len%2===0?BLACK:WHITE;
 // 이 폰에서 사람이 두는 색인가 (두 사람 대국이면 둘 다)
 const isPerson=c=>!!game.pvp||c===game.human;
 function newGame(o){
+  if(recView){recView=null;history.replaceState(null,'',location.pathname);}
   cancelAI();epoch++;thinking=false;
   const pvp=o.opp==='pvp',human=pvp?BLACK:o.color===0?(Math.random()<.5?BLACK:WHITE):o.color;
   game={id:Date.now(),human,level:o.level,moves:[],over:false,result:null,assisted:false};
@@ -214,7 +218,44 @@ function newGame(o){
 function rebuild(){g=RJ.Game.from(game.moves);winLine=null;
   if(game.over&&game.moves.length){const last=game.moves[game.moves.length-1];if(g.isWin(last))winLine=RJ.winLine(g.b,last);}
   updateForbid();resize();ui();}
-function save(){store('omok-game',game);}
+function save(){
+  if(recView){recPut(recGame());return;} // 지난 대국은 분석 결과만 기록에 더한다
+  store('omok-game',game);recPut(game);
+}
+// ---------- 지난 대국 기록 (common/records.js) ----------
+const recPut=g=>REC.put('omok',g,recMeta(g),sgfText(g));
+const recGame=()=>recView?Object.assign({},game,{over:recView.over,result:recView.result}):game;
+function recMeta(g){
+  const r=g.over&&g.result;
+  return{opp:g.pvp?'두 사람':`AI ${RJ.LEVELS[g.level].name} (${omokRank(LEVEL_RATING[g.level])})`,side:g.pvp?'':NAME[g.human],info:'렌주',len:g.moves.length+'수',
+    out:!r?'open':r.draw?'draw':g.pvp?'done':r.youWin?'win':'loss',res:!r?'끝나지 않은 대국':r.draw?'무승부 · '+r.how:`${NAME[r.winner]} 승 · ${r.how}`};
+}
+// 기보 파일: SGF (GM[4] = 오목·렌주)
+function sgfText(g){
+  const d=new Date(g.id),c=p=>String.fromCharCode(97+p%N)+String.fromCharCode(97+((p/N)|0)),ai='AI '+RJ.LEVELS[g.level].name;
+  let s=`(;GM[4]FF[4]CA[UTF-8]AP[TableTop]SZ[15]RU[Renju]DT[${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}]`;
+  s+=g.pvp?'PB[흑]PW[백]':`PB[${g.human===BLACK?'나':ai}]PW[${g.human===WHITE?'나':ai}]`;
+  if(g.over&&g.result)s+=`RE[${g.result.draw?'0':(g.result.winner===BLACK?'B':'W')+'+'+(g.result.how==='기권'?'R':'')}]`;
+  g.moves.forEach((p,i)=>{s+=`;${i%2?'W':'B'}[${c(p)}]`;});
+  return s+')';
+}
+const exportSgf=()=>{const g=recGame();REC.download(REC.fileName('omok',g.id),sgfText(g));};
+async function openRecord(id){
+  let r=null;try{r=await REC.get('omok',id);}catch(e){}
+  if(!r){toast('지난 대국 기록을 찾지 못했습니다');history.replaceState(null,'',location.pathname);if(!game||recView){recView=null;resume();}return;}
+  cancelAI();epoch++;thinking=false;hint=-1;pending=-1;analyzing=false;
+  recView={over:r.game.over,result:r.game.result};
+  game=r.game;
+  if(!game.over){game.over=true;game.result={winner:null,how:'',youWin:null,draw:false};}
+  view=game.moves.length;rebuild();draw();analyzeGame();
+}
+// 주소가 #rec=대국id 이면 그 기록을 보고, 아니면 두던 대국으로
+function route(){
+  const m=/^#rec=(\d+)$/.exec(location.hash);
+  if(m){openRecord(+m[1]);return;}
+  if(!game||recView){cancelAI();epoch++;thinking=false;analyzing=false;recView=null;resume();}
+}
+function closeRecord(){history.replaceState(null,'',location.pathname);route();}
 function updateForbid(){forbid=!game.over&&settings.forbid&&g.turn===BLACK?RJ.forbiddenPoints(game.moves):[];}
 
 function playMove(p){
@@ -254,7 +295,7 @@ function endGame(winner,how){
   analyzeGame();
 }
 function undo(){
-  if(!game.moves.length)return;
+  if(recView||!game.moves.length)return;
   cancelAI();epoch++;thinking=false;
   const mv=game.moves.slice();
   do{mv.pop();}while(!game.pvp&&mv.length&&turnOf(mv.length)!==game.human);
@@ -462,10 +503,13 @@ function ui(){
   $('#resultCard').classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
     const r=game.result;
-    $('#resTitle').textContent=r.draw?'무승부':game.pvp?`🎉 ${NAME[r.winner]} 승`:(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
-    $('#resDetail').textContent=r.how;
+    if(recView){const m=recMeta(recGame());$('#resTitle').textContent=`지난 대국 · ${REC.when(game.id)}`;$('#resDetail').textContent=`${m.res} · ${m.opp}${m.side?' · 나 '+m.side:''}`;}
+    else{$('#resTitle').textContent=r.draw?'무승부':game.pvp?`🎉 ${NAME[r.winner]} 승`:(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
+    $('#resDetail').textContent=r.how;}
+    $('#resUndo').textContent=recView?'돌아가기':'무르기';
     const rc=$('#ratingChange'),ra=game.ratingApplied;
-    if(ra){const d=ra.after-ra.before;rc.innerHTML=`내 급수 ${omokRank(ra.before)} → ${RB.text(RB.get())} <span class="${d>=0?'up':'down'}">(레이팅 ${d>=0?'+':''}${d})</span>`;}
+    if(recView)rc.textContent='';
+    else if(ra){const d=ra.after-ra.before;rc.innerHTML=`내 급수 ${omokRank(ra.before)} → ${RB.text(RB.get())} <span class="${d>=0?'up':'down'}">(레이팅 ${d>=0?'+':''}${d})</span>`;}
     else rc.textContent=game.pvp?'':game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(len);
@@ -478,7 +522,7 @@ function ui(){
 }
 
 // ---------- 버튼 ----------
-$('#aUndo').onclick=undo;$('#resUndo').onclick=undo;$('#aHint').onclick=showHint;
+$('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():undo();$('#resDl').onclick=exportSgf;$('#aHint').onclick=showHint;
 $('#aResign').onclick=async()=>{
   if(game.over)return;
   const loser=game.pvp?g.turn:game.human;
@@ -525,16 +569,18 @@ for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('om
 
 // ---------- 시작 ----------
 initWorker();
-(function start(){
+function resume(){
   const saved=load('omok-game',null);
   if(saved&&Array.isArray(saved.moves)){
-    game=saved;view=game.over?game.moves.length:null;rebuild();
+    game=saved;if(!game.id)game.id=Date.now();view=game.over?game.moves.length:null;hint=-1;pending=-1;rebuild();recPut(game);
     if(!game.over){toast('이어서 둡니다');maybeAI();}else analyzeGame();
   }else{
     game={id:Date.now(),human:BLACK,level:2,moves:[],over:false,result:null};
     rebuild();openNew();
   }
-})();
+}
+window.addEventListener('hashchange',route);
+route();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
 </script>
 </body>

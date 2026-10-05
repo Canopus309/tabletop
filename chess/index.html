@@ -99,6 +99,7 @@
         <span id="rvText"></span>
       </div>
       <button class="mistake-btn hidden" id="nextMistake"></button>
+      <div class="res-links"><button type="button" id="resDl">기보 내려받기</button><a href="../records/#chess">지난 대국 모두 보기 ›</a></div>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
     </div>
 
@@ -176,6 +177,7 @@
 
 <script src="../common/ui.js"></script>
 <script src="../common/leaderboard.js"></script>
+<script src="../common/records.js"></script>
 <script src="../common/rating.js"></script>
 <script type="module">
 import { Chess } from './vendor/chess.js';
@@ -188,6 +190,7 @@ const settings=load('chess-settings',{dots:true,coords:true,sound:true,flip:true
 window.soundEnabled=()=>settings.sound;
 
 let game=null,ch=null,view=null,thinking=false,epoch=0,sel=null,hintMv=null,analyzing=false;
+let recView=null; // 지난 대국 보는 중: 기록의 원래 {over, result}
 let engine=null;
 try{ if(!location.protocol.startsWith('http'))throw 0; engine=new Engine('vendor/stockfish-19-lite-single.js'); }catch(e){engine=null;}
 
@@ -203,6 +206,7 @@ const pieceImg=p=>`pieces/${p.color}${p.type.toUpperCase()}.svg`;
 const uci=m=>m.from+m.to+(m.promotion||'');
 function replay(n){const c=new Chess();for(const u of game.moves.slice(0,n))c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]});return c;}
 function newGame(o){
+  if(recView){recView=null;history.replaceState(null,'',location.pathname);}
   if(engine)engine.stop();epoch++;thinking=false;
   const pvp=o.opp==='pvp',human=pvp?'w':o.color==='r'?(Math.random()<.5?'w':'b'):o.color;
   game={id:Date.now(),human,level:o.level,moves:[],sans:[],over:false,result:null,assisted:false,evals:null};
@@ -213,7 +217,47 @@ function newGame(o){
   toast(pvp?'두 사람 대국을 시작합니다 · 백부터 번갈아 두세요':`${NAME[human]}으로 시작합니다 · ${LEVELS[o.level].name} (레이팅 ${LEVELS[o.level].elo})`);
   maybeAI();
 }
-function save(){store('chess-game',game);}
+function save(){
+  if(recView){recPut(recGame());return;} // 지난 대국은 분석 결과만 기록에 더한다
+  store('chess-game',game);recPut(game);
+}
+// ---------- 지난 대국 기록 (common/records.js) ----------
+const recPut=g=>REC.put('chess',g,recMeta(g),pgnText(g));
+const recGame=()=>recView?Object.assign({},game,{over:recView.over,result:recView.result}):game;
+function recMeta(g){
+  const r=g.over&&g.result,L=LEVELS[g.level];
+  return{opp:g.pvp?'두 사람':`Stockfish ${L.name} (${L.elo})`,side:g.pvp?'':NAME[g.human],info:'',len:Math.ceil(g.moves.length/2)+'수',
+    out:!r?'open':r.draw?'draw':g.pvp?'done':r.youWin?'win':'loss',res:!r?'끝나지 않은 대국':r.draw?r.how:`${NAME[r.winner]} 승 · ${r.how}`};
+}
+// 기보 파일: PGN
+function pgnText(g){
+  const d=new Date(g.id),p2=n=>String(n).padStart(2,'0'),L=LEVELS[g.level],ai=`Stockfish ${L.name} (${L.elo})`,r=g.over&&g.result;
+  const res=!r?'*':r.draw?'1/2-1/2':r.winner==='w'?'1-0':'0-1';
+  const tag=(k,v)=>`[${k} "${String(v).replace(/["\\]/g,'')}"]\n`;
+  let s=tag('Event',g.pvp?'Table Top 두 사람 대국':'Table Top AI 대국')+tag('Site','Table Top')+tag('Date',`${d.getFullYear()}.${p2(d.getMonth()+1)}.${p2(d.getDate())}`)+tag('Round','-')
+    +tag('White',g.pvp?'백':g.human==='w'?'나':ai)+tag('Black',g.pvp?'흑':g.human==='b'?'나':ai)+tag('Result',res);
+  if(r&&r.how)s+=tag('Termination',r.how);
+  let body='';g.sans.forEach((m,i)=>{body+=(i%2?'':(i/2+1)+'. ')+m+' ';});
+  // 수순은 한 줄 80자 안쪽으로 줄바꿈
+  return s+'\n'+(body+res).replace(/(.{1,79})(\s|$)/g,'$1\n')+'\n';
+}
+const exportPgn=()=>{const g=recGame();REC.download(REC.fileName('chess',g.id),pgnText(g));};
+async function openRecord(id){
+  let r=null;try{r=await REC.get('chess',id);}catch(e){}
+  if(!r){toast('지난 대국 기록을 찾지 못했습니다');history.replaceState(null,'',location.pathname);if(!game||recView){recView=null;resume();}return;}
+  if(engine)engine.stop();epoch++;thinking=false;analyzing=false;sel=null;hintMv=null;
+  recView={over:r.game.over,result:r.game.result};
+  game=r.game;
+  if(!game.over){game.over=true;game.result={winner:null,how:'',draw:false,youWin:null};}
+  ch=replay(game.moves.length);setFlip(0);view=game.moves.length;render();ui();analyzeGame();
+}
+// 주소가 #rec=대국id 이면 그 기록을 보고, 아니면 두던 대국으로
+function route(){
+  const m=/^#rec=(\d+)$/.exec(location.hash);
+  if(m){openRecord(+m[1]);return;}
+  if(!game||recView){if(engine)engine.stop();epoch++;thinking=false;analyzing=false;recView=null;resume();}
+}
+function closeRecord(){history.replaceState(null,'',location.pathname);route();}
 function applyMove(u){
   const m=ch.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]});
   game.moves.push(uci(m));game.sans.push(m.san);
@@ -268,7 +312,7 @@ function finish(resign){
   analyzeGame();
 }
 function undo(){
-  if(!game.moves.length)return;
+  if(recView||!game.moves.length)return;
   if(engine)engine.stop();epoch++;thinking=false;
   const mv=game.moves.slice();
   do{mv.pop();}while(!game.pvp&&mv.length&&(mv.length%2===0?'w':'b')!==game.human);
@@ -460,10 +504,13 @@ function ui(){
   $('#resultCard').classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
     const r=game.result;
-    $('#resTitle').textContent=r.draw?'무승부':game.pvp?`🎉 ${NAME[r.winner]} 승`:(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
-    $('#resDetail').textContent=r.how;
+    if(recView){const m=recMeta(recGame());$('#resTitle').textContent=`지난 대국 · ${REC.when(game.id)}`;$('#resDetail').textContent=`${m.res} · ${m.opp}${m.side?' · 나 '+m.side:''}`;}
+    else{$('#resTitle').textContent=r.draw?'무승부':game.pvp?`🎉 ${NAME[r.winner]} 승`:(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
+    $('#resDetail').textContent=r.how;}
+    $('#resUndo').textContent=recView?'돌아가기':'무르기';
     const rc=$('#ratingChange');
-    if(game.ratingApplied!=null){const d=game.ratingApplied;rc.innerHTML=`레이팅 ${ratingText(R)} <span class="${d>=0?'up':'down'}">(${d>=0?'+':''}${d})</span>`;}
+    if(recView)rc.textContent='';
+    else if(game.ratingApplied!=null){const d=game.ratingApplied;rc.innerHTML=`레이팅 ${ratingText(R)} <span class="${d>=0?'up':'down'}">(${d>=0?'+':''}${d})</span>`;}
     else rc.textContent=game.pvp?'':game.assisted?'무르기·힌트를 써서 레이팅에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(len);
@@ -477,7 +524,7 @@ function ui(){
 $('#moveList').addEventListener('click',e=>{const m=e.target.closest('.m');if(m&&game.over)setView(+m.dataset.i);});
 
 // ---------- 버튼 ----------
-$('#aUndo').onclick=undo;$('#resUndo').onclick=undo;$('#aHint').onclick=hint;
+$('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():undo();$('#resDl').onclick=exportPgn;$('#aHint').onclick=hint;
 $('#aResign').onclick=async()=>{
   if(game.over)return;
   const loser=game.pvp?ch.turn():game.human,winner=loser==='w'?'b':'w';
@@ -524,16 +571,18 @@ $('#btnSettings').onclick=()=>{for(const k in OPT)$(OPT[k]).checked=settings[k];
 for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('chess-settings',settings);if(game)setFlip(0);render();};
 
 // ---------- 시작 ----------
-(function start(){
+function resume(){
   const saved=load('chess-game',null);
   if(saved&&Array.isArray(saved.moves)){
-    game=saved;ch=replay(game.moves.length);setFlip(0);view=game.over?game.moves.length:null;render();ui();
+    game=saved;if(!game.id)game.id=Date.now();sel=null;hintMv=null;ch=replay(game.moves.length);setFlip(0);view=game.over?game.moves.length:null;render();ui();recPut(game);
     if(game.over)analyzeGame();else{toast('이어서 둡니다');maybeAI();}
   }else{
     game={id:Date.now(),human:'w',level:2,moves:[],sans:[],over:false,result:null,assisted:false,evals:null};
     ch=new Chess();render();ui();openNew();
   }
-})();
+}
+window.addEventListener('hashchange',route);
+route();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
 </script>
 </body>

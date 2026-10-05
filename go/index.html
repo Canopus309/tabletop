@@ -71,6 +71,7 @@
         <span id="rvText"></span>
       </div>
       <button class="mistake-btn hidden" id="nextMistake"></button>
+      <div class="res-links"><button type="button" id="resDl">기보 내려받기</button><a href="../records/#go">지난 대국 모두 보기 ›</a></div>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
     </div>
 
@@ -287,6 +288,7 @@ self.onmessage=e=>self.postMessage(handleMessage(e.data));
 <script src="katago.js"></script>
 <script src="../common/ui.js"></script>
 <script src="../common/leaderboard.js"></script>
+<script src="../common/records.js"></script>
 
 <!-- ================= APP ================= -->
 <script>
@@ -312,6 +314,7 @@ const NAME={1:'흑',2:'백'};
 const settings=load('baduk-settings',{coords:true,numbers:false,sound:true,showWr:false,model:'b10',confirm:matchMedia('(pointer:coarse)').matches});
 
 let game=null,board=null,view=null,thinking=false,thinkFor=0,epoch=0;
+let recView=null; // 지난 대국 보는 중: 기록의 원래 {over, result}
 let hints=null,ownMap=null,deadSet=null,pending=0,hover=0;
 
 // ---------- 엔진 호출 (Web Worker, 실패 시 메인 스레드) ----------
@@ -436,7 +439,7 @@ function loadRating(){try{return JSON.parse(localStorage.getItem('baduk-rating')
 function recordGameRank(){
   if(game.pvp){save();ui();return;}
   const s=samplesOf(game);game.myRank=estimateRank(s);
-  if(s.length>=10&&game.result){
+  if(s.length>=10&&game.result&&!recView){
     const list=loadRating().filter(r=>r.id!==game.id);
     list.push({id:game.id||Date.now(),date:new Date().toISOString().slice(0,10),n:game.n,level:game.level,win:!!game.result.youWin,rank:game.myRank,s:s.map(v=>v.mq)});
     store('baduk-rating',list.slice(-30));
@@ -568,6 +571,7 @@ const aiColor=()=>3-game.human;
 const isPerson=c=>!!game.pvp||c===game.human;
 
 function newGame(o){
+  if(recView){recView=null;history.replaceState(null,'',location.pathname);}
   cancelEngine();stopPonder();epoch++;
   if(kataState==='ready')Kata.resetSession();
   const pvp=o.opp==='pvp',human=pvp?BLACK:o.color===0?(Math.random()<.5?1:2):o.color;
@@ -583,7 +587,36 @@ function newGame(o){
 }
 function resetView(){view=null;hints=null;ownMap=null;deadSet=null;pending=0;hover=0;}
 function rebuild(){board=Board.fromState(stateOf());resize();ui();}
-function save(){store('baduk-game',game);}
+function save(){
+  if(recView){recPut(recGame());return;} // 지난 대국은 분석 결과만 기록에 더한다
+  store('baduk-game',game);recPut(game);
+}
+// ---------- 지난 대국 기록 (common/records.js) ----------
+const recPut=g=>REC.put('go',g,recMeta(g),sgfText(g));
+// 보는 중인 기록을 원래 상태(끝나지 않은 대국 포함)로 되돌린 것
+const recGame=()=>recView?Object.assign({},game,{over:recView.over,result:recView.result}):game;
+function recMeta(g){
+  const done=g.over&&g.result;
+  return{opp:g.pvp?'두 사람':`AI ${LEVELS[g.level].name} (${LEVELS[g.level].rank})`,side:g.pvp?'':NAME[g.human],
+    info:`${g.n}줄${g.setup.length?' · '+g.setup.length+'점 접바둑':''}`,len:g.moves.length+'수',
+    out:!done?'open':g.pvp?'done':g.result.youWin?'win':'loss',res:done?g.result.title:'끝나지 않은 대국'};
+}
+async function openRecord(id){
+  let r=null;try{r=await REC.get('go',id);}catch(e){}
+  if(!r){toast('지난 대국 기록을 찾지 못했습니다');history.replaceState(null,'',location.pathname);if(!game||recView){recView=null;resume();}return;}
+  cancelEngine();stopPonder();epoch++;thinking=false;
+  recView={over:r.game.over,result:r.game.result};
+  game=r.game;
+  if(!game.over){game.over=true;game.result={winner:0,detail:'',title:'',youWin:null};}
+  resetView();rebuild();view=game.moves.length;ui();draw();analyzeGame();
+}
+// 주소가 #rec=대국id 이면 그 기록을 보고, 아니면 두던 대국으로
+function route(){
+  const m=/^#rec=(\d+)$/.exec(location.hash);
+  if(m){openRecord(+m[1]);return;}
+  if(!game||recView){epoch++;thinking=false;recView=null;resume();}
+}
+function closeRecord(){history.replaceState(null,'',location.pathname);route();}
 
 function playMove(p){
   const cap=board.play(p);game.moves.push(p);
@@ -735,7 +768,7 @@ function endGame(winner,detail,how){
 }
 
 function undo(){
-  if(!game.moves.length)return;
+  if(recView||!game.moves.length)return;
   cancelEngine();stopPonder();epoch++;thinking=false;
   const first=game.setup.length?WHITE:BLACK;
   const turnAt=len=>len%2===0?first:3-first;
@@ -781,19 +814,18 @@ async function estimateNow(){
   draw();ui();
 }
 
-function exportSgf(){
-  const tmp=new Board(game.n),c=p=>{const [x,y]=tmp.xy(p);return String.fromCharCode(97+x)+String.fromCharCode(97+y);};
-  const d=new Date().toISOString().slice(0,10);
-  let s=`(;GM[1]FF[4]CA[UTF-8]AP[BadukAI]SZ[${game.n}]KM[${game.komi}]DT[${d}]RU[Chinese]`;
-  s+=game.pvp?'PB[흑]PW[백]':`PB[${game.human===1?'나':'AI '+LEVELS[game.level].name}]PW[${game.human===2?'나':'AI '+LEVELS[game.level].name}]`;
-  if(game.setup.length)s+=`HA[${game.setup.length}]AB`+game.setup.map(p=>`[${c(p)}]`).join('');
-  if(game.result)s+=`RE[${game.result.winner===1?'B':'W'}+${game.result.title.includes('불계')?'R':game.result.title.match(/[\d.]+/)[0]}]`;
-  let col=game.setup.length?'W':'B';
-  for(const m of game.moves){s+=`;${col}[${m===PASS?'':c(m)}]`;col=col==='B'?'W':'B';}
-  s+=')';
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'application/x-go-sgf'}));
-  a.download=`baduk-${d}.sgf`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+function sgfText(g){
+  const tmp=new Board(g.n),c=p=>{const [x,y]=tmp.xy(p);return String.fromCharCode(97+x)+String.fromCharCode(97+y);};
+  const d=new Date(g.id||Date.now()),ai='AI '+LEVELS[g.level].name;
+  let s=`(;GM[1]FF[4]CA[UTF-8]AP[TableTop]SZ[${g.n}]KM[${g.komi}]DT[${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}]RU[Chinese]`;
+  s+=g.pvp?'PB[흑]PW[백]':`PB[${g.human===1?'나':ai}]PW[${g.human===2?'나':ai}]`;
+  if(g.setup.length)s+=`HA[${g.setup.length}]AB`+g.setup.map(p=>`[${c(p)}]`).join('');
+  if(g.over&&g.result)s+=`RE[${g.result.winner===1?'B':'W'}+${g.result.title.includes('불계')?'R':g.result.title.match(/[\d.]+/)[0]}]`;
+  let col=g.setup.length?'W':'B';
+  for(const m of g.moves){s+=`;${col}[${m===PASS?'':c(m)}]`;col=col==='B'?'W':'B';}
+  return s+')';
 }
+const exportSgf=()=>{const g=recGame();REC.download(REC.fileName('go',g.id||Date.now()),sgfText(g));};
 
 // ---------- 그리기 ----------
 const cv=$('#board'),ctx=cv.getContext('2d'),wrap=$('#boardWrap');
@@ -937,8 +969,10 @@ function ui(){
   $('#playCard').classList.toggle('hidden',game.over);
   const rc=$('#resultCard');rc.classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
-    $('#resTitle').textContent=game.pvp?'🎉 '+game.result.title:(game.result.youWin?'🎉 승리! ':'아쉬운 패배 · ')+game.result.title;
-    $('#resDetail').textContent=game.result.detail;
+    if(recView){const m=recMeta(recGame());$('#resTitle').textContent=`지난 대국 · ${REC.when(game.id)}`;$('#resDetail').textContent=`${m.res} · ${m.opp}${m.side?' · 나 '+m.side:''}`;}
+    else{$('#resTitle').textContent=game.pvp?'🎉 '+game.result.title:(game.result.youWin?'🎉 승리! ':'아쉬운 패배 · ')+game.result.title;
+    $('#resDetail').textContent=game.result.detail;}
+    $('#resUndo').textContent=recView?'돌아가기':'무르기';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=view===null?game.moves.length:view;
     $('#rvText').textContent=`${rg.value}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(vi);
@@ -953,7 +987,7 @@ function ui(){
 }
 
 // ---------- 버튼 ----------
-$('#aUndo').onclick=undo;$('#resUndo').onclick=undo;
+$('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():undo();$('#resDl').onclick=exportSgf;
 $('#aPass').onclick=async()=>{if(!isPerson(board.turn)||thinking||game.over)return;
   if(board.last!==PASS&&game.moves.length<game.n*game.n*0.3&&!(await ask('패스할까요?','아직 둘 곳이 많이 남아 있습니다.','패스')))return;
   playMove(PASS);};
@@ -1036,17 +1070,19 @@ for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('ba
 
 // ---------- 시작 ----------
 initWorker();startKata();setTimeout(lbSync,3000);saveSummary();
-(function start(){
+function resume(){
   const saved=load('baduk-game',null);
   if(saved&&saved.n&&Array.isArray(saved.moves)){
-    game=saved;resetView();rebuild();
+    game=saved;if(!game.id)game.id=Date.now();resetView();rebuild();recPut(game);
     if(game.over){view=game.moves.length;if(game.moves.length>=2&&game.moves.at(-1)===PASS&&game.moves.at(-2)===PASS&&!game.result.title.includes('불계'))finishGame();ui();}
     else{toast('이어서 둡니다');maybeAI();}
   }else{
     game={n:9,komi:7.5,handicap:0,human:1,level:2,setup:[],moves:[],over:false,result:null,wr:0.5};
     rebuild();openNew();
   }
-})();
+}
+window.addEventListener('hashchange',route);
+route();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
 </script>
 </body>

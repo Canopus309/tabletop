@@ -79,6 +79,8 @@ a.icon-btn{color:var(--text);text-decoration:none}
 .ana .bad{color:var(--danger);font-weight:700}
 .mistake-btn{width:100%;margin:-2px 0 12px;padding:9px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--danger);font-weight:600;cursor:pointer}
 .mistake-btn:disabled{color:var(--muted);cursor:default}
+.res-links{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 18px;margin:-4px 0 8px;font-size:13px;font-weight:600}
+.res-links button,.res-links a{border:0;background:none;padding:4px 2px;color:var(--accent);font:inherit;cursor:pointer;text-decoration:none}
 .rank-line{font-size:14px;font-weight:600;margin:-6px 0 10px}
 .lvdesc.rec{color:var(--accent);font-weight:600}
 .rank-big{font-size:36px;font-weight:800;text-align:center;letter-spacing:-.02em;margin:4px 0 2px}

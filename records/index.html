@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>지난 대국 · Table Top</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../common/base.css">
+<style>
+.wrap{max-width:720px;margin:0 auto;padding:6px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.tabs{display:flex;gap:6px;margin:6px 0 14px}
+.tab{flex:1;padding:10px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.sum{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 12px}
+.sum b{font-size:15px}
+.sum span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.sum button{flex:none;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:13px;cursor:pointer}
+.sum button:disabled{opacity:.45;cursor:default}
+.list{display:flex;flex-direction:column;gap:8px}
+.rec{display:flex;align-items:center;gap:12px;padding:11px 8px 11px 12px;border-radius:14px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);color:inherit;text-decoration:none}
+.rec:hover{border-color:var(--muted)}
+.rec .o{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:13.5px;background:var(--chip);color:var(--muted)}
+.rec .o.win{background:var(--accent);color:var(--accent-ink)}
+.rec .o.loss{background:var(--danger);color:#fff}
+.rec .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rec .t b{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec .t small{font-size:12.5px;color:var(--muted);line-height:1.45}
+.rec .now{color:var(--accent);font-weight:700}
+.rec .dl{flex:none;width:40px;height:40px;border:0;border-radius:10px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.rec .dl:hover{background:var(--chip);color:var(--text)}
+.rec .dl svg{width:20px;height:20px}
+.empty{padding:26px 10px;text-align:center;color:var(--muted);font-size:14px;line-height:1.6}
+.more{display:block;width:100%;margin-top:10px}
+.note{margin:16px 4px 0;font-size:12.5px;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../" title="Table Top 홈" aria-label="Table Top 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+    지난 대국
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" id="tabs">
+    <button class="tab" data-k="go">바둑</button>
+    <button class="tab" data-k="omok">오목</button>
+    <button class="tab" data-k="chess">체스</button>
+  </nav>
+  <div class="sum"><div><b id="sumTitle"></b><span id="sumSub"></span></div><button type="button" id="dlAll">전체 내려받기</button></div>
+  <div class="list" id="list"></div>
+  <button class="ghost more hidden" id="more" type="button">더 보기</button>
+  <p class="note">대국은 끝날 때까지 한 수 한 수 이 기기에 자동으로 저장됩니다. 누르면 그 대국을 다시 볼 수 있고, 오른쪽 단추로 기보 파일(바둑·오목 SGF, 체스 PGN)을 내려받을 수 있습니다. 기록은 이 기기의 브라우저 안에만 있어서, 브라우저 데이터를 지우면 함께 지워집니다. 오래 남길 기록은 내려받아 두세요.</p>
+</main>
+
+<div id="toast"></div>
+<script src="../common/ui.js"></script>
+<script src="../common/records.js"></script>
+<script>
+'use strict';
+const GAMES={go:{name:'바둑',url:'../go/',cur:'baduk-game'},omok:{name:'오목',url:'../omok/',cur:'omok-game'},chess:{name:'체스',url:'../chess/',cur:'chess-game'}};
+const OUT={win:'승',loss:'패',draw:'무',done:'끝',open:'…'};
+const PAGE=50;
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let cur='go',rows=[],shown=PAGE,failed=false;
+// 지금 두고 있는 대국 id (끝나지 않았으면 '이어 두기'로 연다)
+function playingId(k){try{const g=JSON.parse(localStorage.getItem(GAMES[k].cur));return g&&!g.over?g.id:null;}catch(e){return null;}}
+function render(){
+  const g=GAMES[cur],now=playingId(cur);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.k===cur));
+  const cnt=o=>rows.filter(r=>r.meta&&r.meta.out===o).length,two=cnt('done');
+  $('#sumTitle').textContent=`${g.name} 대국 ${rows.length}판`;
+  $('#sumSub').textContent=rows.length?`승 ${cnt('win')} · 패 ${cnt('loss')}${cnt('draw')?' · 무 '+cnt('draw'):''}${two?' · 두 사람 '+two:''}${cnt('open')?' · 끝나지 않음 '+cnt('open'):''}`:'';
+  $('#dlAll').disabled=!rows.length;
+  const list=$('#list');
+  if(!rows.length){list.innerHTML=`<div class="empty">${failed?'이 브라우저에서는 기록을 저장할 수 없습니다.<br>(개인 정보 보호 모드에서는 저장이 막힐 수 있습니다)':`아직 저장된 ${g.name} 대국이 없습니다.<br>대국을 두면 자동으로 여기에 쌓입니다.`}</div>`;$('#more').classList.add('hidden');return;}
+  list.innerHTML=rows.slice(0,shown).map((r,i)=>{
+    const m=r.meta||{},live=r.id===now&&m.out==='open';
+    const o=m.out==='done'&&r.game.result&&r.game.result.winner?(cur==='chess'?(r.game.result.winner==='w'?'백':'흑'):r.game.result.winner===1?'흑':'백')+'승':OUT[m.out]||'…';
+    const href=live?g.url:`${g.url}#rec=${r.id}`;
+    return `<a class="rec" href="${href}"><span class="o ${m.out||''}">${o}</span><span class="t"><b>${esc(m.opp||'')}${m.side?' · 나 '+esc(m.side):''}</b>`
+      +`<small>${REC.when(r.id)} · ${m.info?esc(m.info)+' · ':''}${esc(m.len||'')}<br>${live?'<span class="now">두는 중 · 이어 두기 ›</span>':esc(m.res||'')}</small></span>`
+      +`<button class="dl" type="button" data-i="${i}" title="기보 내려받기" aria-label="기보 내려받기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button></a>`;
+  }).join('');
+  const more=$('#more');more.classList.toggle('hidden',rows.length<=shown);more.textContent=`더 보기 (${rows.length-shown}판 남음)`;
+}
+$('#list').addEventListener('click',e=>{
+  const b=e.target.closest('.dl');if(!b)return;
+  e.preventDefault();e.stopPropagation();
+  const r=rows[+b.dataset.i];if(r)REC.download(REC.fileName(cur,r.id),r.file);
+});
+$('#more').onclick=()=>{shown+=PAGE;render();};
+// 전체 내려받기: 바둑·오목은 SGF 모음(한 파일에 여러 대국), 체스는 PGN 여러 판
+$('#dlAll').onclick=()=>{if(rows.length)REC.download(REC.allName(cur),rows.slice().reverse().map(r=>r.file.trim()).join('\n\n')+'\n');};
+async function show(){
+  let k=location.hash.slice(1);if(!GAMES[k])k='go';cur=k;shown=PAGE;
+  try{rows=await REC.list(k);failed=false;}catch(e){rows=[];failed=true;}
+  if(k===cur)render();
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{history.replaceState(null,'',location.pathname+'#'+t.dataset.k);show();});
+window.addEventListener('hashchange',show);
+show();
+// 기록이 브라우저 정리 때 지워지지 않게 오래 보관을 요청한다 (허락 여부는 브라우저가 정함)
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist();}).catch(()=>{});}catch(e){}
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
+</script>
+</body>
+</html>
