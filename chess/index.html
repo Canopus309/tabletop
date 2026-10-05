@@ -107,13 +107,18 @@
 <dialog id="dlgNew">
   <div class="dlg">
     <h2>새 게임 · 체스</h2>
-    <div class="field"><span class="flabel">내 색</span>
+    <div class="field"><span class="flabel">상대</span>
+      <div class="seg">
+        <input type="radio" name="opp" id="oAI" value="ai" checked><label for="oAI">AI</label>
+        <input type="radio" name="opp" id="oPvp" value="pvp"><label for="oPvp">사람<small>한 폰으로 번갈아</small></label>
+      </div></div>
+    <div class="field" id="fColor"><span class="flabel">내 색</span>
       <div class="seg">
         <input type="radio" name="color" id="cW" value="w" checked><label for="cW">백 (먼저)</label>
         <input type="radio" name="color" id="cB" value="b"><label for="cB">흑</label>
         <input type="radio" name="color" id="cR" value="r"><label for="cR">무작위</label>
       </div></div>
-    <div class="field"><span class="flabel">AI 레이팅</span>
+    <div class="field" id="fLevel"><span class="flabel">AI 레이팅</span>
       <div class="seg" id="segLevel"></div>
       <div class="lvdesc" id="lvDesc"></div>
       <div class="lvdesc rec" id="recLevel"></div></div>
@@ -134,6 +139,7 @@
     <label class="toggle"><div>갈 수 있는 칸 표시</div><span class="sw"><input type="checkbox" id="optDots"><span></span></span></label>
     <label class="toggle"><div>좌표 표시</div><span class="sw"><input type="checkbox" id="optCoords"><span></span></span></label>
     <label class="toggle"><div>효과음 · 진동</div><span class="sw"><input type="checkbox" id="optSound"><span></span></span></label>
+    <label class="toggle"><div>두 사람 대국: 차례마다 판 돌리기<small>둘 차례인 쪽이 항상 아래에 오게 합니다</small></div><span class="sw"><input type="checkbox" id="optFlip"><span></span></span></label>
     <p class="credit">AI: <b>Stockfish 19</b> Lite (GPL-3.0, nmrugg/stockfish.js) · 규칙: chess.js (BSD) · 말 그림: cburnett (GPL-2.0+)</p>
     <div class="dlg-actions" style="margin-top:14px"><button type="button" class="primary" data-close="ok">닫기</button></div>
   </div>
@@ -176,7 +182,7 @@ migrateLevels('chess',['chess-game','chess-newopts','chess-rating']);
 
 const NAME={w:'백',b:'흑'};
 const VAL={p:1,n:3,b:3,r:5,q:9,k:0};
-const settings=load('chess-settings',{dots:true,coords:true,sound:true});
+const settings=load('chess-settings',{dots:true,coords:true,sound:true,flip:true});
 window.soundEnabled=()=>settings.sound;
 
 let game=null,ch=null,view=null,thinking=false,epoch=0,sel=null,hintMv=null,analyzing=false;
@@ -184,17 +190,25 @@ let engine=null;
 try{ if(!location.protocol.startsWith('http'))throw 0; engine=new Engine('vendor/stockfish-19-lite-single.js'); }catch(e){engine=null;}
 
 // ---------- 게임 ----------
+// 이 폰에서 사람이 두는 색인가 (두 사람 대국이면 둘 다)
+const isPerson=c=>!!game.pvp||c===game.human;
+// 판 아래쪽에 올 색: AI 대국은 내 색, 두 사람 대국은 백 (판 돌리기를 켜면 둘 차례인 쪽)
+let flipSide='w',flipT=0;
+const bottom=()=>game.pvp?(settings.flip?flipSide:'w'):game.human;
+function setFlip(delay){clearTimeout(flipT);const want=ch.turn();if(!game.pvp||want===flipSide)return;
+  if(delay)flipT=setTimeout(()=>{flipSide=ch.turn();render();},delay);else flipSide=want;}
 const pieceImg=p=>`pieces/${p.color}${p.type.toUpperCase()}.svg`;
 const uci=m=>m.from+m.to+(m.promotion||'');
 function replay(n){const c=new Chess();for(const u of game.moves.slice(0,n))c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]});return c;}
 function newGame(o){
   if(engine)engine.stop();epoch++;thinking=false;
-  const human=o.color==='r'?(Math.random()<.5?'w':'b'):o.color;
+  const pvp=o.opp==='pvp',human=pvp?'w':o.color==='r'?(Math.random()<.5?'w':'b'):o.color;
   game={id:Date.now(),human,level:o.level,moves:[],sans:[],over:false,result:null,assisted:false,evals:null};
-  view=null;sel=null;hintMv=null;ch=new Chess();
+  if(pvp)game.pvp=true;
+  view=null;sel=null;hintMv=null;ch=new Chess();setFlip(0);
   if(engine)engine.newGame();
   save();render();ui();
-  toast(`${NAME[human]}으로 시작합니다 · ${LEVELS[o.level].name} (레이팅 ${LEVELS[o.level].elo})`);
+  toast(pvp?'두 사람 대국을 시작합니다 · 백부터 번갈아 두세요':`${NAME[human]}으로 시작합니다 · ${LEVELS[o.level].name} (레이팅 ${LEVELS[o.level].elo})`);
   maybeAI();
 }
 function save(){store('chess-game',game);}
@@ -206,10 +220,11 @@ function applyMove(u){
   if(settings.sound&&navigator.vibrate)try{navigator.vibrate(10);}catch(e){}
   if(ch.isGameOver()){finish();return;}
   save();render();ui();
+  setFlip(650); // 둔 수를 잠깐 보여 준 뒤 판을 돌린다
   maybeAI();
 }
 async function maybeAI(){
-  if(!engine||game.over||ch.turn()===game.human)return;
+  if(!engine||game.over||isPerson(ch.turn()))return;
   const ep=epoch,t0=performance.now();
   thinking=true;ui();
   let u;
@@ -221,10 +236,10 @@ async function maybeAI(){
   applyMove(u);
 }
 function humanMove(from,to){
-  if(game.over||thinking||view!==null||ch.turn()!==game.human)return false;
+  if(game.over||thinking||view!==null||!isPerson(ch.turn()))return false;
   const legal=ch.moves({square:from,verbose:true}).filter(m=>m.to===to);
   if(!legal.length){return false;}
-  if(legal.some(m=>m.promotion)){askPromo(game.human).then(p=>{if(p)applyMove(from+to+p);else{sel=null;render();}});return true;}
+  if(legal.some(m=>m.promotion)){askPromo(ch.turn()).then(p=>{if(p)applyMove(from+to+p);else{sel=null;render();}});return true;}
   applyMove(from+to);return true;
 }
 function askPromo(color){
@@ -244,8 +259,8 @@ function finish(resign){
   else if(ch.isInsufficientMaterial())how='체크메이트할 기물 부족 (무승부)';
   else if(ch.isDrawByFiftyMoves())how='50수 규칙 (무승부)';
   else how='무승부';
-  game.result={winner,how,draw:!winner,youWin:winner===game.human};
-  sound(game.result.youWin?'win':'pass');
+  game.result={winner,how,draw:!winner,youWin:game.pvp?null:winner===game.human};
+  sound(game.result.youWin!==false&&winner?'win':'pass');
   updateRating();
   view=game.moves.length;save();render();ui();
   analyzeGame();
@@ -254,14 +269,14 @@ function undo(){
   if(!game.moves.length)return;
   if(engine)engine.stop();epoch++;thinking=false;
   const mv=game.moves.slice();
-  do{mv.pop();}while(mv.length&&(mv.length%2===0?'w':'b')!==game.human);
+  do{mv.pop();}while(!game.pvp&&mv.length&&(mv.length%2===0?'w':'b')!==game.human);
   if(!game.over||game.ratingApplied==null)game.assisted=true; // 대국 중 무르기 → 레이팅 미반영
   game.moves=mv;game.sans=game.sans.slice(0,mv.length);game.over=false;game.result=null;game.evals=null;
-  view=null;sel=null;hintMv=null;ch=replay(mv.length);
+  view=null;sel=null;hintMv=null;ch=replay(mv.length);setFlip(0);
   save();render();ui();maybeAI();
 }
 async function hint(){
-  if(!engine||game.over||thinking||ch.turn()!==game.human)return;
+  if(!engine||game.over||thinking||!isPerson(ch.turn()))return;
   if(hintMv){hintMv=null;render();ui();return;}
   const ep=epoch;thinking=true;ui();
   const r=await engine.best(game.moves.slice(),14);
@@ -274,7 +289,7 @@ const RB=ratingBoard({game:'chess',start:1200,levels:LEVELS.map(l=>({name:l.name
   sub:R=>`레이팅 대국 ${R.games}판 · 편차 ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`});
 const loadRating=RB.get,ratingText=RB.text;
 function updateRating(){
-  if(game.assisted||game.ratingApplied!=null||game.moves.length<4&&!game.result.winner)return;
+  if(game.pvp||game.assisted||game.ratingApplied!=null||game.moves.length<4&&!game.result.winner)return;
   const r=RB.apply(game.level,game.result.draw?0.5:game.result.youWin?1:0,game.id);
   game.ratingApplied=Math.round(r.after)-Math.round(r.before);
 }
@@ -320,7 +335,7 @@ function drawGraph(){
   let last=-1;while(last+1<=game.moves.length&&ev[last+1]!=null)last++;
   if(last>=0){g.beginPath();g.moveTo(X(0),h);for(let i=0;i<=last;i++)g.lineTo(X(i),Y(ev[i]));g.lineTo(X(last),h);g.closePath();g.fillStyle='#f0efe9';g.fill();}
   g.strokeStyle='rgba(128,128,128,.7)';g.setLineDash([3,3]);g.beginPath();g.moveTo(0,Y(50));g.lineTo(w,Y(50));g.stroke();g.setLineDash([]);
-  for(const m of mistakes()){g.fillStyle=m.loss>=50?'#e0463f':'#f0a020';g.beginPath();g.arc(X(m.i),Y(ev[m.i]),m.mover===game.human?4:2.5,0,7);g.fill();}
+  for(const m of mistakes()){g.fillStyle=m.loss>=50?'#e0463f':'#f0a020';g.beginPath();g.arc(X(m.i),Y(ev[m.i]),isPerson(m.mover)?4:2.5,0,7);g.fill();}
   const vi=view!==null?view:game.moves.length;
   g.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2f6f5e';g.lineWidth=2;g.beginPath();g.moveTo(X(vi),0);g.lineTo(X(vi),h);g.stroke();
 }
@@ -328,11 +343,11 @@ function graphPick(e){const r=gcv.getBoundingClientRect();setView(Math.round((e.
 gcv.addEventListener('pointerdown',e=>{if(!game||!game.over)return;try{gcv.setPointerCapture(e.pointerId);}catch(_){}graphPick(e);});
 gcv.addEventListener('pointermove',e=>{if(e.buttons&&game&&game.over)graphPick(e);});
 new ResizeObserver(()=>drawGraph()).observe(gcv);
-$('#nextMistake').onclick=()=>{const mine=mistakes().filter(m=>m.mover===game.human);if(!mine.length)return;const cur=view??game.moves.length;setView((mine.find(m=>m.i>cur)||mine[0]).i);};
+$('#nextMistake').onclick=()=>{const mine=mistakes().filter(m=>isPerson(m.mover));if(!mine.length)return;const cur=view??game.moves.length;setView((mine.find(m=>m.i>cur)||mine[0]).i);};
 
 // ---------- 판 그리기 ----------
 const cb=$('#cb'),FILES='abcdefgh';
-function squareOrder(){const out=[];for(let r=0;r<8;r++)for(let f=0;f<8;f++){const rank=game.human==='w'?8-r:r+1,file=game.human==='w'?f:7-f;out.push(FILES[file]+rank);}return out;}
+function squareOrder(){const bt=bottom(),out=[];for(let r=0;r<8;r++)for(let f=0;f<8;f++){const rank=bt==='w'?8-r:r+1,file=bt==='w'?f:7-f;out.push(FILES[file]+rank);}return out;}
 // 64칸은 한 번만 만들고(방향·좌표 설정이 바뀔 때만 다시), 그 뒤로는 바뀐 칸의 표시만 고친다
 let cells=null,builtKey='';
 function buildBoard(){
@@ -349,7 +364,7 @@ function buildBoard(){
 }
 function render(){
   if(!game)return;
-  const key=game.human+(settings.coords?'c':'');
+  const key=bottom()+(settings.coords?'c':'');
   if(!cells||builtKey!==key){buildBoard();builtKey=key;}
   const len=view!==null?view:game.moves.length,c=len===game.moves.length?ch:replay(len);
   const last=len?game.moves[len-1]:null,targets=new Map();
@@ -376,10 +391,10 @@ let drag=null;
 const sqAt=(x,y)=>{const el=document.elementFromPoint(x,y);const s=el&&el.closest&&el.closest('.sq');return s?s.dataset.sq:null;};
 cb.addEventListener('pointerdown',e=>{
   const s=e.target.closest('.sq');if(!s)return;const sq=s.dataset.sq;
-  if(game.over||thinking||view!==null||ch.turn()!==game.human)return;
-  const p=ch.get(sq);
-  if(sel&&sel!==sq&&!(p&&p.color===game.human)){if(humanMove(sel,sq))return;sel=null;render();return;}
-  if(p&&p.color===game.human){
+  if(game.over||thinking||view!==null||!isPerson(ch.turn()))return;
+  const p=ch.get(sq),me=ch.turn();
+  if(sel&&sel!==sq&&!(p&&p.color===me)){if(humanMove(sel,sq))return;sel=null;render();return;}
+  if(p&&p.color===me){
     sel=sq;render();
     const img=document.createElement('img');img.src=pieceImg(p);img.className='drag-ghost';const size=s.getBoundingClientRect().width;img.style.width=img.style.height=size+'px';
     drag={from:sq,img,moved:false,x:e.clientX,y:e.clientY};
@@ -416,51 +431,56 @@ function ui(){
   const diff=material(c),caps=capturedUpTo(len);
   for(const col of ['w','b']){
     const el=col==='w'?$('#pW'):$('#pB');
-    el.querySelector('.who').textContent=col===game.human?`나 · ${ratingText(R)}`:`Stockfish · ${L.name} ${L.elo}`;
+    el.querySelector('.who').textContent=game.pvp?'사람':col===game.human?`나 · ${ratingText(R)}`:`Stockfish · ${L.name} ${L.elo}`;
     const adv=col==='w'?diff:-diff,opp=col==='w'?'b':'w';
     let ch2='',prev='';
     for(const t of caps[col]){if(prev&&prev!==t)ch2+='<span class="gap"></span>';ch2+=`<img src="pieces/${opp}${t.toUpperCase()}.svg" alt="">`;prev=t;}
     if(adv>0)ch2+=`<b>+${adv}</b>`;
     const capEl=el.querySelector('.capt');if(capEl.dataset.k!==ch2){capEl.innerHTML=ch2;capEl.dataset.k=ch2;}
     el.classList.toggle('active',!game.over&&ch.turn()===col);
-    el.classList.toggle('think',thinking&&col!==game.human&&ch.turn()===col);
+    el.classList.toggle('think',thinking&&!isPerson(col)&&ch.turn()===col);
   }
   const st=$('#statusText');
   if(!engine)st.innerHTML='<b>체스 AI는 웹 주소로 열어야 동작합니다</b>';
   else if(game.over)st.innerHTML='<b>대국 종료</b>';
-  else if(thinking)st.innerHTML=ch.turn()===game.human?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
-  else st.innerHTML=`<b>${NAME[ch.turn()]}</b> 차례${ch.turn()===game.human?' · 내 차례':''}${ch.inCheck()?' · <b style="color:var(--danger)">체크</b>':''}`;
+  else if(thinking)st.innerHTML=isPerson(ch.turn())?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
+  else st.innerHTML=`<b>${NAME[ch.turn()]}</b> 차례${game.pvp?'':ch.turn()===game.human?' · 내 차례':''}${ch.inCheck()?' · <b style="color:var(--danger)">체크</b>':''}`;
   $('#moveText').textContent=`${Math.ceil(len/2)}수째`;
   // 기보
   const bad=new Set(mistakes().map(m=>m.i));let html='';
   for(let i=0;i<game.sans.length;i+=2){html+=`<span class="n">${i/2+1}.</span>`;for(const j of [i,i+1])html+=j<game.sans.length?`<span class="m${j+1===len?' cur':''}${bad.has(j+1)?' bad':''}" data-i="${j+1}">${game.sans[j]}</span>`:'<span></span>';}
   const ml=$('#moveList');ml.innerHTML=html;const cur=ml.querySelector('.cur');if(cur&&view===null)ml.scrollTop=ml.scrollHeight;
-  const myTurn=!game.over&&!thinking&&ch.turn()===game.human;
+  const myTurn=!game.over&&!thinking&&isPerson(ch.turn());
   $('#aUndo').disabled=!game.moves.length;$('#aHint').disabled=(!myTurn&&!hintMv)||!engine;$('#aResign').disabled=game.over;
   $('#aHint').classList.toggle('on',!!hintMv);
-  $('#assistNote').textContent=game.assisted?'무르기나 힌트를 써서 이 대국은 레이팅에 반영되지 않습니다.':'무르기나 힌트를 쓰면 이 대국은 레이팅에 반영되지 않습니다.';
+  $('#assistNote').textContent=game.pvp?'두 사람 대국은 레이팅에 반영되지 않습니다.':game.assisted?'무르기나 힌트를 써서 이 대국은 레이팅에 반영되지 않습니다.':'무르기나 힌트를 쓰면 이 대국은 레이팅에 반영되지 않습니다.';
   $('#playCard').classList.toggle('hidden',game.over);
   $('#resultCard').classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
     const r=game.result;
-    $('#resTitle').textContent=r.draw?'무승부':(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
+    $('#resTitle').textContent=r.draw?'무승부':game.pvp?`🎉 ${NAME[r.winner]} 승`:(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
     $('#resDetail').textContent=r.how;
     const rc=$('#ratingChange');
     if(game.ratingApplied!=null){const d=game.ratingApplied;rc.innerHTML=`레이팅 ${ratingText(R)} <span class="${d>=0?'up':'down'}">(${d>=0?'+':''}${d})</span>`;}
-    else rc.textContent=game.assisted?'무르기·힌트를 써서 레이팅에 반영하지 않았습니다':'';
+    else rc.textContent=game.pvp?'':game.assisted?'무르기·힌트를 써서 레이팅에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(len);
-    const mine=mistakes().filter(m=>m.mover===game.human),mb=$('#nextMistake');
-    mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`내 실수 ${mine.length}개 · 다음 실수 보기 ›`:'큰 실수 없음';
+    const mine=mistakes().filter(m=>isPerson(m.mover)),mb=$('#nextMistake');
+    const cnt=game.pvp?`백 ${mine.filter(m=>m.mover==='w').length} · 흑 ${mine.filter(m=>m.mover==='b').length}`:`${mine.length}개`;
+    mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`${game.pvp?'실수':'내 실수'} ${cnt} · 다음 실수 보기 ›`:'큰 실수 없음';
     drawGraph();
   }
-  $('#metaText').textContent=`Stockfish 19 Lite · AI ${L.name} (레이팅 ${L.elo})`;
+  $('#metaText').textContent=game.pvp?'두 사람 대국 · 분석: Stockfish 19 Lite':`Stockfish 19 Lite · AI ${L.name} (레이팅 ${L.elo})`;
 }
 $('#moveList').addEventListener('click',e=>{const m=e.target.closest('.m');if(m&&game.over)setView(+m.dataset.i);});
 
 // ---------- 버튼 ----------
 $('#aUndo').onclick=undo;$('#resUndo').onclick=undo;$('#aHint').onclick=hint;
-$('#aResign').onclick=async()=>{if(game.over)return;if(await ask('기권할까요?','이번 대국을 AI의 승리로 끝냅니다.','기권')){if(engine)engine.stop();epoch++;finish(game.human==='w'?'b':'w');}};
+$('#aResign').onclick=async()=>{
+  if(game.over)return;
+  const loser=game.pvp?ch.turn():game.human,winner=loser==='w'?'b':'w';
+  if(await ask(game.pvp?`${NAME[loser]}이 기권할까요?`:'기권할까요?',game.pvp?`이번 대국을 ${NAME[winner]}의 승리로 끝냅니다.`:'이번 대국을 AI의 승리로 끝냅니다.','기권')){if(engine)engine.stop();epoch++;finish(winner);}
+};
 function setView(v){view=Math.max(0,Math.min(game.moves.length,v));sel=null;render();ui();}
 $('#rvRange').oninput=e=>setView(+e.target.value);
 $('#rvPrev').onclick=()=>setView((view??game.moves.length)-1);
@@ -475,7 +495,9 @@ document.addEventListener('keydown',e=>{
 // 새 게임 대화상자
 const segL=$('#segLevel');
 LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${l.elo}</small></label>`));
-const lastOpt=load('chess-newopts',{color:'w',level:2});
+const lastOpt=load('chess-newopts',{color:'w',level:2,opp:'ai'});
+function oppUi(){const pvp=document.querySelector('input[name=opp]:checked').value==='pvp';$('#fColor').classList.toggle('hidden',pvp);$('#fLevel').classList.toggle('hidden',pvp);}
+document.querySelectorAll('input[name=opp]').forEach(el=>el.onchange=oppUi);
 function recommend(){const R=loadRating();if(!R.games)return -1;let bi=0;LEVELS.forEach((l,i)=>{if(Math.abs(l.elo-R.rating)<Math.abs(LEVELS[bi].elo-R.rating))bi=i;});return bi;}
 function lvDesc(){
   const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`레이팅 ${l.elo} · ${l.desc}`;
@@ -483,26 +505,27 @@ function lvDesc(){
 }
 segL.addEventListener('change',lvDesc);
 function openNew(){
+  document.querySelector(`input[name=opp][value="${lastOpt.opp}"]`).checked=true;oppUi();
   document.querySelector(`input[name=color][value="${lastOpt.color}"]`).checked=true;
   document.querySelector(`input[name=level][value="${lastOpt.level}"]`).checked=true;
   lvDesc();openDlg($('#dlgNew'),v=>{
     if(v!=='ok')return;
-    const o={color:document.querySelector('input[name=color]:checked').value,level:+document.querySelector('input[name=level]:checked').value};
+    const o={opp:document.querySelector('input[name=opp]:checked').value,color:document.querySelector('input[name=color]:checked').value,level:+document.querySelector('input[name=level]:checked').value};
     Object.assign(lastOpt,o);store('chess-newopts',lastOpt);newGame(o);
   });
 }
 $('#btnNew').onclick=openNew;$('#resNew').onclick=openNew;
 
 // 설정
-const OPT={dots:'#optDots',coords:'#optCoords',sound:'#optSound'};
+const OPT={dots:'#optDots',coords:'#optCoords',sound:'#optSound',flip:'#optFlip'};
 $('#btnSettings').onclick=()=>{for(const k in OPT)$(OPT[k]).checked=settings[k];openDlg($('#dlgSettings'));};
-for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('chess-settings',settings);render();};
+for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('chess-settings',settings);if(game)setFlip(0);render();};
 
 // ---------- 시작 ----------
 (function start(){
   const saved=load('chess-game',null);
   if(saved&&Array.isArray(saved.moves)){
-    game=saved;ch=replay(game.moves.length);view=game.over?game.moves.length:null;render();ui();
+    game=saved;ch=replay(game.moves.length);setFlip(0);view=game.over?game.moves.length:null;render();ui();
     if(game.over)analyzeGame();else{toast('이어서 둡니다');maybeAI();}
   }else{
     game={id:Date.now(),human:'w',level:2,moves:[],sans:[],over:false,result:null,assisted:false,evals:null};

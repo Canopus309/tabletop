@@ -83,13 +83,18 @@
 <dialog id="dlgNew">
   <div class="dlg">
     <h2>새 게임 · 오목 (렌주)</h2>
-    <div class="field"><span class="flabel">내 돌</span>
+    <div class="field"><span class="flabel">상대</span>
+      <div class="seg">
+        <input type="radio" name="opp" id="oAI" value="ai" checked><label for="oAI">AI</label>
+        <input type="radio" name="opp" id="oPvp" value="pvp"><label for="oPvp">사람<small>한 폰으로 번갈아</small></label>
+      </div></div>
+    <div class="field" id="fColor"><span class="flabel">내 돌</span>
       <div class="seg">
         <input type="radio" name="color" id="cB" value="1" checked><label for="cB">흑 (먼저)</label>
         <input type="radio" name="color" id="cW" value="2"><label for="cW">백</label>
         <input type="radio" name="color" id="cR" value="0"><label for="cR">무작위</label>
       </div></div>
-    <div class="field"><span class="flabel">AI 난이도</span>
+    <div class="field" id="fLevel"><span class="flabel">AI 난이도</span>
       <div class="seg" id="segLevel"></div>
       <div class="lvdesc" id="lvDesc"></div>
       <div class="lvdesc rec" id="recLevel"></div></div>
@@ -192,13 +197,16 @@ function cancelAI(){if(worker&&waiters.size){worker.terminate();waiters.clear();
 
 // ---------- 게임 ----------
 const turnOf=len=>len%2===0?BLACK:WHITE;
+// 이 폰에서 사람이 두는 색인가 (두 사람 대국이면 둘 다)
+const isPerson=c=>!!game.pvp||c===game.human;
 function newGame(o){
   cancelAI();epoch++;thinking=false;
-  const human=o.color===0?(Math.random()<.5?BLACK:WHITE):o.color;
+  const pvp=o.opp==='pvp',human=pvp?BLACK:o.color===0?(Math.random()<.5?BLACK:WHITE):o.color;
   game={id:Date.now(),human,level:o.level,moves:[],over:false,result:null,assisted:false};
+  if(pvp)game.pvp=true;
   view=null;hint=-1;pending=-1;
   rebuild();save();
-  toast(`${NAME[human]}으로 시작합니다 · ${RJ.LEVELS[o.level].name}`);
+  toast(pvp?'두 사람 대국을 시작합니다 · 한 수씩 번갈아 두세요':`${NAME[human]}으로 시작합니다 · ${RJ.LEVELS[o.level].name}`);
   maybeAI();
 }
 function rebuild(){g=RJ.Game.from(game.moves);winLine=null;
@@ -217,7 +225,7 @@ function playMove(p){
   maybeAI();
 }
 async function maybeAI(){
-  if(game.over||g.turn===game.human)return;
+  if(game.over||isPerson(g.turn))return;
   const ep=epoch,t0=performance.now();
   thinking=true;ui();
   const r=await aiMove(game.moves.slice(),game.level);
@@ -228,7 +236,7 @@ async function maybeAI(){
   playMove(r.move);
 }
 function humanPlay(p){
-  if(game.over||thinking||view!==null||g.turn!==game.human)return;
+  if(game.over||thinking||view!==null||!isPerson(g.turn))return;
   if(g.b[p]!==EMPTY)return;
   if(!game.moves.length&&p!==CENTER){toast('렌주 룰: 흑의 첫 수는 판 가운데(천원)입니다');sound('bad');pending=-1;draw();return;}
   if(g.turn===BLACK&&RJ.isForbidden(g.b,p)){toast('금수입니다. 흑은 33 · 44 · 장목 자리에 둘 수 없습니다');sound('bad');return;}
@@ -237,23 +245,23 @@ function humanPlay(p){
 }
 function endGame(winner,how){
   game.over=true;thinking=false;
-  const youWin=winner===game.human;
+  const youWin=game.pvp?null:winner===game.human;
   game.result={winner,how,youWin,draw:winner===0};
   forbid=[];view=game.moves.length;
-  updateRating();save();sound(winner===0?'pass':youWin?'win':'pass');ui();draw();
+  updateRating();save();sound(winner===0?'pass':youWin!==false?'win':'pass');ui();draw();
   analyzeGame();
 }
 function undo(){
   if(!game.moves.length)return;
   cancelAI();epoch++;thinking=false;
   const mv=game.moves.slice();
-  do{mv.pop();}while(mv.length&&turnOf(mv.length)!==game.human);
+  do{mv.pop();}while(!game.pvp&&mv.length&&turnOf(mv.length)!==game.human);
   if(game.ratingApplied==null)game.assisted=true;
   game.moves=mv;game.over=false;game.result=null;game.evals=null;game.evalsDone=false;view=null;hint=-1;pending=-1;
   rebuild();save();maybeAI();
 }
 async function showHint(){
-  if(game.over||thinking||g.turn!==game.human)return;
+  if(game.over||thinking||!isPerson(g.turn))return;
   if(hint>=0){hint=-1;draw();ui();return;}
   const ep=epoch;thinking=true;ui();
   const r=await aiMove(game.moves.slice(),RJ.LEVELS.length-2); // 힌트는 고급 단계로
@@ -264,7 +272,7 @@ async function showHint(){
 const RB=ratingBoard({game:'omok',start:LEVEL_RATING[1],levels:RJ.LEVELS.map((l,i)=>({name:l.name,rating:LEVEL_RATING[i]})),fmt:omokRank,prefix:'급수 ',
   sub:R=>`대국 ${R.games}판 · 레이팅 ${Math.round(R.rating)} ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`});
 function updateRating(){
-  if(game.assisted||game.ratingApplied!=null||(game.moves.length<6&&!game.result.youWin&&game.result.how!=='기권'))return;
+  if(game.pvp||game.assisted||game.ratingApplied!=null||(game.moves.length<6&&!game.result.youWin&&game.result.how!=='기권'))return;
   const r=RB.apply(game.level,game.result.draw?0.5:game.result.youWin?1:0,game.id);
   game.ratingApplied={before:Math.round(r.before),after:Math.round(r.after)};
 }
@@ -286,7 +294,7 @@ async function analyzeGame(){
     ev[i]=[+pct.toFixed(1),-1,forced];
     if(i%5===0){ui();drawGraph();}
   }
-  for(const m of mistakes().filter(m=>m.mover===game.human)){
+  for(const m of mistakes().filter(m=>isPerson(m.mover))){
     if(ev[m.i-1][1]>=0)continue;
     const r=await aiEval(game.moves.slice(0,m.i-1),'eval');if(ep!==epoch){analyzing=false;return;}
     ev[m.i-1][1]=r.best;
@@ -333,7 +341,7 @@ function drawGraph(){
   let last=-1;while(last+1<=game.moves.length&&ev[last+1])last++;
   if(last>=0){gx.beginPath();gx.moveTo(Xg(0),h);for(let i=0;i<=last;i++)gx.lineTo(Xg(i),Yg(ev[i][0]));gx.lineTo(Xg(last),h);gx.closePath();gx.fillStyle='#1d1f23';gx.fill();}
   gx.strokeStyle='rgba(128,128,128,.7)';gx.setLineDash([3,3]);gx.beginPath();gx.moveTo(0,Yg(50));gx.lineTo(w,Yg(50));gx.stroke();gx.setLineDash([]);
-  for(const m of mistakes()){gx.fillStyle=m.loss>=50?'#e0463f':'#f0a020';gx.beginPath();gx.arc(Xg(m.i),Yg(ev[m.i][0]),m.mover===game.human?4:2.5,0,7);gx.fill();}
+  for(const m of mistakes()){gx.fillStyle=m.loss>=50?'#e0463f':'#f0a020';gx.beginPath();gx.arc(Xg(m.i),Yg(ev[m.i][0]),isPerson(m.mover)?4:2.5,0,7);gx.fill();}
   const vi=view!==null?view:game.moves.length;
   gx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2f6f5e';gx.lineWidth=2;gx.beginPath();gx.moveTo(Xg(vi),0);gx.lineTo(Xg(vi),h);gx.stroke();
 }
@@ -341,7 +349,7 @@ function graphPick(e){const r=gcv.getBoundingClientRect();setView(Math.round((e.
 gcv.addEventListener('pointerdown',e=>{if(!game||!game.over)return;try{gcv.setPointerCapture(e.pointerId);}catch(_){}graphPick(e);});
 gcv.addEventListener('pointermove',e=>{if(e.buttons&&game&&game.over)graphPick(e);});
 new ResizeObserver(()=>drawGraph()).observe(gcv);
-$('#nextMistake').onclick=()=>{const mine=mistakes().filter(m=>m.mover===game.human);if(!mine.length)return;const cur=view??game.moves.length;setView((mine.find(m=>m.i>cur)||mine[0]).i);};
+$('#nextMistake').onclick=()=>{const mine=mistakes().filter(m=>isPerson(m.mover));if(!mine.length)return;const cur=view??game.moves.length;setView((mine.find(m=>m.i>cur)||mine[0]).i);};
 
 // ---------- 그리기 ----------
 const cv=$('#board'),ctx=cv.getContext('2d'),wrap=$('#boardWrap');
@@ -371,7 +379,7 @@ function draw(){
     for(let i=0;i<N;i++){ctx.fillText(COLS[i],X(i),o);ctx.fillText(COLS[i],X(i),s-o);ctx.fillText(String(N-i),o,X(i));ctx.fillText(String(N-i),s-o,X(i));}
   }
   // 흑 금수 자리
-  if(len===game.moves.length&&forbid.length&&game.human===BLACK&&!thinking){
+  if(len===game.moves.length&&forbid.length&&isPerson(BLACK)&&!thinking){
     ctx.strokeStyle='rgba(200,50,40,.85)';ctx.lineWidth=Math.max(1.5,cell*0.07);const q=cell*0.17;
     for(const p of forbid){const x=X(p%N),y=X((p/N)|0);ctx.beginPath();ctx.moveTo(x-q,y-q);ctx.lineTo(x+q,y+q);ctx.moveTo(x+q,y-q);ctx.lineTo(x-q,y+q);ctx.stroke();}
   }
@@ -401,11 +409,11 @@ function draw(){
     }
   }
   // 미리보기
-  if(!game.over&&!thinking&&view===null&&g.turn===game.human){
+  if(!game.over&&!thinking&&view===null&&isPerson(g.turn)){
     const p=pending>=0?pending:hover;
-    if(p>=0&&g.b[p]===EMPTY){const x=X(p%N),y=X((p/N)|0);drawStone(x,y,r,game.human,pending>=0?0.7:0.4);
+    if(p>=0&&g.b[p]===EMPTY){const x=X(p%N),y=X((p/N)|0);drawStone(x,y,r,g.turn,pending>=0?0.7:0.4);
       if(pending>=0){ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,r*1.1,0,7);ctx.stroke();}}
-    if(!game.moves.length&&game.human===BLACK){const x=X(7),y=X(7);ctx.strokeStyle='rgba(47,140,110,.9)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(x,y,r*1.15,0,7);ctx.stroke();ctx.setLineDash([]);}
+    if(!game.moves.length&&isPerson(BLACK)){const x=X(7),y=X(7);ctx.strokeStyle='rgba(47,140,110,.9)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(x,y,r*1.15,0,7);ctx.stroke();ctx.setLineDash([]);}
   }
 }
 function drawStone(x,y,r,col,alpha){
@@ -435,40 +443,45 @@ function ui(){
   const len=view!==null?view:game.moves.length,lv=RJ.LEVELS[game.level].name;
   for(const col of [BLACK,WHITE]){
     const el=col===BLACK?$('#pB'):$('#pW');
-    el.querySelector('.who').textContent=col===game.human?'나 · '+RB.text(RB.get()):`AI · ${lv} (${omokRank(LEVEL_RATING[game.level])})`;
+    el.querySelector('.who').textContent=game.pvp?'사람':col===game.human?'나 · '+RB.text(RB.get()):`AI · ${lv} (${omokRank(LEVEL_RATING[game.level])})`;
     el.classList.toggle('active',!game.over&&g.turn===col);
-    el.classList.toggle('think',thinking&&col!==game.human&&g.turn===col);
+    el.classList.toggle('think',thinking&&!isPerson(col)&&g.turn===col);
   }
   const st=$('#statusText');
   if(game.over)st.innerHTML='<b>대국 종료</b>';
-  else if(thinking)st.innerHTML=g.turn===game.human?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
-  else st.innerHTML=`<b>${NAME[g.turn]}</b> 차례${g.turn===game.human?' · 내 차례':''}`;
+  else if(thinking)st.innerHTML=isPerson(g.turn)?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
+  else st.innerHTML=`<b>${NAME[g.turn]}</b> 차례${game.pvp?'':g.turn===game.human?' · 내 차례':''}`;
   $('#moveText').textContent=len+'수';
-  const myTurn=!game.over&&!thinking&&g.turn===game.human;
+  const myTurn=!game.over&&!thinking&&isPerson(g.turn);
   $('#aUndo').disabled=!game.moves.length;$('#aHint').disabled=!myTurn&&hint<0;$('#aResign').disabled=game.over;
   $('#aHint').classList.toggle('on',hint>=0);
-  $('#assistNote').textContent=game.assisted?'무르기나 힌트를 써서 이 대국은 급수에 반영되지 않습니다.':'무르기나 힌트를 쓰면 이 대국은 급수에 반영되지 않습니다.';
+  $('#assistNote').textContent=game.pvp?'두 사람 대국은 급수에 반영되지 않습니다.':game.assisted?'무르기나 힌트를 써서 이 대국은 급수에 반영되지 않습니다.':'무르기나 힌트를 쓰면 이 대국은 급수에 반영되지 않습니다.';
   $('#playCard').classList.toggle('hidden',game.over);
   $('#resultCard').classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
     const r=game.result;
-    $('#resTitle').textContent=r.draw?'무승부':(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
+    $('#resTitle').textContent=r.draw?'무승부':game.pvp?`🎉 ${NAME[r.winner]} 승`:(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
     $('#resDetail').textContent=r.how;
     const rc=$('#ratingChange'),ra=game.ratingApplied;
     if(ra){const d=ra.after-ra.before;rc.innerHTML=`내 급수 ${omokRank(ra.before)} → ${RB.text(RB.get())} <span class="${d>=0?'up':'down'}">(레이팅 ${d>=0?'+':''}${d})</span>`;}
-    else rc.textContent=game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
+    else rc.textContent=game.pvp?'':game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(len);
-    const mine=mistakes().filter(m=>m.mover===game.human),mb=$('#nextMistake');
-    mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`내 실수 ${mine.length}개 · 다음 실수 보기 ›`:'큰 실수 없음';
+    const mine=mistakes().filter(m=>isPerson(m.mover)),mb=$('#nextMistake');
+    const cnt=game.pvp?`흑 ${mine.filter(m=>m.mover===BLACK).length} · 백 ${mine.filter(m=>m.mover===WHITE).length}`:`${mine.length}개`;
+    mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`${game.pvp?'실수':'내 실수'} ${cnt} · 다음 실수 보기 ›`:'큰 실수 없음';
     drawGraph();
   }
-  $('#metaText').textContent=`15×15 · 렌주 · AI ${lv} (${omokRank(LEVEL_RATING[game.level])})`+(worker?'':' · 계산: 화면');
+  $('#metaText').textContent=game.pvp?'15×15 · 렌주 · 두 사람':`15×15 · 렌주 · AI ${lv} (${omokRank(LEVEL_RATING[game.level])})`+(worker?'':' · 계산: 화면');
 }
 
 // ---------- 버튼 ----------
 $('#aUndo').onclick=undo;$('#resUndo').onclick=undo;$('#aHint').onclick=showHint;
-$('#aResign').onclick=async()=>{if(game.over)return;if(await ask('기권할까요?','이번 대국을 AI의 승리로 끝냅니다.','기권')){cancelAI();epoch++;endGame(3-game.human,'기권');}};
+$('#aResign').onclick=async()=>{
+  if(game.over)return;
+  const loser=game.pvp?g.turn:game.human;
+  if(await ask(game.pvp?`${NAME[loser]}이 기권할까요?`:'기권할까요?',game.pvp?`이번 대국을 ${NAME[3-loser]}의 승리로 끝냅니다.`:'이번 대국을 AI의 승리로 끝냅니다.','기권')){cancelAI();epoch++;endGame(3-loser,'기권');}
+};
 const setView=v=>{view=Math.max(0,Math.min(game.moves.length,v));draw();ui();};
 $('#rvRange').oninput=e=>setView(+e.target.value);
 $('#rvPrev').onclick=()=>setView((view??game.moves.length)-1);
@@ -483,18 +496,21 @@ document.addEventListener('keydown',e=>{
 // 새 게임 대화상자
 const segL=$('#segLevel');
 RJ.LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${omokRank(LEVEL_RATING[i])}</small></label>`));
-const lastOpt=load('omok-newopts',{color:1,level:2});
+const lastOpt=load('omok-newopts',{color:1,level:2,opp:'ai'});
+function oppUi(){const pvp=document.querySelector('input[name=opp]:checked').value==='pvp';$('#fColor').classList.toggle('hidden',pvp);$('#fLevel').classList.toggle('hidden',pvp);}
+document.querySelectorAll('input[name=opp]').forEach(el=>el.onchange=oppUi);
 function lvDesc(){
   const i=+document.querySelector('input[name=level]:checked').value;$('#lvDesc').textContent=`기력 약 ${omokRank(LEVEL_RATING[i])} · ${LEVEL_DESC[i]}`;
   const rec=RB.recommend();$('#recLevel').textContent=rec>=0?`내 급수 ${RB.text(RB.get())} → 추천 난이도: ${RJ.LEVELS[rec].name}`:'';
 }
 segL.addEventListener('change',lvDesc);
 function openNew(){
+  document.querySelector(`input[name=opp][value="${lastOpt.opp}"]`).checked=true;oppUi();
   document.querySelector(`input[name=color][value="${lastOpt.color}"]`).checked=true;
   document.querySelector(`input[name=level][value="${lastOpt.level}"]`).checked=true;
   lvDesc();openDlg($('#dlgNew'),v=>{
     if(v!=='ok')return;
-    const o={color:+document.querySelector('input[name=color]:checked').value,level:+document.querySelector('input[name=level]:checked').value};
+    const o={opp:document.querySelector('input[name=opp]:checked').value,color:+document.querySelector('input[name=color]:checked').value,level:+document.querySelector('input[name=level]:checked').value};
     Object.assign(lastOpt,o);store('omok-newopts',lastOpt);newGame(o);
   });
 }
