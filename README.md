@@ -40,6 +40,7 @@
 
 ## 구조
 - `index.html` 홈 (게임 고르기), `sw.js` 오프라인 캐시, `manifest.webmanifest`
+- `rules/` 바둑 · 오목(렌주) · 체스 규칙 설명 (그림 예시, 각 게임 화면의 ? 버튼)
 - `go/board.js` 바둑판 규칙 (대국 화면 · AI 워커 · 학습 화면이 함께 씀)
 - `common/` 공통 스타일·대화상자·효과음 (`base.css`, `ui.js`), 온라인 순위표 (`leaderboard.js`: Firebase 익명 로그인 + Firestore, 규칙은 `firestore.rules`), 체스·오목 레이팅과 레이팅 순위표 (`rating.js`)
 

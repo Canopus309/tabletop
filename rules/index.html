@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>게임 규칙 · Table Top</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../common/base.css">
+<style>
+.wrap{max-width:820px;margin:0 auto;padding:6px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.tabs{display:flex;gap:6px;margin:6px 0 16px}
+.tab{flex:1;padding:10px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.game-rules{display:flex;flex-direction:column;gap:12px}
+.rule{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.rule h2{margin:0 0 8px;font-size:17px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.rule h2 .no{flex:none;width:24px;height:24px;border-radius:8px;background:var(--chip);display:grid;place-items:center;font-size:12.5px;color:var(--muted)}
+.rule p,.rule li{font-size:14.5px;line-height:1.7;margin:0 0 6px}
+.rule ul{margin:4px 0 6px;padding-left:20px}
+.rule b{font-weight:700}
+.rule .tip{font-size:13px;color:var(--muted);margin-top:6px}
+.lead{background:color-mix(in srgb,var(--accent) 10%,var(--panel));border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.lead p{margin:0;font-size:15px}
+.dias{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0 4px}
+.dia{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px;width:min(180px,calc(50% - 7px))}
+.dia.wide{width:min(100%,300px)}
+.dia svg,.dia .cbx{width:100%;height:auto;display:block;border-radius:6px;box-shadow:0 1px 0 rgba(0,0,0,.08),0 6px 18px rgba(60,40,10,.18)}
+.dia figcaption{font-size:12.5px;color:var(--muted);text-align:center;line-height:1.5}
+.dia .cbx{display:grid;overflow:hidden}
+.cbx div{position:relative;aspect-ratio:1}
+.cbx .l{background:#ebecd0}.cbx .d{background:#739552}
+.cbx .hl{box-shadow:inset 0 0 0 100px rgba(255,214,0,.42)}
+.cbx img{position:absolute;inset:0;width:100%;height:100%}
+.cbx .mv::after{content:"";position:absolute;left:34%;top:34%;width:32%;height:32%;border-radius:50%;background:rgba(20,30,20,.3)}
+.cbx .cap::after{content:"";position:absolute;inset:4%;border-radius:50%;box-shadow:inset 0 0 0 3px rgba(200,40,30,.75)}
+.pieces{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}
+.pc{display:flex;align-items:center;gap:8px;padding:8px;border-radius:12px;background:var(--chip);font-size:13.5px;line-height:1.4}
+.pc img{width:34px;height:34px;flex:none}
+.pc small{display:block;color:var(--muted);font-size:12px}
+table.nt{border-collapse:collapse;font-size:13.5px;margin:6px 0}
+table.nt td{padding:4px 10px 4px 0;vertical-align:top}
+table.nt td:first-child{font-weight:700;white-space:nowrap;font-family:ui-monospace,Consolas,monospace}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" id="back" href="../" title="게임으로" aria-label="게임으로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>
+    게임 규칙
+  </div>
+  <div class="hbtns"><a class="icon-btn" id="play" href="../" title="두러 가기" aria-label="두러 가기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l14 8-14 8z"/></svg></a></div>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" id="tabs">
+    <button class="tab" data-k="go">바둑</button>
+    <button class="tab" data-k="omok">오목</button>
+    <button class="tab" data-k="chess">체스</button>
+  </nav>
+
+  <!-- ================= 바둑 ================= -->
+  <section class="game-rules" id="go">
+    <div class="rule lead"><p><b>집을 더 많이 차지하는 쪽이 이깁니다.</b> 흑과 백이 번갈아 한 수씩, 선과 선이 만나는 점에 돌을 놓습니다. 한 번 놓은 돌은 움직이지 않고, 잡힐 때만 판에서 들어냅니다.</p></div>
+
+    <div class="rule"><h2><span class="no">1</span>두는 법</h2>
+      <p>흑이 먼저 둡니다. 판 크기는 9줄 · 13줄 · 19줄이 있고, 처음 배우는 분은 9줄이 좋습니다.</p>
+      <p>내 차례에 둘 곳이 마땅치 않으면 <b>패스</b>할 수 있습니다. 두 사람이 연속으로 패스하면 대국이 끝납니다.</p>
+    </div>
+
+    <div class="rule"><h2><span class="no">2</span>활로와 따내기</h2>
+      <p>돌에 가로·세로로 붙은 빈 점을 <b>활로</b>(숨 쉬는 구멍)라고 합니다. 상대 돌의 활로를 모두 막으면 그 돌을 <b>따내어</b> 판에서 들어냅니다. 따낸 돌은 계가할 때 내 몫이 됩니다.</p>
+      <div class="dias">
+        <figure class="dia"><svg data-go="...../..+../.+O+./..+../....."></svg><figcaption>가운데 백 돌의 활로는 4개(초록 점)</figcaption></figure>
+        <figure class="dia"><svg data-go="...../..X../.XOX./..*../....."></svg><figcaption>활로가 하나 남은 상태가 <b>단수</b>. 흑이 ☆에 두면 백을 따냅니다</figcaption></figure>
+        <figure class="dia"><svg data-go=".+O+./..+../....." data-edge="t"></svg><figcaption>변(판 가장자리)에서는 활로가 3개</figcaption></figure>
+        <figure class="dia"><svg data-go="O+.../+..../....." data-edge="t l"></svg><figcaption>귀에서는 2개뿐이라 잡히기 쉽습니다</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="rule"><h2><span class="no">3</span>이어진 돌</h2>
+      <p>가로·세로로 붙은 같은 색 돌은 한 덩어리가 되어 활로를 함께 씁니다. 따낼 때도 덩어리 전체를 한꺼번에 따냅니다. <b>대각선으로 놓인 돌은 이어진 것이 아닙니다.</b></p>
+      <div class="dias">
+        <figure class="dia"><svg data-go="....../.++.../+OO+../.++.../......"></svg><figcaption>이어진 백 두 점의 활로는 6개</figcaption></figure>
+        <figure class="dia"><svg data-go="....../..O.../...O../....../......"></svg><figcaption>대각선은 이어지지 않은 따로따로의 돌</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="rule"><h2><span class="no">4</span>둘 수 없는 자리 (자충)</h2>
+      <p>두자마자 내 돌의 활로가 하나도 없게 되는 자리에는 둘 수 없습니다. <b>단, 그 수로 상대 돌을 따낼 수 있으면 둘 수 있습니다.</b> 따내면 활로가 생기기 때문입니다.</p>
+      <div class="dias">
+        <figure class="dia"><svg data-go="...../..O../.O#O./..O../....."></svg><figcaption>흑은 × 자리에 둘 수 없습니다</figcaption></figure>
+        <figure class="dia"><svg data-go="..X../.XOX./XO*OX/.XOX./..X.."></svg><figcaption>백 네 점이 모두 ☆ 하나만 활로라서, 흑은 ☆에 두어 네 점을 따낼 수 있습니다</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="rule"><h2><span class="no">5</span>패</h2>
+      <p>한 점을 따낸 바로 다음 수에, 상대가 그 자리에서 곧바로 되따내 같은 모양으로 돌아가는 것은 금지입니다. 이것을 <b>패</b>라고 합니다. 되따내려면 먼저 다른 곳에 한 수(<b>팻감</b>)를 두고, 상대가 받아 준 뒤에 따내야 합니다.</p>
+      <div class="dias">
+        <figure class="dia"><svg data-go="....../..XO../.XO*O./..XO../......"></svg><figcaption>흑이 ☆에 두어 백 한 점을 따내면…</figcaption></figure>
+        <figure class="dia"><svg data-go="....../..XO../.X#XO./..XO../......"></svg><figcaption>백은 × 자리에서 곧바로 되따낼 수 없습니다</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="rule"><h2><span class="no">6</span>삶과 죽음</h2>
+      <p>덩어리 안에 따로 떨어진 빈 점(<b>눈</b>)이 두 개 있으면, 상대가 두 곳을 동시에 막을 수 없어 영원히 잡히지 않습니다. 이 돌은 <b>살았다</b>고 합니다. 눈이 하나뿐이면 결국 잡힙니다.</p>
+      <div class="dias">
+        <figure class="dia"><svg data-go=".O.OX/OOOOX/XXXXX" data-edge="t l"></svg><figcaption>눈이 두 개(빈 점 두 곳) → 산 돌</figcaption></figure>
+        <figure class="dia"><svg data-go="..OOX/OOOOX/XXXXX" data-edge="t l"></svg><figcaption>눈이 하나 → 흑이 안을 차례로 메우면 잡힘</figcaption></figure>
+      </div>
+      <p class="tip">어떤 모양이 살고 죽는지는 <a href="../go/learn/">바둑 학습</a>의 사활 문제로 연습할 수 있습니다.</p>
+    </div>
+
+    <div class="rule"><h2><span class="no">7</span>대국 끝과 계가</h2>
+      <p>두 사람이 연속으로 패스하면 끝납니다. 더 둘 곳이 없거나, 둬도 손해일 때 패스합니다. 그다음 집을 셉니다(<b>계가</b>).</p>
+      <ul>
+        <li>이 앱은 <b>중국식 계가</b>를 씁니다. 판 위에 살아 있는 내 돌 수와 내 돌로 둘러싼 빈 점(집)의 수를 모두 더합니다.</li>
+        <li>판 위에 남아 있어도 살 수 없는 돌(<b>사석</b>)은 상대 것으로 셉니다. 사석은 AI(KataGo)가 판단합니다.</li>
+        <li>먼저 두는 흑이 유리하므로 백에게 <b>덤 6.5집</b>을 더해 줍니다. 0.5 때문에 비기는 일이 없습니다.</li>
+        <li>지는 것이 분명하면 <b>기권</b>할 수 있습니다(불계패).</li>
+      </ul>
+    </div>
+
+    <div class="rule"><h2><span class="no">8</span>접바둑</h2>
+      <p>실력 차이가 날 때는 약한 쪽이 흑을 잡고 화점(판의 굵은 점)에 돌을 몇 개 먼저 놓고 시작합니다. 이때는 백이 먼저 두고, 덤은 0.5집입니다. 새 게임 창의 <b>접바둑</b>에서 고릅니다.</p>
+    </div>
+  </section>
+
+  <!-- ================= 오목 ================= -->
+  <section class="game-rules hidden" id="omok">
+    <div class="rule lead"><p><b>가로·세로·대각선으로 내 돌 5개를 먼저 잇달아 놓으면 이깁니다.</b> 이 앱은 공식 대회 규칙인 <b>렌주 룰</b>을 씁니다. 먼저 두는 흑이 너무 유리하지 않도록 흑에게만 금지된 자리(금수)가 있습니다.</p></div>
+
+    <div class="rule"><h2><span class="no">1</span>두는 법</h2>
+      <p>15×15 판에서 흑이 먼저, 번갈아 한 수씩 둡니다. <b>흑의 첫 수는 판 한가운데(천원)</b>입니다. 판이 가득 찰 때까지 아무도 5목을 못 만들면 무승부입니다.</p>
+      <div class="dias"><figure class="dia wide"><svg data-omok=".XXXXX." data-line="1 0 5 0"></svg><figcaption>5개가 잇달아 놓이면(5목) 승리</figcaption></figure></div>
+    </div>
+
+    <div class="rule"><h2><span class="no">2</span>용어</h2>
+      <ul>
+        <li><b>4</b>: 한 수만 더 두면 5목이 되는 모양. 상대는 반드시 막아야 합니다.</li>
+        <li><b>열린 4</b>: 5목이 되는 자리가 양쪽에 두 곳이라 막을 수 없는 4. 만들면 사실상 승리입니다.</li>
+        <li><b>열린 3</b>: 한 수 더 두면 열린 4가 되는 3. 막지 않으면 열린 4가 되므로 보통 바로 막습니다.</li>
+      </ul>
+    </div>
+
+    <div class="rule"><h2><span class="no">3</span>흑의 금수</h2>
+      <p>흑은 아래 세 가지 모양이 생기는 자리에 둘 수 없습니다(× 표시). 앱은 흑 차례에 금수 자리를 빨간 ×로 보여 줍니다. 설정에서 끌 수 있습니다.</p>
+      <div class="dias">
+        <figure class="dia"><svg data-omok="......./......./...X.../...X.../.XX#.../......./......."></svg><figcaption><b>33</b>: 한 수로 열린 3이 두 개 생김</figcaption></figure>
+        <figure class="dia"><svg data-omok="......./...X.../...X.../...X.../XXX#.../......./......."></svg><figcaption><b>44</b>: 한 수로 4가 두 개 생김 (한 줄 안에 생겨도 44)</figcaption></figure>
+        <figure class="dia wide"><svg data-omok=".XXX#XX."></svg><figcaption><b>장목</b>: 6개 이상 잇달아 놓이는 자리</figcaption></figure>
+      </div>
+      <ul>
+        <li>흑은 <b>정확히 5개</b>여야 이깁니다. 5목이 되는 수는 금수 모양이 함께 생겨도 둘 수 있고 바로 이깁니다.</li>
+        <li>겉보기에 3이어도 실제로 열린 4를 만들 수 없는 3(<b>거짓 3</b>)은 33을 셀 때 빼고 봅니다. 앱이 자동으로 판정합니다.</li>
+      </ul>
+    </div>
+
+    <div class="rule"><h2><span class="no">4</span>흑의 승리 수: 4·3</h2>
+      <p>4 하나와 열린 3 하나를 한꺼번에 만드는 <b>4·3</b>은 금수가 아닙니다. 상대가 4를 막는 사이에 3이 열린 4가 되므로, 흑이 이기는 대표적인 방법입니다.</p>
+      <div class="dias"><figure class="dia"><svg data-omok="......./...X.../...X.../...X.../.XX*.../......./......."></svg><figcaption>☆에 두면 4와 열린 3이 동시에 생김 (둘 수 있음)</figcaption></figure></div>
+    </div>
+
+    <div class="rule"><h2><span class="no">5</span>백은 제한 없음</h2>
+      <p>백은 33 · 44를 마음대로 만들 수 있고, <b>6개 이상(장목)이어도 이깁니다.</b> 그래서 백은 흑이 금수 자리밖에 막을 곳이 없도록 몰아넣는 작전도 씁니다.</p>
+      <div class="dias"><figure class="dia wide"><svg data-omok=".OOO*OO."></svg><figcaption>백은 ☆에 두어 6목을 만들어도 승리</figcaption></figure></div>
+    </div>
+  </section>
+
+  <!-- ================= 체스 ================= -->
+  <section class="game-rules hidden" id="chess">
+    <div class="rule lead"><p><b>상대 킹을 체크메이트하면 이깁니다.</b> 체크메이트는 킹이 공격받고 있는데 어떻게 해도 피할 수 없는 상태입니다. 킹을 실제로 잡지는 않습니다.</p></div>
+
+    <div class="rule"><h2><span class="no">1</span>판과 처음 배치</h2>
+      <p>8×8 판에서 <b>백이 먼저</b>, 번갈아 한 번에 기물 하나를 움직입니다. 오른쪽 아래 칸이 흰 칸이 되게 놓고, 퀸은 자기 색 칸(백 퀸은 흰 칸, 흑 퀸은 검은 칸)에서 시작합니다.</p>
+      <div class="dias"><figure class="dia wide"><div class="cbx" data-ch="rnbqkbnr/pppppppp/......../......../......../......../PPPPPPPP/RNBQKBNR" data-org="a8"></div><figcaption>처음 배치 (아래가 백)</figcaption></figure></div>
+    </div>
+
+    <div class="rule"><h2><span class="no">2</span>기물이 움직이는 법</h2>
+      <div class="pieces">
+        <div class="pc"><img src="../chess/pieces/wK.svg" alt=""><div><b>킹</b><small>모든 방향으로 한 칸</small></div></div>
+        <div class="pc"><img src="../chess/pieces/wQ.svg" alt=""><div><b>퀸</b> · 9점<small>가로·세로·대각선 몇 칸이든</small></div></div>
+        <div class="pc"><img src="../chess/pieces/wR.svg" alt=""><div><b>룩</b> · 5점<small>가로·세로 몇 칸이든</small></div></div>
+        <div class="pc"><img src="../chess/pieces/wB.svg" alt=""><div><b>비숍</b> · 3점<small>대각선 몇 칸이든</small></div></div>
+        <div class="pc"><img src="../chess/pieces/wN.svg" alt=""><div><b>나이트</b> · 3점<small>L자로 이동, 다른 기물을 뛰어넘음</small></div></div>
+        <div class="pc"><img src="../chess/pieces/wP.svg" alt=""><div><b>폰</b> · 1점<small>앞으로 한 칸, 잡을 땐 대각선 앞</small></div></div>
+      </div>
+      <p>퀸·룩·비숍은 길이 막히면 그 너머로 갈 수 없습니다. 상대 기물이 있는 칸으로 가면 그 기물을 <b>잡습니다</b>. 점수는 기물의 대략적인 가치이고, 앱은 잡은 기물의 차이를 +로 보여 줍니다.</p>
+      <div class="dias">
+        <figure class="dia"><div class="cbx" data-ch="......./......./..***../..*K*../..***../......./......." data-org="a7"></div><figcaption>킹</figcaption></figure>
+        <figure class="dia"><div class="cbx" data-ch="*..*..*/.*.*.*./..***../***Q***/..***../.*.*.*./*..*..*" data-org="a7"></div><figcaption>퀸</figcaption></figure>
+        <figure class="dia"><div class="cbx" data-ch="...*.../...*.../...*.../***R***/...*.../...*.../...*..." data-org="a7"></div><figcaption>룩</figcaption></figure>
+        <figure class="dia"><div class="cbx" data-ch="*.....*/.*...*./..*.*../...B.../..*.*../.*...*./*.....*" data-org="a7"></div><figcaption>비숍</figcaption></figure>
+        <figure class="dia"><div class="cbx" data-ch="......./..*.*../.*...*./...N.../.*...*./..*.*../......." data-org="a7"></div><figcaption>나이트 (사이에 기물이 있어도 뛰어넘음)</figcaption></figure>
+        <figure class="dia"><div class="cbx" data-ch="...../..*../..*../..P../....." data-org="a5"></div><figcaption>폰: 앞으로 한 칸, 처음 움직일 때만 두 칸까지</figcaption></figure>
+        <figure class="dia"><div class="cbx" data-ch="...../.p*n./..P../....." data-org="a5" data-ring="1,1;1,3"></div><figcaption>폰은 대각선 앞의 상대 기물만 잡음 (앞의 기물은 못 잡음)</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="rule"><h2><span class="no">3</span>체크와 체크메이트</h2>
+      <p>킹이 상대 기물에게 공격받는 상태가 <b>체크</b>입니다. 체크를 받으면 반드시 벗어나야 합니다: 킹을 옮기거나, 사이를 막거나, 공격하는 기물을 잡습니다. 내 킹이 공격받게 되는 수는 둘 수 없습니다.</p>
+      <p>어떤 수로도 체크를 벗어날 수 없으면 <b>체크메이트</b>, 그 대국은 끝나고 체크메이트한 쪽이 이깁니다.</p>
+      <div class="dias"><figure class="dia wide"><div class="cbx" data-ch="....R.k./.....ppp/........" data-org="a8" data-hl="0,6"></div><figcaption>흑 킹이 자기 폰에 막혀 룩의 체크를 피할 곳이 없음 → 체크메이트</figcaption></figure></div>
+    </div>
+
+    <div class="rule"><h2><span class="no">4</span>특별한 규칙</h2>
+      <p><b>캐슬링</b>: 킹과 룩을 한 번에 움직여 킹을 안전한 곳으로 옮깁니다. 킹이 룩 쪽으로 두 칸 가고, 룩이 킹을 넘어 바로 옆에 섭니다. 앱에서는 킹을 두 칸 옮기면 됩니다. 다음 조건을 모두 갖춰야 합니다.</p>
+      <ul>
+        <li>킹과 그 룩이 한 번도 움직이지 않았다</li>
+        <li>둘 사이에 기물이 없다</li>
+        <li>킹이 지금 체크 상태가 아니고, 지나가는 칸과 도착하는 칸이 공격받고 있지 않다</li>
+      </ul>
+      <div class="dias">
+        <figure class="dia wide"><div class="cbx" data-ch="R...K..R" data-org="a1"></div><figcaption>캐슬링 전</figcaption></figure>
+        <figure class="dia wide"><div class="cbx" data-ch="R....RK." data-org="a1" data-hl="0,5;0,6"></div><figcaption>킹 쪽 캐슬링 뒤 (O-O)</figcaption></figure>
+        <figure class="dia wide"><div class="cbx" data-ch="..KR...R" data-org="a1" data-hl="0,2;0,3"></div><figcaption>퀸 쪽 캐슬링 뒤 (O-O-O)</figcaption></figure>
+      </div>
+      <p><b>앙파상</b>: 상대 폰이 처음 두 칸 전진해 내 폰 바로 옆에 섰다면, <b>바로 다음 수에 한해</b> 그 폰이 한 칸만 왔을 때처럼 대각선으로 잡을 수 있습니다.</p>
+      <div class="dias"><figure class="dia"><div class="cbx" data-ch="...../..*../..pP./....." data-org="b7" data-ring="2,2" data-hl="0,2;2,2"></div><figcaption>흑 폰이 d7에서 d5로 두 칸 전진해 백 폰 옆에 옴 → 백은 바로 다음 수에 d6(점)으로 가며 그 폰을 잡을 수 있음</figcaption></figure></div>
+      <p><b>프로모션</b>: 폰이 맨 끝 줄에 닿으면 퀸 · 룩 · 비숍 · 나이트 중 하나로 바뀝니다. 보통 퀸을 고릅니다. 앱에서는 고르는 창이 뜹니다.</p>
+    </div>
+
+    <div class="rule"><h2><span class="no">5</span>무승부</h2>
+      <ul>
+        <li><b>스테일메이트</b>: 체크는 아닌데 둘 수 있는 수가 하나도 없음</li>
+        <li><b>같은 국면 3회 반복</b></li>
+        <li><b>50수 규칙</b>: 양쪽이 50수 동안 폰을 움직이지도, 기물을 잡지도 않음</li>
+        <li><b>기물 부족</b>: 양쪽 모두 체크메이트할 수 없는 기물만 남음 (예: 킹 대 킹)</li>
+      </ul>
+      <div class="dias"><figure class="dia"><div class="cbx" data-ch="k.../..../.Q.K" data-org="a8"></div><figcaption>흑 차례: 체크가 아닌데 킹이 갈 곳이 없음 → 스테일메이트(무승부)</figcaption></figure></div>
+      <p class="tip">이길 수 있는 상황에서 상대를 꼼짝 못 하게만 만들면 비기므로 조심하세요.</p>
+    </div>
+
+    <div class="rule"><h2><span class="no">6</span>기보 읽는 법</h2>
+      <p>앱의 기보는 표준 표기법을 씁니다. 칸 이름은 왼쪽부터 a~h, 아래부터 1~8입니다.</p>
+      <table class="nt">
+        <tr><td>e4</td><td>폰이 e4로 이동 (폰은 기물 글자 없음)</td></tr>
+        <tr><td>Nf3</td><td>나이트가 f3으로. K 킹, Q 퀸, R 룩, B 비숍, N 나이트</td></tr>
+        <tr><td>Bxc6</td><td>x 는 잡기 (비숍이 c6의 기물을 잡음)</td></tr>
+        <tr><td>Qh5+</td><td>+ 는 체크</td></tr>
+        <tr><td>Qxf7#</td><td># 는 체크메이트</td></tr>
+        <tr><td>O-O / O-O-O</td><td>킹 쪽 / 퀸 쪽 캐슬링</td></tr>
+        <tr><td>e8=Q</td><td>프로모션 (폰이 퀸이 됨)</td></tr>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+// ---------- 바둑·오목 그림 (그림 문자: X 흑, O 백, x·o 표시된 돌, + 활로, # 둘 수 없음, * 좋은 자리) ----------
+let uid=0;
+function boardSvg(svg,rowsStr,kind){
+  const rows=rowsStr.split('/'),H=rows.length,W=Math.max(...rows.map(r=>r.length));
+  const ed=svg.dataset.edge||'',swap=svg.dataset.swap==='1',C=24,id='g'+(++uid);
+  const mL=ed.includes('l')?0.7:0.5,mR=ed.includes('r')?0.7:0.5,mT=ed.includes('t')?0.7:0.5,mB=ed.includes('b')?0.7:0.5;
+  const w=(W-1+mL+mR)*C,h=(H-1+mT+mB)*C,X=i=>(mL+i)*C,Y=j=>(mT+j)*C;
+  let s=`<defs><radialGradient id="${id}b" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#5d5d5d"/><stop offset=".55" stop-color="#202020"/><stop offset="1" stop-color="#060606"/></radialGradient>`+
+    `<radialGradient id="${id}w" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff"/><stop offset=".65" stop-color="#eeeeec"/><stop offset="1" stop-color="#c4c4c0"/></radialGradient>`+
+    `<linearGradient id="${id}bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${kind==='omok'?'#ecd5a3':'#e9c27a'}"/><stop offset="1" stop-color="${kind==='omok'?'#dcbf86':'#d9a956'}"/></linearGradient></defs>`;
+  s+=`<rect width="${w}" height="${h}" fill="url(#${id}bg)"/><g stroke="rgba(40,28,10,.8)" stroke-width="1">`;
+  for(let j=0;j<H;j++)s+=`<line x1="${ed.includes('l')?X(0):0}" y1="${Y(j)}" x2="${ed.includes('r')?X(W-1):w}" y2="${Y(j)}"/>`;
+  for(let i=0;i<W;i++)s+=`<line x1="${X(i)}" y1="${ed.includes('t')?Y(0):0}" x2="${X(i)}" y2="${ed.includes('b')?Y(H-1):h}"/>`;
+  s+='</g><g stroke="rgba(40,28,10,.9)" stroke-width="2.2">';
+  if(ed.includes('t'))s+=`<line x1="${ed.includes('l')?X(0):0}" y1="${Y(0)}" x2="${ed.includes('r')?X(W-1):w}" y2="${Y(0)}"/>`;
+  if(ed.includes('l'))s+=`<line x1="${X(0)}" y1="${ed.includes('t')?Y(0):0}" x2="${X(0)}" y2="${ed.includes('b')?Y(H-1):h}"/>`;
+  s+='</g>';
+  const r=C*0.47;
+  rows.forEach((row,j)=>[...row].forEach((ch,i)=>{
+    const x=X(i),y=Y(j);
+    let c=ch;if(swap&&(c==='X'||c==='O'))c=c==='X'?'O':'X';
+    if('XOxo'.includes(c)){
+      const black=c==='X'||c==='x';
+      s+=`<circle cx="${x+1}" cy="${y+1.6}" r="${r}" fill="rgba(0,0,0,.25)"/><circle cx="${x}" cy="${y}" r="${r}" fill="url(#${id}${black?'b':'w'})"/>`;
+      if(c==='x'||c==='o')s+=`<path d="M${x} ${y-r*.42}L${x+r*.38} ${y+r*.26}L${x-r*.38} ${y+r*.26}Z" fill="#e0463f"/>`;
+    }else if(c==='+')s+=`<circle cx="${x}" cy="${y}" r="${C*.16}" fill="#2f8c6e"/>`;
+    else if(c==='#'){const q=C*.2;s+=`<path d="M${x-q} ${y-q}L${x+q} ${y+q}M${x+q} ${y-q}L${x-q} ${y+q}" stroke="#d0392f" stroke-width="2.6" stroke-linecap="round"/>`;}
+    else if(c==='*')s+=`<circle cx="${x}" cy="${y}" r="${r*.82}" fill="none" stroke="#2f8c6e" stroke-width="2"/><text x="${x}" y="${y+C*.17}" text-anchor="middle" font-size="${C*.5}" font-weight="700" fill="#2f8c6e">★</text>`;
+  }));
+  if(svg.dataset.line){const [a,b,c2,d]=svg.dataset.line.split(' ').map(Number);s+=`<line x1="${X(a)}" y1="${Y(b)}" x2="${X(c2)}" y2="${Y(d)}" stroke="rgba(224,70,63,.9)" stroke-width="4" stroke-linecap="round"/>`;}
+  svg.setAttribute('viewBox',`0 0 ${w} ${h}`);svg.innerHTML=s;
+}
+document.querySelectorAll('svg[data-go]').forEach(s=>boardSvg(s,s.dataset.go,'go'));
+document.querySelectorAll('svg[data-omok]').forEach(s=>boardSvg(s,s.dataset.omok,'omok'));
+// ---------- 체스 그림 (대문자 백, 소문자 흑, * 갈 수 있는 칸, data-ring: 잡을 수 있는 칸, data-hl: 강조 칸) ----------
+const FILES='abcdefgh';
+document.querySelectorAll('.cbx[data-ch]').forEach(el=>{
+  const rows=el.dataset.ch.split('/'),W=Math.max(...rows.map(r=>r.length)),org=el.dataset.org||'a8';
+  const f0=FILES.indexOf(org[0]),r0=+org.slice(1);
+  const marks=k=>new Set((el.dataset[k]||'').split(';').filter(Boolean));
+  const ring=marks('ring'),hl=marks('hl');
+  el.style.gridTemplateColumns=`repeat(${W},1fr)`;
+  let h='';
+  rows.forEach((row,j)=>[...row.padEnd(W,'.')].forEach((ch,i)=>{
+    const dark=(f0+i+(r0-j))%2===1,k=j+','+i;
+    let cls=dark?'d':'l';if(hl.has(k))cls+=' hl';if(ch==='*')cls+=' mv';if(ring.has(k))cls+=' cap';
+    const img=/[kqrbnp]/i.test(ch)?`<img src="../chess/pieces/${ch===ch.toUpperCase()?'w':'b'}${ch.toUpperCase()}.svg" alt="">`:'';
+    h+=`<div class="${cls}">${img}</div>`;
+  }));
+  el.innerHTML=h;
+});
+// ---------- 탭 (주소 #go · #omok · #chess) ----------
+const GAME={go:'../go/',omok:'../omok/',chess:'../chess/'};
+function show(){
+  let k=location.hash.slice(1);if(!GAME[k])k='go';
+  document.querySelectorAll('.game-rules').forEach(s=>s.classList.toggle('hidden',s.id!==k));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.k===k));
+  $('#back').href=GAME[k];$('#play').href=GAME[k];
+  document.title=`${{go:'바둑',omok:'오목',chess:'체스'}[k]} 규칙 · Table Top`;
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{history.replaceState(null,'','#'+t.dataset.k);show();window.scrollTo(0,0);});
+window.addEventListener('hashchange',show);
+show();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
+</script>
+</body>
+</html>

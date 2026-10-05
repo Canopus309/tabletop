@@ -26,6 +26,8 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;cursor:pointer}
 .icon-btn:hover{border-color:var(--muted)}
 a.icon-btn{color:var(--text);text-decoration:none}
+/* 좁은 화면에서 머리줄 버튼이 넘치지 않게 */
+@media (max-width:400px){.hbtns{gap:5px}.icon-btn{width:36px;height:36px;border-radius:11px}.icon-btn svg{width:19px;height:19px}}
 .icon-btn svg{width:20px;height:20px}
 .app{max-width:1120px;margin:0 auto;padding:10px 16px 24px;padding-bottom:max(24px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
 @media (max-width:860px){.app{grid-template-columns:1fr;gap:14px;padding-top:6px}}
