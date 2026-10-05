@@ -283,6 +283,8 @@ const RJ = (() => {
       if (!g.legal(q, c)) continue;
       g.play(q);
       if (g.isWin(q)) { g.undo(); return q + 1; }
+      // 상대에게 아직 5목 자리가 남아 있으면(막은 4 말고 다른 4) 상대가 먼저 이긴다
+      if (g.fivePoints(opp).some(r => g.legal(r, opp))) { g.undo(); continue; }
       const blocks = g.fivePoints(c);
       let win = 0;
       if (blocks.length >= 2) win = q + 1;                       // 막을 곳이 둘 → 승리

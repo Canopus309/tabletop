@@ -1,10 +1,10 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
-const CACHE = 'tabletop-v9';
+const CACHE = 'tabletop-v10';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
   './rules/', './rules/index.html',
-  './common/base.css', './common/ui.js', './common/leaderboard.js', './common/rating.js',
+  './common/base.css', './common/learn.css', './common/learn.js', './common/ui.js', './common/leaderboard.js', './common/rating.js',
   // 바둑
   './go/', './go/index.html', './go/board.js', './go/katago.js',
   './go/learn/', './go/learn/index.html', './go/learn/problems.js',
@@ -13,6 +13,7 @@ const FILES = [
   './go/models/g170e-b10c128.bin.gz',
   // 오목
   './omok/', './omok/index.html', './omok/renju.js',
+  './omok/learn/', './omok/learn/index.html', './omok/learn/vcf.js', './omok/learn/problems.js',
   // 체스
   './chess/', './chess/index.html', './chess/engine.js', './chess/vendor/chess.js',
   './chess/vendor/stockfish-19-lite-single.js', './chess/vendor/stockfish-19-lite-single.wasm',

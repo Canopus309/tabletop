@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>오목 퍼즐 · Table Top</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../common/base.css">
+<link rel="stylesheet" href="../../common/learn.css">
+<style>
+#bw{background:radial-gradient(120% 90% at 30% 20%,rgba(255,255,255,.2),transparent 60%),linear-gradient(135deg,#ecd3a0,#dcb877)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" id="back" href="../" title="오목으로" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#e2c48a"/><circle cx="9" cy="23" r="4.2" fill="#151515"/><circle cx="16" cy="16" r="4.2" fill="#151515"/><circle cx="23" cy="9" r="4.2" fill="#151515"/><circle cx="23" cy="23" r="4.2" fill="#fafafa" stroke="#bbb"/></svg>
+    <span id="hTitle">오목 퍼즐</span>
+  </div>
+  <div class="hbtns">
+    <a class="icon-btn" href="../../rules/#omok" title="규칙" aria-label="규칙"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.2a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6M12 16.8h.01"/></svg></a>
+    <a class="icon-btn" href="../" title="대국하기" aria-label="대국하기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="listView">
+    <nav class="tabs" id="tabs"></nav>
+    <div id="setBody"></div>
+  </section>
+
+  <section id="probView" class="stage hidden">
+    <div class="board-col"><div id="bw"><canvas id="cv" aria-label="문제 오목판"></canvas></div></div>
+    <aside class="panel">
+      <div class="card">
+        <p class="ptitle" id="pTitle"></p>
+        <p class="prompt" id="pPrompt"></p>
+        <div class="tags" id="pTags"></div>
+        <p class="msg" id="pMsg"></p>
+        <p class="note" id="pNote"></p>
+        <div class="steps hidden" id="pSteps"><button id="stPrev" aria-label="이전 수">‹</button><span id="stText"></span><button id="stNext" aria-label="다음 수">›</button></div>
+      </div>
+      <div class="card">
+        <div class="btns" id="pBtns">
+          <button class="act" id="bRetry"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>다시</button>
+          <button class="act" id="bHint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>힌트</button>
+          <button class="act" id="bShow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span id="bShowT">정답</span></button>
+        </div>
+        <div class="nav2"><button class="ghost" id="bList">목록</button><button class="primary" id="bNext">다음 문제 ›</button></div>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<div id="toast"></div>
+<script src="../../common/ui.js"></script>
+<script src="../renju.js"></script>
+<script src="vcf.js"></script>
+<script src="problems.js"></script>
+<script src="../../common/learn.js"></script>
+<script>
+'use strict';
+const settings=load('omok-settings',{sound:true,forbid:true});
+function soundEnabled(){return settings.sound!==false;}
+const LV=['입문','초급','중급','고급'];
+const B=RJ.BLACK,W=RJ.WHITE,COLS='ABCDEFGHJKLMNOP';
+// 오목판 (공통 그리기용 모양: n, c[], pt, xy)
+class OBoard{constructor(arr){this.n=15;this.c=Int8Array.from(arr);}pt(x,y){return y*15+x;}xy(p){return [p%15,(p/15)|0];}}
+const nameOf=p=>COLS[p%15]+(15-((p/15)|0));
+function boardOf(moves){return new OBoard(RJ.Game.from(moves).b);}
+function place(b,p,c){b.c[p]=c;sound('stone');if(settings.sound&&navigator.vibrate)try{navigator.vibrate(10);}catch(e){}}
+// 흑 차례일 때 금수 자리 (설정을 따른다)
+function forbidOf(b,c){
+  if(c!==B||!settings.forbid)return [];
+  const s=new VCF.Solver(b.c);return s.near().filter(q=>RJ.isForbidden(b.c,q));
+}
+function frame(it){
+  const [x0,y0,x1,y1]=it.box;let a=x0-2,b=y0-2,c=x1+2,d=y1+2;
+  while(c-a<8){if(a>0)a--;if(c-a<8&&c<14)c++;if(a<=0&&c>=14)break;}
+  while(d-b<8){if(b>0)b--;if(d-b<8&&d<14)d++;if(b<=0&&d>=14)break;}
+  setView(15,a,b,c,d);
+}
+const winLineOf=(b,p)=>{const l=RJ.winLine(b.c,p);if(!l)return null;let lo=l[0],hi=l[0];for(const q of l){if(q<lo)lo=q;if(q>hi)hi=q;}return [lo,hi];};
+
+// ---------- 연속 4로 이기기 ----------
+function openVcf(it){
+  $('#pTitle').textContent=`${it.set.name} · ${LV[it.lv]} ${it.idx+1}`;
+  $('#pPrompt').innerHTML=`${dot(it.c)} ${turnName(it.c)} 차례 · ${it.d}수 안에 이기세요`;
+  $('#pTags').innerHTML=it.tags.map(t=>`<span>${t}</span>`).join('');
+  $('#bShowT').textContent='정답';
+  $('#bRetry').onclick=()=>{stopDemo();resetV(false);};
+  $('#bHint').onclick=()=>{if(cur.state!=='play')return;cur.helped=true;const s=new VCF.Solver(D.b.c);D.hints=s.winningMoves(it.c,cur.left);draw();msg('초록 점이 이기는 자리입니다.');};
+  $('#bShow').onclick=()=>showVcf();
+  frame(it);cur.helped=false;cur.failed=false;
+  resetV(true);
+}
+function resetV(first){
+  const it=cur.it,b=boardOf(it.moves);
+  cur.state='play';cur.left=it.d;cur.no=0;
+  setD(b,{last:it.moves[it.moves.length-1],forbid:forbidOf(b,it.c)});
+  $('#pNote').textContent='';
+  msg(first?'매 수 4를 두어 상대가 막게 하세요. 마지막 수가 5목이면 성공입니다.':'처음부터 다시 풀어 보세요.');
+  onBoard=vPlay;draw();
+}
+async function vPlay(p){
+  if(cur.state!=='play')return;
+  const it=cur.it,b=D.b,c=it.c,opp=3-c;
+  if(b.c[p])return;
+  if(c===B&&RJ.isForbidden(b.c,p)){toast('금수입니다. 흑은 33 · 44 · 장목 자리에 둘 수 없습니다');sound('bad');return;}
+  D.hints=[];D.bad=-1;D.forbid=[];
+  if(RJ.makesFive(b.c,p,c)){place(b,p,c);D.nums.set(p,++cur.no);D.last=p;D.line=winLineOf(b,p);cur.state='solved';draw();
+    mark(it,cur.helped||cur.failed?2:1);sound('win');msg('정답입니다! 5목 완성','ok');return;}
+  const s=new VCF.Solver(b.c);s.put(p,c);const r=s.replyTo(p,c);
+  place(b,p,c);D.nums.set(p,++cur.no);D.last=p;cur.left--;
+  if(!r){cur.failed=true;cur.state='wrong';D.bad=p;draw();sound('bad');msg('실패 — 4가 아닙니다. 상대에게 한 수를 주면 막히거나 반격당합니다.','bad');return;}
+  if(cur.left<1){cur.failed=true;cur.state='wrong';D.bad=p;draw();sound('bad');msg(`실패 — ${it.d}수 안에 끝낼 수 없습니다.`,'bad');return;}
+  cur.state='wait';draw();
+  const g=demoGen;await sleep(420);if(g!==demoGen)return;
+  if(r.win){
+    // 막을 곳이 둘이면 하나를 막고, 흑이 막을 자리가 금수면 막지 못한다
+    const blk=r.my.find(q=>s.legal(q,opp));
+    if(blk!==undefined&&r.my.length>=2){place(b,blk,opp);D.nums.set(blk,++cur.no);D.last=blk;msg('막을 곳이 두 군데라 상대가 한쪽만 막았습니다. 마무리하세요.');}
+    else{D.good=r.my.slice();msg('흑은 금수라서 막을 수 없습니다! 5목으로 마무리하세요.');}
+    cur.state='play';D.forbid=forbidOf(b,c);draw();return;
+  }
+  place(b,r.block,opp);D.nums.set(r.block,++cur.no);D.last=r.block;s.put(r.block,opp);
+  if(!s.win(c,cur.left)){cur.failed=true;cur.state='wrong';D.bad=p;draw();sound('bad');msg('실패 — 상대가 막았고, 남은 수로는 더 이어 갈 수 없습니다.','bad');return;}
+  cur.state='play';D.forbid=forbidOf(b,c);draw();msg(`좋습니다. 계속 두세요 (남은 수 ${cur.left})`);
+}
+// 정답 수순을 처음부터 보여 준다
+async function showVcf(){
+  stopDemo();cur.helped=true;
+  const it=cur.it,b=boardOf(it.moves),line=new VCF.Solver(b.c).line(it.c,12);
+  setD(b,{last:it.moves[it.moves.length-1]});cur.state='demo';msg('정답 수순');$('#pNote').textContent='';draw();
+  let no=0,c=it.c;
+  try{
+    for(let i=0;i<line.length;i++){
+      await wait(i?650:300);
+      const p=line[i],col=i%2===0?c:3-c;
+      if(p<0){msg('정답 수순 · 흑은 금수라서 막을 수 없습니다');continue;}
+      place(b,p,col);D.nums.set(p,++no);D.last=p;
+      if(i===line.length-1)D.line=winLineOf(b,p);
+      draw();
+    }
+    msg('정답 수순 · <b>다시</b>를 눌러 직접 풀어 보세요.');
+  }catch(e){}
+}
+
+// ---------- 막기 ----------
+function openDefend(it){
+  $('#pTitle').textContent=`${it.set.name} · ${LV[it.lv]} ${it.idx+1}`;
+  $('#pPrompt').innerHTML=`${dot(it.c)} ${turnName(it.c)} 차례 · ${turnName(3-it.c)}의 연속 4를 막으세요`;
+  $('#pTags').innerHTML=`<span>${turnName(3-it.c)} ${it.d}수 노림</span>`;
+  $('#bShowT').textContent='정답';
+  $('#bRetry').onclick=()=>{stopDemo();resetD(false);};
+  $('#bHint').onclick=()=>{if(cur.state!=='play')return;cur.helped=true;D.hints=[it.threat[0]];draw();msg(`초록 점은 ${turnName(3-it.c)}이 노리는 첫 수입니다.`);};
+  $('#bShow').onclick=()=>revealD(-1,'☆ 자리에 두면 막을 수 있습니다.','');
+  frame(it);cur.helped=false;cur.failed=false;
+  resetD(true);
+}
+function resetD(first){
+  const it=cur.it,b=boardOf(it.moves);
+  cur.state='play';
+  setD(b,{last:it.moves[it.moves.length-1],forbid:forbidOf(b,it.c)});
+  $('#pNote').textContent='';
+  msg(first?`${turnName(3-it.c)}이 다음 수부터 연속 4로 이기려 합니다. 어디를 막아야 할까요?`:'다시 골라 보세요.');
+  onBoard=dPlay;draw();
+}
+function dPlay(p){
+  if(cur.state!=='play')return;
+  const it=cur.it,b=D.b,c=it.c;
+  if(b.c[p])return;
+  if(c===B&&RJ.isForbidden(b.c,p)){toast('금수입니다. 흑은 33 · 44 · 장목 자리에 둘 수 없습니다');sound('bad');return;}
+  if(it.answer.includes(p)){mark(it,cur.helped||cur.failed?2:1);sound('win');revealD(p,'정답입니다! 연속 4를 막았습니다.','ok');return;}
+  cur.failed=true;sound('bad');revealD(p,`실패 — 이 수로는 막을 수 없습니다.`,'bad');
+}
+// 둔 수(또는 정답)를 보여 준 뒤, 상대가 어떻게 이기려 했는지(또는 이기는지) 수순으로 보여 준다
+async function revealD(played,head,cls){
+  stopDemo();const it=cur.it,c=it.c,opp=3-c;cur.state='done';
+  const b=boardOf(it.moves),ok=played<0||it.answer.includes(played);
+  setD(b,{last:it.moves[it.moves.length-1],good:ok?it.answer.slice():[]});
+  if(played>=0){place(b,played,c);D.last=played;if(!ok)D.bad=played;else D.good=[];}
+  msg(head,cls);
+  $('#pNote').textContent=ok?`막지 않으면 ${turnName(opp)}이 ${it.threat.length?Math.ceil(it.threat.length/2):it.d}수 만에 이깁니다:`:`${turnName(opp)}이 이렇게 이깁니다:`;
+  draw();
+  try{
+    await wait(1000);
+    // 정답이면 원래 장면에서 상대의 노림수를, 오답이면 둔 뒤의 상대 승리 수순을 보여 준다
+    const nb=ok?boardOf(it.moves):b,line=ok?it.threat:new VCF.Solver(nb.c).line(opp,12);
+    if(ok){D.b=nb;D.good=[];D.last=it.moves[it.moves.length-1];}
+    D.bad=ok?-1:played;D.nums=new Map();let no=0;
+    for(let i=0;i<line.length;i++){
+      const q=line[i],col=i%2===0?opp:c;
+      if(q<0){await wait(400);continue;}
+      place(nb,q,col);D.nums.set(q,++no);D.last=q;if(i===line.length-1)D.line=winLineOf(nb,q);draw();
+      await wait(600);
+    }
+    msg(head+'<br><span style="color:var(--muted);font-weight:500"><b>다시</b>를 누르면 처음 장면으로 돌아갑니다.</span>',cls);
+  }catch(e){}
+}
+
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
+startLearn({storeKey:'omok-learn',title:'오목 퍼즐',backHref:'../',levels:LV,summaryKey:'omokLearn',
+  stars:()=>[[3,3],[11,3],[7,7],[3,11],[11,11]],open:{vcf:openVcf,defend:openDefend}});
+</script>
+</body>
+</html>

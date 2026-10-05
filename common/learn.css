@@ -1,0 +1,56 @@
+/* 학습·퍼즐 화면 공통 스타일 (바둑 학습, 오목 퍼즐) */
+.wrap{max-width:1120px;margin:0 auto;padding:6px 16px 28px;padding-bottom:max(28px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+/* 목록 */
+.tabs{display:flex;gap:6px;margin:6px 0 16px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:9px 16px;border-radius:99px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:14px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.set-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 2px 4px}
+.set-head h2{margin:0;font-size:20px;letter-spacing:-.02em}
+.set-head span{font-size:13px;color:var(--muted);white-space:nowrap}
+.set-desc{margin:0 2px 16px;color:var(--muted);font-size:13.5px;line-height:1.6}
+.lv{margin:0 0 18px}
+.lv h3{margin:0 2px 8px;font-size:14px;color:var(--muted);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.tile{position:relative;min-width:0;overflow:hidden;aspect-ratio:1;border-radius:14px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px}
+.tile b{font-size:19px;letter-spacing:-.02em}
+.tile small{font-size:10.5px;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile:hover{border-color:var(--muted)}
+.tile.clean{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tile.clean small{color:inherit;opacity:.8}
+.tile.help{border-color:var(--accent);border-width:2px;color:var(--accent)}
+.tile.clean::after,.tile.help::after{content:"✓";position:absolute;top:5px;right:8px;font-size:11px;font-weight:800}
+.rows{display:flex;flex-direction:column;gap:8px}
+.jrow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow);cursor:pointer;text-align:left}
+.jrow:hover{border-color:var(--muted)}
+.jrow .no{flex:none;width:32px;height:32px;border-radius:10px;background:var(--chip);display:grid;place-items:center;font-weight:700;font-size:14px}
+.jrow.done .no{background:var(--accent);color:var(--accent-ink)}
+.jrow .t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.jrow .t b{font-size:15px}
+.jrow .t small{font-size:12.5px;color:var(--muted);line-height:1.45}
+/* 문제 화면 */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start}
+@media (max-width:860px){.stage{grid-template-columns:1fr;gap:14px}}
+.board-col{display:flex;justify-content:center}
+#bw{position:relative;width:100%;border-radius:8px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;
+  background:radial-gradient(120% 90% at 30% 20%,rgba(255,255,255,.18),transparent 60%),linear-gradient(135deg,var(--wood1),var(--wood2));
+  box-shadow:0 2px 0 rgba(0,0,0,.08),0 14px 40px rgba(60,40,10,.25)}
+#cv{position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+.ptitle{font-size:13px;color:var(--muted);font-weight:600;margin:0 0 4px}
+.prompt{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;letter-spacing:-.02em;margin:0}
+.msg{margin:12px 0 0;font-size:14px;line-height:1.6;min-height:22px}
+.msg.ok{color:var(--accent);font-weight:600}
+.msg.bad{color:var(--danger);font-weight:600}
+.note{margin:8px 0 0;font-size:13.5px;line-height:1.65;color:var(--text)}
+.note:empty{display:none}
+.btns{display:flex;gap:8px}
+.btns .act{flex:1}
+.btns .act{padding:10px 4px}
+.nav2{display:flex;gap:8px;margin-top:10px}
+.nav2 .ghost{flex:1}.nav2 .primary{flex:2}
+.steps{display:flex;align-items:center;gap:8px;margin-top:12px}
+.steps button{width:42px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-size:16px}
+.steps button:disabled{opacity:.4;cursor:default}
+.steps span{flex:1;text-align:center;font-size:13px;color:var(--muted)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tags span{font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--chip);color:var(--muted)}

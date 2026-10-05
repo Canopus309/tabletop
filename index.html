@@ -82,7 +82,7 @@
         <path d="M38 86L98 26" stroke="#e0463f" stroke-width="2.4" stroke-linecap="round" opacity=".9"/>
       </svg></span>
       <h2>오목 <span class="badge">렌주</span></h2>
-      <p>흑 금수(33·44·장목) 자동 판정 · 4·3 위협을 읽는 AI</p>
+      <p>흑 금수(33·44·장목) 자동 판정 · 4·3 위협을 읽는 AI · 연속 4와 막기 퍼즐</p>
       <div class="me" id="meOmok"></div>
     </a>
 
@@ -108,7 +108,7 @@
 try{
   const s=JSON.parse(localStorage.getItem('tt-summary'))||{};
   if(s.go)document.getElementById('meGo').textContent='내 기력 '+s.go;
-  if(s.omok)document.getElementById('meOmok').textContent=s.omok;
+  if(s.omok||s.omokLearn)document.getElementById('meOmok').textContent=[s.omok,s.omokLearn&&'퍼즐 '+s.omokLearn].filter(Boolean).join(' · ');
   if(s.chess)document.getElementById('meChess').textContent=s.chess;
   if(s.learn)document.getElementById('meLearn').textContent=s.learn;
 }catch(e){}
