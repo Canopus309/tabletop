@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>순위표 · Table Top</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../common/base.css">
+<style>
+.wrap{max-width:720px;margin:0 auto;padding:6px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.tabs{display:flex;gap:6px;margin:6px 0 14px}
+.tab{flex:1;padding:10px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.mine{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.mine .v{font-size:24px;font-weight:800;letter-spacing:-.02em}
+.mine .s{font-size:13px;color:var(--muted);margin-top:2px}
+.mine .open{flex:none;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:13.5px;text-decoration:none;color:var(--text)}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 2px 8px}
+.head b{font-size:15px}
+.head span{font-size:12px;color:var(--muted)}
+.head button{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:6px 10px;font-size:12.5px;cursor:pointer}
+.lb-list{max-height:none}
+.lb-row .no.top{color:var(--accent)}
+.name{margin-top:12px}
+.name p{margin:8px 2px 0;font-size:12.5px;color:var(--muted);line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../" title="Table Top 홈" aria-label="Table Top 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+    순위표
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" id="tabs">
+    <button class="tab" data-k="go">바둑</button>
+    <button class="tab" data-k="omok">오목</button>
+    <button class="tab" data-k="chess">체스</button>
+  </nav>
+
+  <div class="card">
+    <div class="mine"><div><div class="s" id="mineLabel"></div><div class="v" id="mineVal">–</div><div class="s" id="mineSub"></div></div><a class="open" id="openGame" href="../go/">두러 가기</a></div>
+    <div class="head"><b id="lbTitle"></b><span id="lbStatus"></span><button id="refresh" type="button">새로고침</button></div>
+    <div class="lb-list" id="lbList"></div>
+  </div>
+
+  <div class="card name">
+    <div class="lb-name"><input id="lbName" maxlength="12" placeholder="닉네임 (세 게임 공통)" autocomplete="off"><button type="button" id="lbSave">저장</button></div>
+    <p>닉네임은 바둑·오목·체스 순위표에 함께 쓰입니다. 기록은 각 게임을 열 때 자동으로 올라가고, 바둑은 3판, 오목·체스는 레이팅 대국 3판 이상이면 순위표에 나옵니다.</p>
+  </div>
+</main>
+
+<div id="toast"></div>
+<script src="../common/ui.js"></script>
+<script src="../common/leaderboard.js"></script>
+<script>
+'use strict';
+// 게임마다 순위표 컬렉션·정렬·값 표시. 캐시 키는 각 게임 화면과 같아서 오프라인에서도 마지막 목록이 보인다
+const rankName=k=>{k=Math.round(k);return k>0?k+'급':(1-k)+'단';};
+const goRank=r=>r.kyu<=-4?'5단 이상':r.kyu>=20?'20급 이하':rankName(r.kyu);
+const omokRank=r=>{const k=Math.min(30,Math.round(18-(r-600)/80));return k>=1?k+'급':(1-k)+'단';};
+const GAMES={
+  go:{name:'바둑',col:'players',field:'kyu',dir:'ASCENDING',cache:'cache',url:'../go/',label:'내 기력',sumKey:'go',fmt:r=>goRank(r),unit:'기력'},
+  omok:{name:'오목',col:'omok',field:'rating',dir:'DESCENDING',cache:'omokCache',url:'../omok/',label:'내 급수',sumKey:'omok',fmt:r=>omokRank(r.rating)+(r.rd>110?'?':''),unit:'급수'},
+  chess:{name:'체스',col:'chess',field:'rating',dir:'DESCENDING',cache:'chessCache',url:'../chess/',label:'내 레이팅',sumKey:'chess',fmt:r=>Math.round(r.rating)+(r.rd>110?'?':''),unit:'레이팅'},
+};
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let cur='go';
+function summary(){try{return JSON.parse(localStorage.getItem('tt-summary'))||{};}catch(e){return{};}}
+function render(){
+  const g=GAMES[cur],s=LB.state(),rows=s[g.cache]||[],me=rows.findIndex(r=>r.uid===s.uid);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.k===cur));
+  const mine=summary()[g.sumKey];
+  $('#mineLabel').textContent=g.label;
+  $('#mineVal').textContent=mine?String(mine).replace(/^(내 기력 |급수 |레이팅 )/,''):'기록 없음';
+  $('#mineSub').textContent=me>=0?`순위표 ${me+1}위`:s.name?'아직 순위표에 없습니다':'닉네임을 정하면 순위표에 참가합니다';
+  $('#openGame').href=g.url;$('#openGame').textContent=`${g.name} 두러 가기`;
+  $('#lbTitle').textContent=`${g.name} ${g.unit} 순위`;
+  const at=s[g.cache+'At'];
+  $('#lbStatus').textContent=!LB.configured()?'순위표 서버 준비 중':!navigator.onLine?'오프라인 · 마지막으로 받은 목록':at?'갱신 '+new Date(at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  $('#lbList').innerHTML=rows.length
+    ?rows.map((r,i)=>`<div class="lb-row${r.uid===s.uid?' me':''}"><span class="no${i<3?' top':''}">${i+1}</span><span>${esc(r.name||'')}</span><span>${esc(g.fmt(r))}</span><span class="g">${r.games}판</span></div>`).join('')
+    :`<div class="lb-empty">${navigator.onLine?'아직 순위표에 아무도 없습니다.':'오프라인입니다. 연결되면 순위표를 받아옵니다.'}</div>`;
+  if(document.activeElement!==$('#lbName'))$('#lbName').value=s.name||'';
+}
+const fetched={};
+async function refresh(force){
+  render();
+  const g=GAMES[cur];
+  if(!LB.configured()||!navigator.onLine||(fetched[cur]&&!force))return;
+  $('#lbStatus').textContent='받는 중…';
+  try{await LB.fetchTopFrom(g.col,g.field,g.dir,g.cache);fetched[cur]=true;}catch(e){console.warn('[순위표]',e);toast('순위표를 받지 못했습니다');}
+  render();
+}
+function show(){let k=location.hash.slice(1);if(!GAMES[k])k='go';cur=k;refresh(false);}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{history.replaceState(null,'','#'+t.dataset.k);show();});
+window.addEventListener('hashchange',show);
+$('#refresh').onclick=()=>refresh(true);
+$('#lbSave').onclick=()=>{
+  const name=$('#lbName').value.trim().slice(0,12);
+  if(!name){toast('닉네임을 입력하세요');return;}
+  // 세 게임 모두 다음에 열 때 새 닉네임으로 다시 올린다
+  LB.set({name,pending:true,chessPending:true,omokPending:true});
+  toast('저장했습니다. 각 게임을 열 때 순위표에 반영됩니다');render();
+};
+window.addEventListener('online',()=>refresh(true));
+show();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../sw.js').catch(()=>{});
+</script>
+</body>
+</html>

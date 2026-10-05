@@ -1,9 +1,9 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
-const CACHE = 'tabletop-v14';
+const CACHE = 'tabletop-v15';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
-  './rules/', './rules/index.html',
+  './rules/', './rules/index.html', './ranks/', './ranks/index.html',
   './common/base.css', './common/learn.css', './common/learn.js', './common/ui.js', './common/leaderboard.js', './common/rating.js',
   // 바둑
   './go/', './go/index.html', './go/board.js', './go/katago.js',
