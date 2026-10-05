@@ -1,5 +1,5 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
-const CACHE = 'tabletop-v16';
+const CACHE = 'tabletop-v17';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',

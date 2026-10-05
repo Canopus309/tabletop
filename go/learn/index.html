@@ -282,87 +282,19 @@ function yStep(k){
   draw();
 }
 
-// ---------- 정석 사전 (조셉키피디아처럼 갈래를 골라 본다) ----------
-// 나무: {m 수, t 종류(j 정석·v 변화·x 실수), n 이름, c 설명, k 다음 수들}. 뿌리의 setup 은 미리 놓인 흑돌
-const JT={j:['정석','#2f8c6e'],v:['변화','#3b7dd8'],x:['실수','#d0392f']};
-function openJoseki(it){
-  $('#pTitle').textContent=`${it.set.name} ${it.idx+1}`;
-  $('#pPrompt').textContent=it.title;
-  $('#bHint').classList.add('hidden');
-  $('#bShowT').textContent='연습';
-  $('#bRetry').onclick=()=>{stopDemo();cur.practice=false;jGo([]);};
-  $('#bShow').onclick=()=>jPractice();
-  $('#stPrev').onclick=()=>jGo(cur.path.slice(0,-1));
-  $('#stNext').onclick=()=>{const k=jKids();if(k.length)jGo(cur.path.concat(k[0]));};
-  $('#pSteps').classList.remove('hidden');
-  // 나무에 나오는 모든 수가 들어가게 귀 부분을 잘라 보여 준다
-  const b=new Board(19);let x0=18,y1=0;
-  const walk=n=>{const [x,y]=b.xy(sgP(b,n.m));x0=Math.min(x0,x);y1=Math.max(y1,y);n.k.forEach(walk);};walk(it.tree);
-  for(const s of it.tree.setup||[]){const [x,y]=b.xy(sgP(b,s));x0=Math.min(x0,x);y1=Math.max(y1,y);}
-  setView(19,Math.min(x0-2,11),0,18,Math.max(y1+2,7));
-  cur.practice=false;
-  jGo([]);
+// ---------- 정석: 조셉키피디아 링크 ----------
+function renderSet(s,body){
+  if(s.kind!=='link')return false;
+  const n=body.querySelector('.set-head span');if(n)n.remove();
+  body.insertAdjacentHTML('beforeend',`<div class="rows"><a class="jrow" href="${s.url}" target="_blank" rel="noopener"><span class="no">↗</span><span class="t"><b>${s.site}</b><small>${new URL(s.url).host.replace(/^www\./,'')} · 인터넷 연결 필요</small></span></a></div>`);
+  return true;
 }
-const jKids=()=>cur.path.length?cur.path[cur.path.length-1].k:[cur.it.tree];
-const jColor=c=>c===1?'흑':'백';
-// 지금 장면에서 둘 차례 (뿌리 setup 은 흑, 첫 수는 it.first)
-const jTurn=len=>len%2===0?cur.it.first:3-cur.it.first;
-function jGo(path){
-  stopDemo();
-  const it=cur.it,b=new Board(19);
-  for(const s of it.tree.setup||[])b.place(sgP(b,s),BLACK);
-  b.turn=it.first;
-  const nums=new Map();
-  path.forEach((n,i)=>{const p=sgP(b,n.m);b.play(p);nums.set(p,i+1);});
-  for(const [p] of nums)if(b.c[p]===EMPTY)nums.delete(p);
-  cur.path=path;cur.miss=0;
-  const kids=jKids(),last=path.length?sgP(b,path[path.length-1].m):-1;
-  const cands=cur.practice?[]:kids.map((n,i)=>({p:sgP(b,n.m),label:String.fromCharCode(65+i),color:JT[n.t][1]}));
-  setD(b,{nums,last,cands});
-  onBoard=jPlay;draw();
-  const k=path.length,node=path[k-1];
-  $('#stPrev').disabled=k===0;$('#stNext').disabled=!kids.length;
-  $('#stText').textContent=k?`${k}수째`:'처음';
-  if(!k){msg(it.desc);$('#pNote').innerHTML='';}
-  else{msg(`<b>${k}.</b> ${jColor(jTurn(k-1))} · ${node.n} <span style="color:${JT[node.t][1]};font-weight:700">${JT[node.t][0]}</span>`);$('#pNote').innerHTML=esc(node.c).replace(/\n/g,'<br>');}
-  // 다음 수 후보 목록
-  let box=$('#jCands');if(!box){box=document.createElement('div');box.id='jCands';box.className='cands';$('#pNote').after(box);}
-  if(cur.practice){
-    box.innerHTML='';
-    if(!kids.length){msg('정석을 끝까지 두었습니다!','ok');}
-    else msg(`연습 · ${jColor(jTurn(k))} 차례 · 정석 수를 두세요`+(k?`<br><span style="color:var(--muted);font-weight:500">${k}. ${esc(node.n)}</span>`:''));
-    return;
-  }
-  box.innerHTML=kids.length?kids.map((n,i)=>`<button class="cand" data-i="${i}"><span class="lb" style="background:${JT[n.t][1]}">${String.fromCharCode(65+i)}</span>${jColor(jTurn(k))} ${esc(n.n)}<small style="color:${JT[n.t][1]}">${JT[n.t][0]}</small></button>`).join('')
-    +`<div class="legend"><span><i style="background:${JT.j[1]}"></i>정석</span><span><i style="background:${JT.v[1]}"></i>변화</span><span><i style="background:${JT.x[1]}"></i>실수</span></div>`
-    :'<p class="note" style="color:var(--muted)">이 갈래의 끝입니다. ‹ 로 돌아가 다른 갈래를 볼 수 있습니다.</p>';
-  box.querySelectorAll('.cand').forEach(el=>el.onclick=()=>jGo(cur.path.concat(kids[+el.dataset.i])));
-  if(!kids.length&&path.every(n=>n.t==='j'))mark(it,1);
-}
-const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function jPlay(p){
-  const kids=jKids(),i=kids.findIndex(n=>sgP(D.b,n.m)===p);
-  if(i<0){
-    if(D.b.c[p]!==EMPTY)return;
-    sound('bad');
-    if(cur.practice){cur.miss++;if(cur.miss>=2){D.hints=kids.filter(n=>n.t!=='x').map(n=>sgP(D.b,n.m));draw();msg('초록 점 자리가 정석입니다.','bad');}else msg('정석 사전에 없는 수입니다. 다시 생각해 보세요.','bad');}
-    else toast('정석 사전에 없는 수입니다. 색 표시된 자리 중에서 골라 보세요');
-    return;
-  }
-  const n=kids[i];
-  if(cur.practice&&n.t==='x'){sound('bad');msg(`실수 — ${esc(n.n)}: ${esc(n.c)}`,'bad');return;}
-  sound('stone');
-  jGo(cur.path.concat(n));
-}
-// 연습: 후보 표시 없이 정석 수를 직접 둔다 (두 번 틀리면 자리를 알려 준다)
-function jPractice(){cur.practice=true;jGo([]);}
 
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
 const STAR={19:[3,9,15],13:[3,6,9],9:[2,4,6]};
-startLearn({storeKey:'go-learn',title:'바둑 학습',backHref:'../',levels:LV,summaryKey:'learn',rowKinds:['joseki'],
+startLearn({storeKey:'go-learn',title:'바둑 학습',backHref:'../',levels:LV,summaryKey:'learn',renderSet,
   stars:n=>{const s=STAR[n]||[];return n===9?[[2,2],[6,2],[2,6],[6,6],[4,4]]:s.flatMap(a=>s.map(c=>[a,c]));},
-  nextLabel:it=>it.set.kind==='joseki'?'다음 정석 ›':'다음 문제 ›',
-  open:{tsumego:openTsumego,yose:openYose,joseki:openJoseki}});
+  open:{tsumego:openTsumego,yose:openYose}});
 </script>
 </body>
 </html>

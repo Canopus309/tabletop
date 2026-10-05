@@ -29,15 +29,6 @@ function renderList(){
   const done=s.items.filter(it=>prog.done[it.id]).length;
   body.innerHTML=`<div class="set-head"><h2>${s.name}</h2><span>${done} / ${s.items.length}</span></div><p class="set-desc">${s.desc}</p>`;
   if(LC.renderSet&&LC.renderSet(s,body))return; // 페이지가 직접 그리는 목록
-  if((LC.rowKinds||[]).includes(s.kind)){
-    const rows=document.createElement('div');rows.className='rows';
-    s.items.forEach((it,i)=>{
-      const r=document.createElement('button');r.className='jrow'+(prog.done[it.id]?' done':'');
-      r.innerHTML=`<span class="no">${prog.done[it.id]?'✓':i+1}</span><span class="t"><b>${it.title}</b><small>${it.desc}</small></span>`;
-      r.onclick=()=>go(it.id);rows.appendChild(r);
-    });
-    body.appendChild(rows);return;
-  }
   for(let lv=0;lv<LC.levels.length;lv++){
     const items=s.items.filter(it=>it.lv===lv);if(!items.length)continue;
     const box=document.createElement('div');box.className='lv';
@@ -76,9 +67,8 @@ window.addEventListener('hashchange',route);
 const cv=$('#cv'),ctx=cv?cv.getContext('2d'):null,bw=$('#bw');
 let V={x0:0,y0:0,x1:8,y1:8,n:9},G={cell:0,ox:0,oy:0,w:0,h:0,dpr:1};
 // 화면 상태: 판, 표시(번호·힌트·표적·틀린 수·좋은 자리·금수·5목 선). 점이 없으면 -1
-// cands: 다음 수 후보 표시 [{p, label, color}] (정석 사전)
-let D={b:null,nums:new Map(),hints:[],targets:[],bad:-1,good:[],last:-1,forbid:[],line:null,cands:[]};
-function setD(b,o={}){D=Object.assign({b,nums:new Map(),hints:[],targets:[],bad:-1,good:[],last:-1,forbid:[],line:null,cands:[]},o);}
+let D={b:null,nums:new Map(),hints:[],targets:[],bad:-1,good:[],last:-1,forbid:[],line:null};
+function setD(b,o={}){D=Object.assign({b,nums:new Map(),hints:[],targets:[],bad:-1,good:[],last:-1,forbid:[],line:null},o);}
 function setView(n,x0,y0,x1,y1){
   V={n,x0:Math.max(0,x0),y0:Math.max(0,y0),x1:Math.min(n-1,x1),y1:Math.min(n-1,y1)};
   const k=0.62,c=0.5;
@@ -139,8 +129,6 @@ function draw(){
   }
   if(D.line){const [a,c2]=D.line,[ax,ay]=b.xy(a),[cx,cy]=b.xy(c2);ctx.strokeStyle='rgba(224,70,63,.9)';ctx.lineWidth=Math.max(2,cell*0.12);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(PX(ax),PY(ay));ctx.lineTo(PX(cx),PY(cy));ctx.stroke();ctx.lineCap='butt';}
   if(D.bad>=0&&b.c[D.bad]!==ST_E){const [x,y]=b.xy(D.bad);ctx.strokeStyle='#e0463f';ctx.lineWidth=Math.max(2,cell*0.08);ctx.beginPath();ctx.arc(PX(x),PY(y),r*1.02,0,7);ctx.stroke();}
-  for(const c of D.cands){const [x,y]=b.xy(c.p);if(b.c[c.p]!==ST_E)continue;ctx.fillStyle=c.color;ctx.beginPath();ctx.arc(PX(x),PY(y),r*0.7,0,7);ctx.fill();
-    ctx.fillStyle='#fff';ctx.font=`700 ${cell*0.46}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(c.label,PX(x),PY(y)+cell*0.02);}
   for(const p of D.hints){const [x,y]=b.xy(p);ctx.fillStyle='rgba(47,140,110,.85)';ctx.beginPath();ctx.arc(PX(x),PY(y),r*0.55,0,7);ctx.fill();}
   for(const p of D.good){const [x,y]=b.xy(p);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=Math.max(2,cell*0.08);ctx.beginPath();ctx.arc(PX(x),PY(y),r*0.9,0,7);ctx.stroke();
     if(b.c[p]===ST_E){ctx.fillStyle='rgba(47,140,110,.95)';ctx.font=`700 ${cell*0.5}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('☆',PX(x),PY(y)+cell*0.02);}}
@@ -182,7 +170,6 @@ const dot=c=>`<span class="dot ${c===ST_B?'b':'w'}"></span>`;
 function openItem(it){
   cur={it};
   $('#pTags').innerHTML='';$('#pNote').textContent='';$('#pSteps').classList.add('hidden');
-  const jc=$('#jCands');if(jc)jc.remove(); // 정석 사전의 후보 목록
   $('#pBtns').classList.remove('hidden');$('#bHint').classList.remove('hidden');
   const nx=it.set.items[it.idx+1];
   $('#bNext').textContent=nx?(LC.nextLabel?LC.nextLabel(it):'다음 문제 ›'):'목록으로';
