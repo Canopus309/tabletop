@@ -59,20 +59,6 @@
       <div class="me" id="meGo"></div>
     </a>
 
-    <a class="game" href="go/learn/">
-      <span class="art"><svg viewBox="0 0 160 100" aria-hidden="true">
-        <rect width="160" height="100" fill="url(#wd)"/>
-        <g stroke="#3a2a10" stroke-width=".8" opacity=".55"><path d="M14 14v86M34 14v86M54 14v86M74 14v86M94 14v86M114 14v86M134 14v86M154 14v86M14 14h146M14 34h146M14 54h146M14 74h146M14 94h146"/></g>
-        <path d="M14 14h146M14 14v86" stroke="#3a2a10" stroke-width="2" opacity=".7"/>
-        <g fill="url(#sw)"><circle cx="14" cy="14" r="8.5"/><circle cx="14" cy="34" r="8.5"/><circle cx="34" cy="34" r="8.5"/><circle cx="54" cy="34" r="8.5"/><circle cx="74" cy="34" r="8.5"/><circle cx="94" cy="14" r="8.5"/><circle cx="94" cy="34" r="8.5"/></g>
-        <g fill="url(#sb)"><circle cx="14" cy="54" r="8.5"/><circle cx="34" cy="54" r="8.5"/><circle cx="54" cy="54" r="8.5"/><circle cx="74" cy="54" r="8.5"/><circle cx="94" cy="54" r="8.5"/><circle cx="114" cy="34" r="8.5"/><circle cx="114" cy="14" r="8.5"/></g>
-        <circle cx="54" cy="14" r="8.5" fill="none" stroke="#2f8c6e" stroke-width="2.6"/><text x="54" y="19" text-anchor="middle" font-size="13" font-weight="700" fill="#2f8c6e">★</text>
-      </svg></span>
-      <h2>바둑 학습</h2>
-      <p>사활 · 맥 · 끝내기 문제와 기본 정석 · 정답과 오답을 끝까지 읽어 확인한 문제</p>
-      <div class="me" id="meLearn"></div>
-    </a>
-
     <a class="game" href="omok/">
       <span class="art"><svg viewBox="0 0 160 100" aria-hidden="true">
         <rect width="160" height="100" fill="#e9cf9a"/>
@@ -107,10 +93,9 @@
 // 각 게임이 남긴 요약(내 기력 등)을 보여 준다
 try{
   const s=JSON.parse(localStorage.getItem('tt-summary'))||{};
-  if(s.go)document.getElementById('meGo').textContent='내 기력 '+s.go;
+  if(s.go||s.learn)document.getElementById('meGo').textContent=[s.go&&'내 기력 '+s.go,s.learn&&'학습 '+s.learn].filter(Boolean).join(' · ');
   if(s.omok||s.omokLearn)document.getElementById('meOmok').textContent=[s.omok,s.omokLearn&&'퍼즐 '+s.omokLearn].filter(Boolean).join(' · ');
   if(s.chess||s.chessPuzzle)document.getElementById('meChess').textContent=[s.chess,s.chessPuzzle&&'퍼즐 '+s.chessPuzzle].filter(Boolean).join(' · ');
-  if(s.learn)document.getElementById('meLearn').textContent=s.learn;
 }catch(e){}
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
