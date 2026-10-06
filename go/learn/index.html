@@ -230,7 +230,7 @@ function renderSet(s,body){
 
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
 const STAR={19:[3,9,15],13:[3,6,9],9:[2,4,6]};
-startLearn({cols:'ABCDEFGHJKLMNOPQRST',storeKey:'go-learn',title:'바둑 학습',backHref:'../',levels:LV,summaryKey:'learn',renderSet,
+startLearn({cols:'ABCDEFGHJKLMNOPQRST',storeKey:'go-learn',title:'바둑 학습',backHref:'../home/',levels:LV,summaryKey:'learn',renderSet,
   stars:n=>{const s=STAR[n]||[];return n===9?[[2,2],[6,2],[2,6],[6,6],[4,4]]:s.flatMap(a=>s.map(c=>[a,c]));},
   open:{tsumego:openTsumego}});
 </script>

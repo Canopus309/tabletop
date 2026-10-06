@@ -51,7 +51,7 @@
 <body>
 <header>
   <div class="brand">
-    <a class="home-btn" href="../" title="Table Top 홈" aria-label="Table Top 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <a class="home-btn" href="home/" title="체스 홈" aria-label="체스 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
     <img class="logo" src="pieces/wN.svg" alt="" style="background:#739552;border-radius:8px">
     체스
   </div>
@@ -91,16 +91,19 @@
       <p id="resDetail"></p>
       <p class="rating-change" id="ratingChange"></p>
       <div class="graph-wrap"><canvas id="wrGraph" aria-label="수마다 백 승률 그래프. 눌러서 그 수로 이동"></canvas></div>
-      <p id="anaText" class="ana"></p>
-      <div class="review">
-        <button id="rvPrev" aria-label="이전 수">‹</button>
-        <input type="range" id="rvRange" min="0" max="0" value="0" aria-label="복기">
-        <button id="rvNext" aria-label="다음 수">›</button>
-        <span id="rvText"></span>
+      <div class="rv-dock" id="rvDock">
+        <p id="anaText" class="ana"></p>
+        <div class="cands hidden" id="candBox"></div>
+        <div class="review">
+          <button id="rvPrev" aria-label="이전 수">‹</button>
+          <input type="range" id="rvRange" min="0" max="0" value="0" aria-label="복기">
+          <button id="rvNext" aria-label="다음 수">›</button>
+          <span id="rvText"></span>
+        </div>
+        <div class="vari hidden" id="variBar"><span id="variText"></span><div class="vari-btns"><button type="button" id="variAi">AI 수</button><button type="button" id="variExit">본선으로</button></div></div>
+        <div class="rv-btns"><button class="mistake-btn hidden" id="nextMistake"></button><button type="button" class="cand-btn" id="candBtn">AI 후보 수</button></div>
+        <p class="vari-hint" id="variHint">말을 움직이면 지금 장면에서 다른 수를 둬 보는 변화도(참고도)가 됩니다.</p>
       </div>
-      <div class="vari hidden" id="variBar"><span id="variText"></span><div class="vari-btns"><button type="button" id="variAi">AI 수</button><button type="button" id="variExit">본선으로</button></div></div>
-      <p class="vari-hint" id="variHint">말을 움직이면 지금 장면에서 다른 수를 둬 보는 변화도(참고도)가 됩니다.</p>
-      <button class="mistake-btn hidden" id="nextMistake"></button>
       <div class="res-links"><button type="button" id="resDl">기보 내려받기</button><a href="../records/#chess">지난 대국 모두 보기 ›</a></div>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
     </div>
@@ -258,6 +261,8 @@ async function openRecord(id){
 function route(){
   const m=/^#rec=(\d+)$/.exec(location.hash);
   if(m){openRecord(+m[1]);return;}
+  // 게임 홈의 '새 대국'
+  if(location.hash==='#new'){history.replaceState(null,'',location.pathname);if(!game||recView){epoch++;thinking=false;recView=null;resume();}openNew();return;}
   if(!game||recView){if(engine)engine.stop();epoch++;thinking=false;analyzing=false;recView=null;resume();}
 }
 function closeRecord(){history.replaceState(null,'',location.pathname);route();}
@@ -360,6 +365,7 @@ async function analyzeGame(){
     if(i%4===0){ui();drawGraph();}
   }
   analyzing=false;save();ui();drawGraph();
+  if(candOn&&cands&&cands.wait){cands=null;ui();}
 }
 // i번째 수(1부터)를 둔 쪽 기준 승률 변화
 function moveDelta(i){const ev=game.evals;if(!ev||ev[i]==null||ev[i-1]==null)return null;const mover=i%2===1?'w':'b',s=mover==='w'?1:-1;return{mover,dw:s*(ev[i]-ev[i-1])};}
@@ -416,6 +422,7 @@ function render(){
   const key=bottom()+(settings.coords?'c':'');
   if(!cells||builtKey!==key){buildBoard();builtKey=key;}
   const len=view!==null?view:game.moves.length,c=vari?variChess():len===game.moves.length?ch:replay(len);
+  const candBest=candOn&&game.over&&cands&&cands.list&&cands.list.length&&cands.key===reviewKey()?cands.list[0].move:null;
   const last=vari&&vari.k?vari.moves[vari.k-1]:len?game.moves[len-1]:null,targets=new Map(),ip=inputPos();
   if(sel&&ip)for(const m of ip.moves({square:sel,verbose:true}))targets.set(m.to,!!m.captured);
   let checkSq=null;
@@ -425,7 +432,7 @@ function render(){
     if(cell.src!==src){cell.src=src;if(src){cell.img.src=src;cell.img.style.visibility='';}else cell.img.style.visibility='hidden';}
     cell.img.style.opacity='';
     const extra=(last&&(s===last.slice(0,2)||s===last.slice(2,4))?' last':'')+(s===sel?' sel':'')
-      +(hintMv&&len===game.moves.length&&(s===hintMv.slice(0,2)||s===hintMv.slice(2,4))?' hint':'')+(s===checkSq?' check':'');
+      +((hintMv&&len===game.moves.length&&(s===hintMv.slice(0,2)||s===hintMv.slice(2,4)))||(candBest&&(s===candBest.slice(0,2)||s===candBest.slice(2,4)))?' hint':'')+(s===checkSq?' check':'');
     if(cell.cls!==extra){cell.el.classList.remove('last','sel','hint','check');if(extra)cell.el.classList.add(...extra.trim().split(' '));cell.cls=extra;}
     const mk=settings.dots&&targets.has(s)?(targets.get(s)?'ring':'dot'):'';
     if(cell.mark.className!==mk)cell.mark.className=mk;
@@ -471,6 +478,47 @@ async function variAi(){
   if(!r.best||r.best==='(none)'){ui();return;}
   variPush(r.best);toast('AI: '+vari.sans[vari.k-1]);
 }
+// ---------- AI 후보 수 (복기 중 지금 장면에서 둘 만한 수와 최선 수순) ----------
+let candOn=false,cands=null,candT=0;
+const reviewUci=()=>vari?variUci():game.moves.slice(0,view??game.moves.length);
+const reviewKey=()=>reviewUci().join(' ');
+// uci 수순을 기보 표기(SAN)로
+function sansOf(moves,seq){const c=replay(0);for(const u of moves)c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]});const out=[];for(const u of seq){try{out.push(c.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]}).san);}catch(e){break;}}return out;}
+function candUi(){
+  $('#candBtn').classList.toggle('on',candOn);$('#candBtn').textContent=candOn?'후보 수 끄기':'AI 후보 수';
+  const box=$('#candBox');box.classList.toggle('hidden',!candOn);
+  if(!candOn)return;
+  const key=reviewKey();
+  if(!cands||cands.key!==key){cands={key,loading:true};clearTimeout(candT);const m=reviewUci();candT=setTimeout(()=>candRun(m,key),250);}
+  if(cands.wait){box.textContent='대국 분석이 끝나면 후보 수를 보여 드립니다…';return;}
+  if(cands.loading){box.textContent='Stockfish가 이 장면을 읽는 중…';return;}
+  if(!cands.list.length){box.textContent='이미 끝난 장면입니다.';return;}
+  let html=`<b>${NAME[cands.me]} 차례 · AI 후보</b> `+cands.list.map((c,i)=>`<span class="c${i?'':' best'}">${i+1} ${c.san} ${Math.round(c.wp)}%</span>`).join(' ');
+  if(!vari&&(view??game.moves.length)<game.moves.length){
+    const vi=view??game.moves.length,u=game.moves[vi],i=cands.list.findIndex(c=>c.move===u),d=moveDelta(vi+1);
+    html+=`<br>실제로 둔 수 ${game.sans[vi]}: ${i<0?'AI 후보 밖':i===0?'AI 최선과 같음':(i+1)+'번 후보'}${i<0&&d?' · 그 수로 승률 '+Math.round(d.dw)+'%p':''}`;
+  }
+  if(cands.list[0].pv.length>1)html+=' <button type="button" class="link" id="candPv">1번 수순 보기 ›</button>';
+  box.innerHTML=html;const pb=$('#candPv');if(pb)pb.onclick=candPv;
+}
+async function candRun(m,key){
+  if(!candOn||!cands||cands.key!==key)return;
+  if(analyzing||!engine){cands=engine?{key,wait:true}:{key,list:[]};ui();return;}
+  const ep=epoch,r=await engine.analyse(m,{depth:12,multipv:3});
+  if(ep!==epoch||!cands||cands.key!==key)return;
+  const me=replay(0);for(const u of m)me.move({from:u.slice(0,2),to:u.slice(2,4),promotion:u[4]});
+  const list=r.list.filter(e=>e.move).map(e=>({move:e.move,pv:e.pv.slice(0,12),san:sansOf(m,[e.move])[0]||e.move,wp:winPct(Math.max(-3000,Math.min(3000,e.cp)))}));
+  cands={key,list,me:me.turn()};render();ui();
+}
+// 1번 후보의 수순을 변화도로 펼쳐 › 로 한 수씩 본다
+function candPv(){
+  if(!cands||!cands.list.length)return;
+  const pv=cands.list[0].pv,base=vari?variUci():game.moves.slice(0,view??game.moves.length),sans=sansOf(base,pv),mv=pv.slice(0,sans.length);
+  if(vari){vari.moves=vari.moves.slice(0,vari.k).concat(mv);vari.sans=vari.sans.slice(0,vari.k).concat(sans);}
+  else vari={base:view??game.moves.length,moves:mv,sans,k:0};
+  view=vari.base;sel=null;render();ui();toast('› 를 누르면 AI 추천 수순을 한 수씩 둡니다');
+}
+$('#candBtn').onclick=()=>{candOn=!candOn;cands=null;render();ui();};
 $('#variAi').onclick=variAi;$('#variExit').onclick=variExit;
 
 // ---------- 입력: 눌러서 고르고 누르기, 또는 끌어서 놓기 ----------
@@ -559,9 +607,11 @@ function ui(){
     if(vari){const vc=variChess();$('#variText').innerHTML=`<b>변화도</b> ${vari.k}/${vari.moves.length}수${vari.k?' · '+vari.sans[vari.k-1]:''} · ${vc.isCheckmate()?'체크메이트':vc.isGameOver()?'무승부':NAME[vc.turn()]+' 차례'}`;$('#variAi').disabled=thinking||analyzing||!engine||vc.isGameOver();}
     const mine=mistakes().filter(m=>isPerson(m.mover)),mb=$('#nextMistake');
     const cnt=game.pvp?`백 ${mine.filter(m=>m.mover==='w').length} · 흑 ${mine.filter(m=>m.mover==='b').length}`:`${mine.length}개`;
-    mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`${game.pvp?'실수':'내 실수'} ${cnt} · 다음 실수 보기 ›`:'큰 실수 없음';
+    mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`다음 ${game.pvp?'실수':'내 실수'} › (${cnt})`:'큰 실수 없음';
     drawGraph();
   }
+  document.body.classList.toggle('docked',!!game.over);
+  if(game.over){candUi();document.body.style.setProperty('--dock-h',$('#rvDock').offsetHeight+'px');}
   $('#metaText').textContent=game.pvp?'두 사람 대국 · 분석: Stockfish 19 Lite':`Stockfish 19 Lite · AI ${L.name} (레이팅 ${L.elo})`;
 }
 $('#moveList').addEventListener('click',e=>{const m=e.target.closest('.m');if(m&&game.over)setView(+m.dataset.i);});

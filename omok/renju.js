@@ -484,6 +484,22 @@ const RJ = (() => {
     return { v, best };
   }
 
+  // 복기용: 지금 장면에서 둘 만한 수 몇 개와 각 수의 승률(두는 쪽 기준), 1번 수에서 이어지는 수순
+  function reviewCandidates(moves, k = 3) {
+    if (!moves.length) return { list: [{ move: CENTER, p: 0.5, pv: [CENTER] }] };
+    const g = Game.from(moves), c = g.turn;
+    if (g.isWin(moves[moves.length - 1])) return { list: [] };
+    const list = candidates(g, c, 8).map(q => ({ move: q, p: 1 - analyzePosition(moves.concat(q)).p }));
+    list.sort((a, b) => b.p - a.p);
+    const top = list.slice(0, k);
+    if (top.length) {
+      const m = moves.concat(top[0].move), pv = [top[0].move];
+      for (let i = 0; i < 9; i++) { if (Game.from(m).isWin(m[m.length - 1])) break; const r = chooseMove(m, LEVELS.length - 2); if (r.move < 0) break; m.push(r.move); pv.push(r.move); }
+      top[0].pv = pv;
+    }
+    return { list: top };
+  }
+
   // 흑 금수 자리 전체 (화면 표시용)
   function forbiddenPoints(moves) {
     const g = Game.from(moves), out = [];
@@ -505,14 +521,14 @@ const RJ = (() => {
     return null;
   }
 
-  return { N, NN, EMPTY, BLACK, WHITE, CENTER, LEVELS, Game, isForbidden, makesFive, foursDir, chooseMove, evaluatePosition, analyzePosition, rolloutWinrate, forbiddenPoints, winLine, vcf, WIN };
+  return { N, NN, EMPTY, BLACK, WHITE, CENTER, LEVELS, Game, isForbidden, makesFive, foursDir, chooseMove, evaluatePosition, analyzePosition, reviewCandidates, rolloutWinrate, forbiddenPoints, winLine, vcf, WIN };
 })();
 
-// Web Worker 로 쓰일 때: {id, moves, level} → {id, move, ...},  type:'analyze' → {id, p},  type:'eval' → {id, v, best}
+// Web Worker 로 쓰일 때: {id, moves, level} → {id, move, ...},  type:'analyze' → {id, p},  type:'eval' → {id, v, best},  type:'cands' → {id, list}
 if (typeof window === 'undefined' && typeof self !== 'undefined') {
   self.onmessage = e => {
     const { id, moves, level, type } = e.data;
-    const r = type === 'analyze' ? RJ.analyzePosition(moves) : type === 'eval' ? RJ.evaluatePosition(moves) : RJ.chooseMove(moves, level);
+    const r = type === 'analyze' ? RJ.analyzePosition(moves) : type === 'eval' ? RJ.evaluatePosition(moves) : type === 'cands' ? RJ.reviewCandidates(moves) : RJ.chooseMove(moves, level);
     self.postMessage(Object.assign({ id }, r));
   };
 }

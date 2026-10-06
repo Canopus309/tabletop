@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>체스 홈 · Table Top</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../common/base.css">
+<link rel="stylesheet" href="../../common/hub.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../../" title="Table Top 홈 (게임 고르기)" aria-label="Table Top 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <img class="logo" src="../pieces/wN.svg" alt="" style="background:#739552;border-radius:8px">
+    체스
+  </div>
+</header>
+<main class="hub">
+  <div class="hub-me" id="hubMe"></div>
+  <h2>대국</h2>
+  <div class="hub-list" id="hubPlay"></div>
+  <h2>공부하기 · 그 밖</h2>
+  <div class="hub-list" id="hubMore"></div>
+</main>
+<script src="../../common/ui.js"></script>
+<script src="../../common/records.js"></script>
+<script>window.HUB={"type":"chess","name":"체스","save":"chess-game","sum":"chess","learnSum":"chessPuzzle","learn":{"title":"퍼즐","desc":"레이팅 퍼즐 · 주제별 퍼즐"},"rules":"기물 움직임 · 특수 규칙"};</script>
+<script src="../../common/hub.js"></script>
+</body>
+</html>

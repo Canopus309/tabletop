@@ -307,7 +307,7 @@ function renderRated(s,body){
 
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
 prSummary();
-startLearn({storeKey:'chess-learn',title:'체스 퍼즐',backHref:'../',levels:LV,summaryKey:'chessLearn',stars:()=>[],
+startLearn({storeKey:'chess-learn',title:'체스 퍼즐',backHref:'../home/',levels:LV,summaryKey:'chessLearn',stars:()=>[],
   renderSet:renderRated,nextLabel:()=>'다음 문제 ›',open:{cpz:openPuzzle,rated:openPuzzle}});
 </script>
 </body>

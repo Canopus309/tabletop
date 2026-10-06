@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>오목 홈 · Table Top</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../common/base.css">
+<link rel="stylesheet" href="../../common/hub.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../../" title="Table Top 홈 (게임 고르기)" aria-label="Table Top 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#e2c38a"/><g fill="#151515"><circle cx="9" cy="23" r="3.6"/><circle cx="14" cy="18" r="3.6"/><circle cx="19" cy="13" r="3.6"/></g><g fill="#fafafa" stroke="#aaa" stroke-width=".6"><circle cx="19" cy="20" r="3.6"/><circle cx="24" cy="13" r="3.6"/></g></svg>
+    오목
+  </div>
+</header>
+<main class="hub">
+  <div class="hub-me" id="hubMe"></div>
+  <h2>대국</h2>
+  <div class="hub-list" id="hubPlay"></div>
+  <h2>공부하기 · 그 밖</h2>
+  <div class="hub-list" id="hubMore"></div>
+</main>
+<script src="../../common/ui.js"></script>
+<script src="../../common/records.js"></script>
+<script>window.HUB={"type":"omok","name":"오목","save":"omok-game","sum":"omok","learnSum":"omokLearn","learn":{"title":"퍼즐","desc":"연속 4로 이기기 · 막기"},"rules":"렌주 룰 · 흑 금수"};</script>
+<script src="../../common/hub.js"></script>
+</body>
+</html>

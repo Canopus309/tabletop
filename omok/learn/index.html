@@ -208,7 +208,7 @@ async function revealD(played,head,cls){
 }
 
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
-startLearn({cols:'ABCDEFGHIJKLMNO',storeKey:'omok-learn',title:'오목 퍼즐',backHref:'../',levels:LV,summaryKey:'omokLearn',
+startLearn({cols:'ABCDEFGHIJKLMNO',storeKey:'omok-learn',title:'오목 퍼즐',backHref:'../home/',levels:LV,summaryKey:'omokLearn',
   stars:()=>[[3,3],[11,3],[7,7],[3,11],[11,11]],open:{vcf:openVcf,defend:openDefend}});
 </script>
 </body>
