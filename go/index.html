@@ -298,12 +298,12 @@ migrateLevels('go',['baduk-game','baduk-newopts','baduk-rating']);
 // kata: KataGo 신경망 설정 / playouts·time·temp: KataGo를 못 쓸 때의 기본 AI 설정
 // rank: 화면에 보이는 기력. 입문~중급은 KaTrain(MIT)의 급수 보정 공식, 고급·최강은 추정치
 const LEVELS=[
-  {name:'입문',rank:'18급',desc:'바둑을 처음 배우는 분께. 수를 몇 개만 살펴보고 둡니다.',kata:{mode:'rank',kyu:18},playouts:120,time:250,temp:1},
-  {name:'초보',rank:'15급',desc:'바둑을 막 배운 분께. 단수와 따내기를 알면 둘 만합니다.',kata:{mode:'rank',kyu:15},playouts:400,time:400,temp:0.7},
-  {name:'초급',rank:'12급',desc:'규칙을 알고 몇 판 둬 본 분께.',kata:{mode:'rank',kyu:12},playouts:1200,time:700,temp:0.35},
-  {name:'중급',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
-  {name:'고급',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
-  {name:'최강',get rank(){return TOP_RANK[curModel()]||'3단+';},desc:'KataGo가 1,200수 이상 읽고, 내 차례에도 미리 읽습니다. 기력은 추정치입니다.',kata:{mode:'search',visits:1200,time:7000},playouts:1e9,time:8000,temp:0},
+  {name:'입문',bot:'형준봇',rank:'18급',desc:'바둑을 처음 배우는 분께. 수를 몇 개만 살펴보고 둡니다.',kata:{mode:'rank',kyu:18},playouts:120,time:250,temp:1},
+  {name:'초보',bot:'규형봇',rank:'15급',desc:'바둑을 막 배운 분께. 단수와 따내기를 알면 둘 만합니다.',kata:{mode:'rank',kyu:15},playouts:400,time:400,temp:0.7},
+  {name:'초급',bot:'제일봇',rank:'12급',desc:'규칙을 알고 몇 판 둬 본 분께.',kata:{mode:'rank',kyu:12},playouts:1200,time:700,temp:0.35},
+  {name:'중급',bot:'컨디션 좋은 제일봇',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
+  {name:'고급',bot:'각성한 제일봇',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
+  {name:'최강',bot:'택희봇',get rank(){return TOP_RANK[curModel()]||'3단+';},desc:'KataGo가 1,200수 이상 읽고, 내 차례에도 미리 읽습니다. 기력은 추정치입니다.',kata:{mode:'search',visits:1200,time:7000},playouts:1e9,time:8000,temp:0},
 ];
 // 최강 단계 추정 기력 (신경망별)
 const TOP_RANK={b6:'3단+',b10:'5단+',b15:'7단+'};
@@ -465,9 +465,9 @@ function showRank(){
   const{rank,games}=overallRank(),list=loadRating().slice().reverse();
   $('#rkBig').textContent=rank?rankText(rank).replace(/ \(.*\)/,''):'–';
   $('#rkSub').textContent=rank
-    ?`범위 ${rankName(rank.weak)}~${rankName(rank.strong)} · 최근 ${games}판, 내 수 ${rank.n}개 기준 · 추천 난이도: ${LEVELS[recommendLevel(rank.kyu)].name}`
+    ?`범위 ${rankName(rank.weak)}~${rankName(rank.strong)} · 최근 ${games}판, 내 수 ${rank.n}개 기준 · 추천 난이도: ${LEVELS[recommendLevel(rank.kyu)].name} (${LEVELS[recommendLevel(rank.kyu)].bot})`
     :'아직 기록이 없습니다. 대국을 마치면 자동으로 측정됩니다.';
-  $('#rkList').innerHTML=list.map(r=>`<div class="rank-row"><span class="d">${r.date.slice(5)}</span><span>${r.n}줄 · ${LEVELS[r.level]?LEVELS[r.level].name:''}</span><span class="${r.win?'w':'l'}">${r.win?'승':'패'}</span><span>${rankText(r.rank).replace('약 ','')}</span></div>`).join('');
+  $('#rkList').innerHTML=list.map(r=>`<div class="rank-row"><span class="d">${r.date.slice(5)}</span><span>${r.n}줄 · ${LEVELS[r.level]?LEVELS[r.level].bot:''}</span><span class="${r.win?'w':'l'}">${r.win?'승':'패'}</span><span>${rankText(r.rank).replace('약 ','')}</span></div>`).join('');
   openDlg($('#dlgRank'));
 }
 // ---------- 온라인 순위표 ----------
@@ -582,7 +582,7 @@ function newGame(o){
   game={id:Date.now(),n:o.size,komi,handicap:o.handicap,human,level:o.level,setup,moves:[],over:false,result:null,wr:0.5};
   if(pvp)game.pvp=true;
   resetView();rebuild();save();
-  toast(pvp?'두 사람 대국을 시작합니다 · 한 수씩 번갈아 두세요':`${NAME[human]}으로 대국을 시작합니다 · ${LEVELS[o.level].name}`);
+  toast(pvp?'두 사람 대국을 시작합니다 · 한 수씩 번갈아 두세요':`${NAME[human]}으로 대국을 시작합니다 · 상대 ${LEVELS[o.level].bot}`);
   maybeAI();
 }
 function resetView(){view=null;hints=null;ownMap=null;deadSet=null;pending=0;hover=0;}
@@ -597,7 +597,7 @@ const recPut=g=>REC.put('go',g,recMeta(g),sgfText(g));
 const recGame=()=>recView?Object.assign({},game,{over:recView.over,result:recView.result}):game;
 function recMeta(g){
   const done=g.over&&g.result;
-  return{opp:g.pvp?'두 사람':`AI ${LEVELS[g.level].name} (${LEVELS[g.level].rank})`,side:g.pvp?'':NAME[g.human],
+  return{opp:g.pvp?'두 사람':`${LEVELS[g.level].bot} (${LEVELS[g.level].rank})`,side:g.pvp?'':NAME[g.human],
     info:`${g.n}줄${g.setup.length?' · '+g.setup.length+'점 접바둑':''}`,len:g.moves.length+'수',
     out:!done?'open':g.pvp?'done':g.result.youWin?'win':'loss',res:done?g.result.title:'끝나지 않은 대국'};
 }
@@ -816,7 +816,7 @@ async function estimateNow(){
 
 function sgfText(g){
   const tmp=new Board(g.n),c=p=>{const [x,y]=tmp.xy(p);return String.fromCharCode(97+x)+String.fromCharCode(97+y);};
-  const d=new Date(g.id||Date.now()),ai='AI '+LEVELS[g.level].name;
+  const d=new Date(g.id||Date.now()),ai=LEVELS[g.level].bot;
   let s=`(;GM[1]FF[4]CA[UTF-8]AP[TableTop]SZ[${g.n}]KM[${g.komi}]DT[${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}]RU[Chinese]`;
   s+=g.pvp?'PB[흑]PW[백]':`PB[${g.human===1?'나':ai}]PW[${g.human===2?'나':ai}]`;
   if(g.setup.length)s+=`HA[${g.setup.length}]AB`+g.setup.map(p=>`[${c(p)}]`).join('');
@@ -943,10 +943,10 @@ new ResizeObserver(resize).observe(wrap);
 // ---------- UI 상태 ----------
 function ui(){
   if(!game)return;
-  const b=displayBoard(),lv=LEVELS[game.level].name;
+  const b=displayBoard(),lv=LEVELS[game.level].bot;
   for(const col of [1,2]){
     const el=col===1?$('#pB'):$('#pW');
-    el.querySelector('.who').textContent=game.pvp?'사람':col===game.human?'나':`AI · ${lv} (${LEVELS[game.level].rank})`;
+    el.querySelector('.who').textContent=game.pvp?'사람':col===game.human?'나':`${lv} (${LEVELS[game.level].rank})`;
     el.querySelector('.caps').textContent='따낸 돌 '+b.caps[col];
     el.classList.toggle('active',!game.over&&b.turn===col);
     el.classList.toggle('think',thinking&&thinkFor===col&&!isPerson(col));
@@ -1021,8 +1021,8 @@ function fillHandi(){
   sel.value=String(Math.min(cur,max));
 }
 function lvDesc(){
-  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`기력 약 ${l.rank} · ${l.desc}`;
-  const{rank}=overallRank();$('#recLevel').textContent=rank?`내 기력 ${rankText(rank).replace(/ \(.*\)/,'')} → 추천 난이도: ${LEVELS[recommendLevel(rank.kyu)].name}`:'';
+  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').innerHTML=`<b style="display:block;font-size:15px;color:var(--text);margin-bottom:2px">상대: ${l.bot}</b>기력 약 ${l.rank} · ${l.desc}`;
+  const{rank}=overallRank();$('#recLevel').textContent=rank?`내 기력 ${rankText(rank).replace(/ \(.*\)/,'')} → 추천 난이도: ${LEVELS[recommendLevel(rank.kyu)].name} (${LEVELS[recommendLevel(rank.kyu)].bot})`:'';
 }
 document.querySelectorAll('input[name=size]').forEach(el=>el.onchange=fillHandi);
 segL.addEventListener('change',lvDesc);
