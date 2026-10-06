@@ -80,6 +80,13 @@ a.icon-btn{color:var(--text);text-decoration:none}
 .ana .bad{color:var(--danger);font-weight:700}
 .mistake-btn{width:100%;margin:-2px 0 12px;padding:9px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--danger);font-weight:600;cursor:pointer}
 .mistake-btn:disabled{color:var(--muted);cursor:default}
+/* 복기 중 변화도(참고도) */
+.vari{display:flex;align-items:center;justify-content:space-between;gap:6px 8px;flex-wrap:wrap;margin:-4px 0 12px;padding:8px 10px;border-radius:10px;background:var(--chip);font-size:13px;text-align:left}
+.vari b{color:var(--accent)}
+.vari-btns{display:flex;gap:6px}
+.vari-btns button{padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);font-size:12.5px;font-weight:600;cursor:pointer}
+.vari-btns button:disabled{opacity:.45;cursor:default}
+.result p.vari-hint{font-size:12px;margin:-6px 0 10px}
 .res-links{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 18px;margin:-4px 0 8px;font-size:13px;font-weight:600}
 .res-links button,.res-links a{border:0;background:none;padding:4px 2px;color:var(--accent);font:inherit;cursor:pointer;text-decoration:none}
 .rank-line{font-size:14px;font-weight:600;margin:-6px 0 10px}

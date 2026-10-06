@@ -70,6 +70,8 @@
         <button id="rvNext" aria-label="다음 수">›</button>
         <span id="rvText"></span>
       </div>
+      <div class="vari hidden" id="variBar"><span id="variText"></span><div class="vari-btns"><button type="button" id="variAi">AI 수</button><button type="button" id="variPass">손 빼기</button><button type="button" id="variExit">본선으로</button></div></div>
+      <p class="vari-hint" id="variHint">판을 누르면 지금 장면에서 다른 수를 둬 보는 변화도(참고도)가 됩니다.</p>
       <button class="mistake-btn hidden" id="nextMistake"></button>
       <div class="res-links"><button type="button" id="resDl">기보 내려받기</button><a href="../records/#go">지난 대국 모두 보기 ›</a></div>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
@@ -315,6 +317,7 @@ const settings=load('baduk-settings',{coords:true,numbers:false,sound:true,showW
 
 let game=null,board=null,view=null,thinking=false,thinkFor=0,epoch=0;
 let recView=null; // 지난 대국 보는 중: 기록의 원래 {over, result}
+let vari=null; // 복기 중 변화도: {base: 본선에서 갈라진 수, moves: 변화도 수순, k: 지금 보는 수}
 let hints=null,ownMap=null,deadSet=null,pending=0,hover=0;
 
 // ---------- 엔진 호출 (Web Worker, 실패 시 메인 스레드) ----------
@@ -585,7 +588,7 @@ function newGame(o){
   toast(pvp?'두 사람 대국을 시작합니다 · 한 수씩 번갈아 두세요':`${NAME[human]}으로 대국을 시작합니다 · 상대 ${LEVELS[o.level].bot}`);
   maybeAI();
 }
-function resetView(){view=null;hints=null;ownMap=null;deadSet=null;pending=0;hover=0;}
+function resetView(){view=null;vari=null;hints=null;ownMap=null;deadSet=null;pending=0;hover=0;}
 function rebuild(){board=Board.fromState(stateOf());resize();ui();}
 function save(){
   if(recView){recPut(recGame());return;} // 지난 대국은 분석 결과만 기록에 더한다
@@ -814,6 +817,40 @@ async function estimateNow(){
   draw();ui();
 }
 
+// ---------- 변화도 (복기 중 다른 수를 둬 보기) ----------
+const variState=()=>stateOf(game.moves.slice(0,vari.base).concat(vari.moves.slice(0,vari.k)));
+function variPush(p){
+  if(!vari)vari={base:view??game.moves.length,moves:[],k:0};
+  vari.moves=vari.moves.slice(0,vari.k);vari.moves.push(p);vari.k++;
+  view=vari.base;draw();ui();
+}
+function variPlay(p){
+  if(thinking)return;
+  const b=Board.fromState(vari?variState():stateOf(game.moves.slice(0,view??game.moves.length)));
+  if(b.c[p]!==EMPTY)return;
+  if(!b.isLegal(p,b.turn)){toast(p===b.ko?'패: 바로 되따낼 수 없습니다':'착수 금지: 스스로 활로가 없어지는 자리입니다');sound('bad');return;}
+  const cap=b.play(p);sound(cap?'cap':'stone',cap);
+  variPush(p);
+}
+function variStep(d){vari.k=Math.max(0,Math.min(vari.moves.length,vari.k+d));draw();ui();}
+function variExit(){if(!vari)return;view=vari.base;vari=null;draw();ui();}
+// 변화도 장면에서 AI 가 둘 수 (KataGo 로 잠깐 읽는다)
+async function variAi(){
+  if(thinking||game.analyzing)return;
+  const st=vari?variState():stateOf(game.moves.slice(0,view??game.moves.length)),me=Board.fromState(st).turn,ep=epoch;
+  thinking=true;thinkFor=0;ui();
+  let mv,wr;
+  if(await kataReady()){
+    const a=await Kata.think(st,{visits:300,time:2500,batch:kataBatch(game.n,300),abort:()=>ep!==epoch});
+    mv=a.stats.length?a.stats[0].move:PASS;wr=a.stats.length?a.stats[0].winrate:a.rootWinrate;
+  }else{const r=await callEngine({type:'genmove',state:st,opts:{playouts:1e9,time:1500,temp:0}});mv=r.move;wr=r.winrate;}
+  thinking=false;if(ep!==epoch){ui();return;}
+  toast(`AI: ${mv===PASS?'손 빼기':moveName(mv)} · ${NAME[me]} 승률 ${Math.round(wr*100)}%`);
+  if(mv!==PASS)sound('stone');
+  variPush(mv);
+}
+$('#variAi').onclick=variAi;$('#variPass').onclick=()=>{if(!thinking)variPush(PASS);};$('#variExit').onclick=variExit;
+
 function sgfText(g){
   const tmp=new Board(g.n),c=p=>{const [x,y]=tmp.xy(p);return String.fromCharCode(97+x)+String.fromCharCode(97+y);};
   const d=new Date(g.id||Date.now()),ai=LEVELS[g.level].bot;
@@ -838,7 +875,10 @@ function resize(){
 }
 const X=i=>G.m+i*G.cell;
 
-function displayBoard(){return view!==null&&view<game.moves.length?Board.fromState(stateOf(game.moves.slice(0,view))):board;}
+function displayBoard(){
+  if(vari)return Board.fromState(variState());
+  return view!==null&&view<game.moves.length?Board.fromState(stateOf(game.moves.slice(0,view))):board;
+}
 
 function draw(){
   if(!game||!G.s)return;
@@ -862,7 +902,7 @@ function draw(){
     }
   }
   // 영역 표시
-  if(ownMap){
+  if(ownMap&&!vari){
     for(const p of b.pts){
       const o=ownMap[p],v=b.c[p],[x,y]=b.xy(p);
       const isDead=deadSet?deadSet.has(p)&&b===board:(v===BLACK&&o<-0.4)||(v===WHITE&&o>0.4);
@@ -875,14 +915,15 @@ function draw(){
   }
   // 수순 번호 계산
   let nums=null;
-  if(settings.numbers){
+  if(vari){nums=new Map();for(let i=0;i<vari.k;i++)if(vari.moves[i]!==PASS)nums.set(vari.moves[i],i+1);}
+  else if(settings.numbers){
     nums=new Map();const len=view!==null?view:game.moves.length;
     for(let i=0;i<len;i++)if(game.moves[i]!==PASS)nums.set(game.moves[i],i+1);
   }
   // 돌
   for(const p of b.pts){
     const v=b.c[p];if(v===EMPTY)continue;
-    const [x,y]=b.xy(p),dead=ownMap&&((v===BLACK&&ownMap[p]<-0.4)||(v===WHITE&&ownMap[p]>0.4));
+    const [x,y]=b.xy(p),dead=ownMap&&!vari&&((v===BLACK&&ownMap[p]<-0.4)||(v===WHITE&&ownMap[p]>0.4));
     drawStone(X(x),X(y),r,v,dead?0.45:1);
     if(dead){const q=cell*0.15;ctx.fillStyle=v===BLACK?'#fff':'#111';ctx.fillRect(X(x)-q/2,X(y)-q/2,q,q);}
     if(nums&&nums.has(p)){
@@ -896,6 +937,8 @@ function draw(){
     const [x,y]=b.xy(b.last);ctx.strokeStyle=b.c[b.last]===BLACK?'#fff':'#222';ctx.lineWidth=Math.max(1.5,cell*0.06);
     ctx.beginPath();ctx.arc(X(x),X(y),r*0.42,0,7);ctx.stroke();
   }
+  // 변화도의 마지막 수
+  if(vari&&b.last>0&&b.c[b.last]!==EMPTY){const [x,y]=b.xy(b.last);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(X(x),X(y),r*1.05,0,7);ctx.stroke();}
   // 힌트
   if(hints&&b===board){
     hints.forEach((h,i)=>{
@@ -937,7 +980,7 @@ function pointAt(e){
 }
 cv.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;const p=pointAt(e);if(p!==hover){hover=p;draw();}});
 cv.addEventListener('pointerleave',()=>{hover=0;draw();});
-cv.addEventListener('click',e=>{const p=pointAt(e);if(p)humanPlay(p);else if(pending){pending=0;draw();}});
+cv.addEventListener('click',e=>{const p=pointAt(e);if(game&&game.over){if(p)variPlay(p);return;}if(p)humanPlay(p);else if(pending){pending=0;draw();}});
 new ResizeObserver(resize).observe(wrap);
 
 // ---------- UI 상태 ----------
@@ -976,6 +1019,8 @@ function ui(){
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=view===null?game.moves.length:view;
     $('#rvText').textContent=`${rg.value}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(vi);
+    $('#variBar').classList.toggle('hidden',!vari);$('#variHint').classList.toggle('hidden',!!vari);
+    if(vari){const tb=Board.fromState(variState());$('#variText').innerHTML=`<b>변화도</b> ${vari.k}/${vari.moves.length}수 · ${NAME[tb.turn]} 차례`;$('#variAi').disabled=thinking||!!game.analyzing;$('#variPass').disabled=thinking;}
     $('#rankLine').textContent=game.analyzing||game.pvp?'':game.myRank?`이번 대국 내 기력: ${rankText(game.myRank)} · 내 수 ${game.myRank.n}개 기준`:(game.evals&&game.evals.length?'둔 수가 적어 기력을 재지 못했습니다':'');
     const mine=mistakes().filter(m=>isPerson(m.mover)),mb=$('#nextMistake');
     mb.classList.toggle('hidden',!!game.analyzing||!game.evals);
@@ -998,13 +1043,13 @@ $('#aResign').onclick=async()=>{
   if(await ask(game.pvp?`${NAME[loser]}이 기권할까요?`:'기권할까요?',game.pvp?`이번 대국을 ${NAME[3-loser]}의 승리로 끝냅니다.`:'이번 대국을 AI의 승리로 끝냅니다.','기권')){
     cancelEngine();epoch++;thinking=false;endGame(3-loser,game.pvp?`${NAME[loser]}이 기권했습니다`:'기권으로 대국이 끝났습니다','불계승');}
 };
-const setView=v=>{view=Math.max(0,Math.min(game.moves.length,v));draw();ui();};
+const setView=v=>{vari=null;view=Math.max(0,Math.min(game.moves.length,v));draw();ui();};
 $('#rvRange').oninput=e=>setView(+e.target.value);
-$('#rvPrev').onclick=()=>setView((view??game.moves.length)-1);
-$('#rvNext').onclick=()=>setView((view??game.moves.length)+1);
+$('#rvPrev').onclick=()=>vari?variStep(-1):setView((view??game.moves.length)-1);
+$('#rvNext').onclick=()=>vari?variStep(1):setView((view??game.moves.length)+1);
 document.addEventListener('keydown',e=>{
   if(document.querySelector('dialog[open]'))return;
-  if(game&&game.over&&(e.key==='ArrowLeft'||e.key==='ArrowRight'))setView((view??game.moves.length)+(e.key==='ArrowLeft'?-1:1));
+  if(game&&game.over&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){const d=e.key==='ArrowLeft'?-1:1;if(vari)variStep(d);else setView((view??game.moves.length)+d);}
   if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();}
   if(e.key==='Escape'&&pending){pending=0;draw();}
 });

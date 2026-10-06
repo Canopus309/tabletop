@@ -74,6 +74,8 @@
         <button id="rvNext" aria-label="다음 수">›</button>
         <span id="rvText"></span>
       </div>
+      <div class="vari hidden" id="variBar"><span id="variText"></span><div class="vari-btns"><button type="button" id="variAi">AI 수</button><button type="button" id="variExit">본선으로</button></div></div>
+      <p class="vari-hint" id="variHint">판을 누르면 지금 장면에서 다른 수를 둬 보는 변화도(참고도)가 됩니다.</p>
       <button class="mistake-btn hidden" id="nextMistake"></button>
       <div class="res-links"><button type="button" id="resDl">기보 내려받기</button><a href="../records/#omok">지난 대국 모두 보기 ›</a></div>
       <div class="dlg-actions"><button class="ghost" id="resUndo">무르기</button><button class="primary" id="resNew">새 게임</button></div>
@@ -172,6 +174,7 @@ function soundEnabled(){return settings.sound;}
 
 let game=null,g=null,view=null,thinking=false,epoch=0,hint=-1,pending=-1,hover=-1,forbid=[],winLine=null;
 let recView=null; // 지난 대국 보는 중: 기록의 원래 {over, result}
+let vari=null; // 복기 중 변화도: {base: 본선에서 갈라진 수, moves: 변화도 수순, k: 지금 보는 수}
 
 // ---------- AI 계산 (Web Worker, 안 되면 화면에서 직접) ----------
 let worker=null,reqId=0;const waiters=new Map();
@@ -210,7 +213,7 @@ function newGame(o){
   const pvp=o.opp==='pvp',human=pvp?BLACK:o.color===0?(Math.random()<.5?BLACK:WHITE):o.color;
   game={id:Date.now(),human,level:o.level,moves:[],over:false,result:null,assisted:false};
   if(pvp)game.pvp=true;
-  view=null;hint=-1;pending=-1;
+  view=null;vari=null;hint=-1;pending=-1;
   rebuild();save();
   toast(pvp?'두 사람 대국을 시작합니다 · 한 수씩 번갈아 두세요':`${NAME[human]}으로 시작합니다 · ${RJ.LEVELS[o.level].name}`);
   maybeAI();
@@ -247,7 +250,7 @@ async function openRecord(id){
   recView={over:r.game.over,result:r.game.result};
   game=r.game;
   if(!game.over){game.over=true;game.result={winner:null,how:'',youWin:null,draw:false};}
-  view=game.moves.length;rebuild();draw();analyzeGame();
+  view=game.moves.length;vari=null;rebuild();draw();analyzeGame();
 }
 // 주소가 #rec=대국id 이면 그 기록을 보고, 아니면 두던 대국으로
 function route(){
@@ -300,7 +303,7 @@ function undo(){
   const mv=game.moves.slice();
   do{mv.pop();}while(!game.pvp&&mv.length&&turnOf(mv.length)!==game.human);
   if(game.ratingApplied==null)game.assisted=true;
-  game.moves=mv;game.over=false;game.result=null;game.evals=null;game.evalsDone=false;view=null;hint=-1;pending=-1;
+  game.moves=mv;game.over=false;game.result=null;game.evals=null;game.evalsDone=false;view=null;vari=null;hint=-1;pending=-1;
   rebuild();save();maybeAI();
 }
 async function showHint(){
@@ -361,6 +364,36 @@ const isBlunder=d=>!!d.tactic||d.dw<=-50;
 const isMistake=d=>isBlunder(d)||d.dw<=-20||(d.dw<=-10&&d.pa<d.pb/2);
 function mistakes(){const out=[];if(!game.evals)return out;for(let i=1;i<=game.moves.length;i++){const d=moveDelta(i);if(d&&isMistake(d))out.push({i,mover:d.mover,loss:isBlunder(d)?50:-d.dw});}return out;}
 const pname=p=>COLS[p%N]+(N-((p/N)|0));
+// ---------- 변화도 (복기 중 다른 수를 둬 보기) ----------
+const variMoves=()=>game.moves.slice(0,vari.base).concat(vari.moves.slice(0,vari.k));
+// 지금 보는 변화도 장면이 5목으로 끝났는가
+const variWon=()=>{if(!vari||!vari.k)return false;const m=variMoves();return RJ.Game.from(m).isWin(m[m.length-1]);};
+function variPush(p){
+  if(!vari)vari={base:view??game.moves.length,moves:[],k:0};
+  vari.moves=vari.moves.slice(0,vari.k);vari.moves.push(p);vari.k++;
+  view=vari.base;sound('stone');draw();ui();
+}
+function variPlay(p){
+  if(thinking)return;
+  const m=vari?variMoves():game.moves.slice(0,view??game.moves.length),b=RJ.Game.from(m);
+  if(b.b[p]!==EMPTY)return;
+  if(vari&&variWon()){toast('이미 5목이 완성된 장면입니다. ‹ 로 되돌려 다른 수를 둬 보세요');return;}
+  if(!m.length&&p!==CENTER){toast('렌주 룰: 흑의 첫 수는 판 가운데(천원)입니다');sound('bad');return;}
+  if(b.turn===BLACK&&RJ.isForbidden(b.b,p)){toast('금수입니다. 흑은 33 · 44 · 장목 자리에 둘 수 없습니다');sound('bad');return;}
+  variPush(p);
+}
+function variStep(d){vari.k=Math.max(0,Math.min(vari.moves.length,vari.k+d));draw();ui();}
+function variExit(){if(!vari)return;view=vari.base;vari=null;draw();ui();}
+// 변화도 장면에서 AI 가 둘 수 (힌트와 같은 고급 단계)
+async function variAi(){
+  if(thinking||analyzing||variWon())return;
+  const m=vari?variMoves():game.moves.slice(0,view??game.moves.length),ep=epoch;
+  thinking=true;ui();
+  const r=await aiMove(m,RJ.LEVELS.length-2);
+  thinking=false;if(ep!==epoch){ui();return;}
+  if(r.move<0||RJ.Game.from(m).b[r.move]!==EMPTY){toast('AI가 둘 곳을 찾지 못했습니다');ui();return;}
+  toast('AI: '+pname(r.move));variPush(r.move);
+}
 function reviewText(vi){
   const ev=game.evals&&game.evals[vi];
   if(!ev)return analyzing?'수마다 승률 분석 중…':'';
@@ -407,7 +440,7 @@ const X=i=>G.m+i*G.cell;
 function boardAt(len){return len===game.moves.length?g:RJ.Game.from(game.moves.slice(0,len));}
 function draw(){
   if(!game||!G.s)return;
-  const len=view!==null?view:game.moves.length,b=boardAt(len),{cell,s,dpr}=G,r=cell*0.46;
+  const len=view!==null?view:game.moves.length,vm=vari?variMoves():null,b=vm?RJ.Game.from(vm):boardAt(len),{cell,s,dpr}=G,r=cell*0.46;
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,s,s);
   ctx.strokeStyle='rgba(60,42,14,.78)';ctx.lineWidth=Math.max(1,cell*0.03);
   ctx.beginPath();
@@ -426,13 +459,21 @@ function draw(){
     ctx.strokeStyle='rgba(200,50,40,.85)';ctx.lineWidth=Math.max(1.5,cell*0.07);const q=cell*0.17;
     for(const p of forbid){const x=X(p%N),y=X((p/N)|0);ctx.beginPath();ctx.moveTo(x-q,y-q);ctx.lineTo(x+q,y+q);ctx.moveTo(x+q,y-q);ctx.lineTo(x-q,y+q);ctx.stroke();}
   }
+  // 변화도: 흑 차례면 금수 자리
+  if(vm&&b.turn===BLACK&&!variWon()){
+    ctx.strokeStyle='rgba(200,50,40,.85)';ctx.lineWidth=Math.max(1.5,cell*0.07);const q=cell*0.17;
+    for(const p of RJ.forbiddenPoints(vm)){const x=X(p%N),y=X((p/N)|0);ctx.beginPath();ctx.moveTo(x-q,y-q);ctx.lineTo(x+q,y+q);ctx.moveTo(x+q,y-q);ctx.lineTo(x-q,y+q);ctx.stroke();}
+  }
   // 돌
-  const nums=settings.numbers?new Map(game.moves.slice(0,len).map((m,i)=>[m,i+1])):null;
+  const nums=vm?new Map(vari.moves.slice(0,vari.k).map((m,i)=>[m,i+1])):settings.numbers?new Map(game.moves.slice(0,len).map((m,i)=>[m,i+1])):null;
   for(let p=0;p<N*N;p++){
     const v=b.b[p];if(v===EMPTY)continue;
     const x=X(p%N),y=X((p/N)|0);drawStone(x,y,r,v,1);
     if(nums&&nums.has(p)){const t=String(nums.get(p));ctx.fillStyle=v===BLACK?'#f2f2f2':'#1a1a1a';ctx.font=`600 ${cell*(t.length>2?0.32:0.42)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(t,x,y+cell*0.02);}
   }
+  // 변화도의 마지막 수와 5목
+  if(vm&&vari.k){const p=vm[vm.length-1],x=X(p%N),y=X((p/N)|0);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(x,y,r*1.08,0,7);ctx.stroke();
+    if(b.isWin(p)){const pts=RJ.winLine(b.b,p).map(q=>[X(q%N),X((q/N)|0)]).sort((a,c)=>a[0]-c[0]||a[1]-c[1]);ctx.strokeStyle='rgba(224,70,63,.9)';ctx.lineWidth=Math.max(2,cell*0.12);ctx.lineCap='round';ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[pts.length-1][0],pts[pts.length-1][1]);ctx.stroke();ctx.lineCap='butt';}}
   // 마지막 수
   if(len&&!nums){const p=game.moves[len-1],x=X(p%N),y=X((p/N)|0);ctx.fillStyle=b.b[p]===BLACK?'#fff':'#222';ctx.beginPath();ctx.arc(x,y,r*0.26,0,7);ctx.fill();}
   // 5목 선
@@ -444,7 +485,7 @@ function draw(){
   // 힌트
   if(hint>=0&&len===game.moves.length){const x=X(hint%N),y=X((hint/N)|0);ctx.fillStyle='rgba(47,140,110,.9)';ctx.beginPath();ctx.arc(x,y,r*0.85,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font=`700 ${cell*0.4}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('★',x,y+cell*0.02);}
   // 복기 중 실수한 수: 그 직전 국면에서 AI가 추천한 자리
-  if(game.over&&game.evals&&len>0){
+  if(game.over&&!vm&&game.evals&&len>0){
     const d=moveDelta(len),b=game.evals[len-1]&&game.evals[len-1][1];
     if(d&&isMistake(d)&&b>=0&&b!==game.moves[len-1]&&boardAt(len).b[b]===EMPTY){
       const x=X(b%N),y=X((b/N)|0);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=Math.max(2,cell*0.08);ctx.beginPath();ctx.arc(x,y,r*0.9,0,7);ctx.stroke();
@@ -477,7 +518,7 @@ function pointAt(e){
 }
 cv.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;const p=pointAt(e);if(p!==hover){hover=p;draw();}});
 cv.addEventListener('pointerleave',()=>{hover=-1;draw();});
-cv.addEventListener('click',e=>{const p=pointAt(e);if(p>=0)humanPlay(p);else if(pending>=0){pending=-1;draw();}});
+cv.addEventListener('click',e=>{const p=pointAt(e);if(game&&game.over){if(p>=0)variPlay(p);return;}if(p>=0)humanPlay(p);else if(pending>=0){pending=-1;draw();}});
 new ResizeObserver(resize).observe(wrap);
 
 // ---------- 화면 상태 ----------
@@ -513,6 +554,8 @@ function ui(){
     else rc.textContent=game.pvp?'':game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(len);
+    $('#variBar').classList.toggle('hidden',!vari);$('#variHint').classList.toggle('hidden',!!vari);
+    if(vari){const tb=RJ.Game.from(variMoves());$('#variText').innerHTML=`<b>변화도</b> ${vari.k}/${vari.moves.length}수 · ${variWon()?NAME[3-tb.turn]+' 5목':NAME[tb.turn]+' 차례'}`;$('#variAi').disabled=thinking||analyzing||variWon();}
     const mine=mistakes().filter(m=>isPerson(m.mover)),mb=$('#nextMistake');
     const cnt=game.pvp?`흑 ${mine.filter(m=>m.mover===BLACK).length} · 백 ${mine.filter(m=>m.mover===WHITE).length}`:`${mine.length}개`;
     mb.classList.toggle('hidden',analyzing||!game.evals);mb.disabled=!mine.length;mb.textContent=mine.length?`${game.pvp?'실수':'내 실수'} ${cnt} · 다음 실수 보기 ›`:'큰 실수 없음';
@@ -522,19 +565,20 @@ function ui(){
 }
 
 // ---------- 버튼 ----------
+$('#variAi').onclick=variAi;$('#variExit').onclick=variExit;
 $('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():undo();$('#resDl').onclick=exportSgf;$('#aHint').onclick=showHint;
 $('#aResign').onclick=async()=>{
   if(game.over)return;
   const loser=game.pvp?g.turn:game.human;
   if(await ask(game.pvp?`${NAME[loser]}이 기권할까요?`:'기권할까요?',game.pvp?`이번 대국을 ${NAME[3-loser]}의 승리로 끝냅니다.`:'이번 대국을 AI의 승리로 끝냅니다.','기권')){cancelAI();epoch++;endGame(3-loser,'기권');}
 };
-const setView=v=>{view=Math.max(0,Math.min(game.moves.length,v));draw();ui();};
+const setView=v=>{vari=null;view=Math.max(0,Math.min(game.moves.length,v));draw();ui();};
 $('#rvRange').oninput=e=>setView(+e.target.value);
-$('#rvPrev').onclick=()=>setView((view??game.moves.length)-1);
-$('#rvNext').onclick=()=>setView((view??game.moves.length)+1);
+$('#rvPrev').onclick=()=>vari?variStep(-1):setView((view??game.moves.length)-1);
+$('#rvNext').onclick=()=>vari?variStep(1):setView((view??game.moves.length)+1);
 document.addEventListener('keydown',e=>{
   if(document.querySelector('dialog[open]'))return;
-  if(game&&game.over&&(e.key==='ArrowLeft'||e.key==='ArrowRight'))setView((view??game.moves.length)+(e.key==='ArrowLeft'?-1:1));
+  if(game&&game.over&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){const d=e.key==='ArrowLeft'?-1:1;if(vari)variStep(d);else setView((view??game.moves.length)+d);}
   if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();}
   if(e.key==='Escape'&&pending>=0){pending=-1;draw();}
 });
@@ -572,7 +616,7 @@ initWorker();
 function resume(){
   const saved=load('omok-game',null);
   if(saved&&Array.isArray(saved.moves)){
-    game=saved;if(!game.id)game.id=Date.now();view=game.over?game.moves.length:null;hint=-1;pending=-1;rebuild();recPut(game);
+    game=saved;if(!game.id)game.id=Date.now();view=game.over?game.moves.length:null;vari=null;hint=-1;pending=-1;rebuild();recPut(game);
     if(!game.over){toast('이어서 둡니다');maybeAI();}else analyzeGame();
   }else{
     game={id:Date.now(),human:BLACK,level:2,moves:[],over:false,result:null};
