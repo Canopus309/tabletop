@@ -99,8 +99,8 @@
         <input type="radio" name="color" id="cW" value="2"><label for="cW">백</label>
         <input type="radio" name="color" id="cR" value="0"><label for="cR">무작위</label>
       </div></div>
-    <div class="field" id="fLevel"><span class="flabel">AI 난이도</span>
-      <div class="seg" id="segLevel"></div>
+    <div class="field" id="fLevel"><span class="flabel">AI 상대</span>
+      <div class="seg grid2" id="segLevel"></div>
       <div class="lvdesc" id="lvDesc"></div>
       <div class="lvdesc rec" id="recLevel"></div></div>
     <div class="row2">
@@ -301,8 +301,8 @@ const LEVELS=[
   {name:'입문',bot:'형준봇',rank:'18급',desc:'바둑을 처음 배우는 분께. 수를 몇 개만 살펴보고 둡니다.',kata:{mode:'rank',kyu:18},playouts:120,time:250,temp:1},
   {name:'초보',bot:'규형봇',rank:'15급',desc:'바둑을 막 배운 분께. 단수와 따내기를 알면 둘 만합니다.',kata:{mode:'rank',kyu:15},playouts:400,time:400,temp:0.7},
   {name:'초급',bot:'제일봇',rank:'12급',desc:'규칙을 알고 몇 판 둬 본 분께.',kata:{mode:'rank',kyu:12},playouts:1200,time:700,temp:0.35},
-  {name:'중급',bot:'컨디션 좋은 제일봇',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
-  {name:'고급',bot:'각성한 제일봇',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
+  {name:'중급',bot:'어깨 힘 뺀 제일봇',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
+  {name:'고급',bot:'택희한테 과외받은 제일봇',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
   {name:'최강',bot:'택희봇',get rank(){return TOP_RANK[curModel()]||'3단+';},desc:'KataGo가 1,200수 이상 읽고, 내 차례에도 미리 읽습니다. 기력은 추정치입니다.',kata:{mode:'search',visits:1200,time:7000},playouts:1e9,time:8000,temp:0},
 ];
 // 최강 단계 추정 기력 (신경망별)
@@ -465,7 +465,7 @@ function showRank(){
   const{rank,games}=overallRank(),list=loadRating().slice().reverse();
   $('#rkBig').textContent=rank?rankText(rank).replace(/ \(.*\)/,''):'–';
   $('#rkSub').textContent=rank
-    ?`범위 ${rankName(rank.weak)}~${rankName(rank.strong)} · 최근 ${games}판, 내 수 ${rank.n}개 기준 · 추천 난이도: ${LEVELS[recommendLevel(rank.kyu)].name} (${LEVELS[recommendLevel(rank.kyu)].bot})`
+    ?`범위 ${rankName(rank.weak)}~${rankName(rank.strong)} · 최근 ${games}판, 내 수 ${rank.n}개 기준 · 추천 상대: ${LEVELS[recommendLevel(rank.kyu)].bot}`
     :'아직 기록이 없습니다. 대국을 마치면 자동으로 측정됩니다.';
   $('#rkList').innerHTML=list.map(r=>`<div class="rank-row"><span class="d">${r.date.slice(5)}</span><span>${r.n}줄 · ${LEVELS[r.level]?LEVELS[r.level].bot:''}</span><span class="${r.win?'w':'l'}">${r.win?'승':'패'}</span><span>${rankText(r.rank).replace('약 ','')}</span></div>`).join('');
   openDlg($('#dlgRank'));
@@ -1011,7 +1011,7 @@ document.addEventListener('keydown',e=>{
 
 // 새 게임 대화상자
 const segL=$('#segLevel');
-LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small></small></label>`));
+LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.bot}<small></small></label>`));
 const lastOpt=load('baduk-newopts',{size:9,color:1,level:2,handicap:0,komi:'auto',opp:'ai'});
 function oppUi(){const pvp=document.querySelector('input[name=opp]:checked').value==='pvp';$('#fColor').classList.toggle('hidden',pvp);$('#fLevel').classList.toggle('hidden',pvp);}
 document.querySelectorAll('input[name=opp]').forEach(el=>el.onchange=oppUi);
@@ -1021,8 +1021,8 @@ function fillHandi(){
   sel.value=String(Math.min(cur,max));
 }
 function lvDesc(){
-  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').innerHTML=`<b style="display:block;font-size:15px;color:var(--text);margin-bottom:2px">상대: ${l.bot}</b>기력 약 ${l.rank} · ${l.desc}`;
-  const{rank}=overallRank();$('#recLevel').textContent=rank?`내 기력 ${rankText(rank).replace(/ \(.*\)/,'')} → 추천 난이도: ${LEVELS[recommendLevel(rank.kyu)].name} (${LEVELS[recommendLevel(rank.kyu)].bot})`:'';
+  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`기력 약 ${l.rank} · ${l.desc}`;
+  const{rank}=overallRank();$('#recLevel').textContent=rank?`내 기력 ${rankText(rank).replace(/ \(.*\)/,'')} → 추천 상대: ${LEVELS[recommendLevel(rank.kyu)].bot}`:'';
 }
 document.querySelectorAll('input[name=size]').forEach(el=>el.onchange=fillHandi);
 segL.addEventListener('change',lvDesc);

@@ -124,6 +124,9 @@ dialog::backdrop{background:rgba(10,10,12,.45);backdrop-filter:blur(2px)}
 .seg label small{display:block;font-size:11px;font-weight:500;opacity:.75;margin-top:1px}
 .seg input:checked+label{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600}
 .seg input:focus-visible+label{outline:2px solid var(--accent)}
+/* 글이 긴 칸: 2칸씩 줄바꿈 (AI 상대 고르기) */
+.seg.grid2{display:grid;grid-template-columns:repeat(2,1fr)}
+.seg.grid2 label{word-break:keep-all;line-height:1.3}
 select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .lvdesc{font-size:12px;color:var(--muted);margin-top:6px;min-height:16px}
