@@ -69,11 +69,15 @@ let V={x0:0,y0:0,x1:8,y1:8,n:9},G={cell:0,ox:0,oy:0,w:0,h:0,dpr:1};
 // 화면 상태: 판, 표시(번호·힌트·표적·틀린 수·좋은 자리·금수·5목 선). 점이 없으면 -1
 let D={b:null,nums:new Map(),hints:[],targets:[],bad:-1,good:[],last:-1,forbid:[],line:null};
 function setD(b,o={}){D=Object.assign({b,nums:new Map(),hints:[],targets:[],bad:-1,good:[],last:-1,forbid:[],line:null},o);}
+// 좌표(LC.cols 가 있을 때): 글자는 판 가장자리 쪽 바깥 띠에 (가로 글자는 위·아래, 세로 숫자는 왼쪽·오른쪽 중 하나)
+const LBW=0.62;
 function setView(n,x0,y0,x1,y1){
   V={n,x0:Math.max(0,x0),y0:Math.max(0,y0),x1:Math.min(n-1,x1),y1:Math.min(n-1,y1)};
-  const k=0.62,c=0.5;
-  const ml=V.x0===0?k:c,mr=V.x1===n-1?k:c,mt=V.y0===0?k:c,mb=V.y1===n-1?k:c;
-  V.m={ml,mr,mt,mb};
+  const k=0.62,c=0.5,lb=LC&&LC.cols?LBW:0;
+  V.colSide=V.y0!==0&&V.y1===n-1?'b':'t';V.rowSide=V.x0!==0&&V.x1===n-1?'r':'l';
+  const ml=(V.x0===0?k:c)+(V.rowSide==='l'?lb:0),mr=(V.x1===n-1?k:c)+(V.rowSide==='r'?lb:0),
+    mt=(V.y0===0?k:c)+(V.colSide==='t'?lb:0),mb=(V.y1===n-1?k:c)+(V.colSide==='b'?lb:0);
+  V.m={ml,mr,mt,mb,lb};
   bw.style.aspectRatio=`${V.x1-V.x0+ml+mr} / ${V.y1-V.y0+mt+mb}`;
   resize();
 }
@@ -96,7 +100,9 @@ function draw(){
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
   ctx.strokeStyle='rgba(40,28,10,.82)';ctx.lineWidth=Math.max(1,cell*0.03);
   ctx.beginPath();
-  const lx0=V.x0===0?PX(0):0,lx1=V.x1===n-1?PX(n-1):w,ly0=V.y0===0?PY(0):0,ly1=V.y1===n-1?PY(n-1):h;
+  // 잘린 쪽은 선을 끝까지 긋되 좌표 띠는 비워 둔다
+  const L=V.m.lb*cell,lx0=V.x0===0?PX(0):V.rowSide==='l'?L:0,lx1=V.x1===n-1?PX(n-1):V.rowSide==='r'?w-L:w,
+    ly0=V.y0===0?PY(0):V.colSide==='t'?L:0,ly1=V.y1===n-1?PY(n-1):V.colSide==='b'?h-L:h;
   for(let y=V.y0;y<=V.y1;y++){const v=Math.round(PY(y)*dpr)/dpr+0.5/dpr;ctx.moveTo(lx0,v);ctx.lineTo(lx1,v);}
   for(let x=V.x0;x<=V.x1;x++){const v=Math.round(PX(x)*dpr)/dpr+0.5/dpr;ctx.moveTo(v,ly0);ctx.lineTo(v,ly1);}
   ctx.stroke();
@@ -107,6 +113,12 @@ function draw(){
   if(V.x0===0){ctx.moveTo(PX(0),ly0);ctx.lineTo(PX(0),ly1);}
   if(V.x1===n-1){ctx.moveTo(PX(n-1),ly0);ctx.lineTo(PX(n-1),ly1);}
   ctx.stroke();
+  if(L){
+    ctx.fillStyle='rgba(40,28,10,.72)';ctx.font=`600 ${cell*0.3}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';
+    const cy=V.colSide==='t'?L/2:h-L/2,rx=V.rowSide==='l'?L/2:w-L/2;
+    for(let x=V.x0;x<=V.x1;x++)ctx.fillText(LC.cols[x],PX(x),cy);
+    for(let y=V.y0;y<=V.y1;y++)ctx.fillText(String(n-y),rx,PY(y));
+  }
   ctx.fillStyle='rgba(40,28,10,.9)';
   for(const [x,y] of LC.stars(n))if(x>=V.x0&&x<=V.x1&&y>=V.y0&&y<=V.y1){ctx.beginPath();ctx.arc(PX(x),PY(y),Math.max(2,cell*0.1),0,7);ctx.fill();}
   // 흑 금수 자리
