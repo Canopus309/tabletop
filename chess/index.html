@@ -339,7 +339,21 @@ async function hint(){
 }
 
 // ---------- 레이팅 (Glicko-2, 순위표: common/rating.js) ----------
-const RB=ratingBoard({game:'chess',start:1200,levels:LEVELS.map(l=>({name:l.name,rating:l.elo})),fmt:r=>String(Math.round(r)),prefix:'레이팅 ',
+// 2026-10 레이팅 척도를 리체스 기준으로 바꿨다: 예전 기록을 새 척도로 다시 계산한다
+// (예전 단계 0~6 의 상대 레이팅을 Maia 로 잰 리체스 기준 값으로 바꿔 최근 기록을 다시 반영)
+(function rescaleRating(){
+  try{
+    if(localStorage.getItem('chess-scale')==='lichess')return;
+    const R=JSON.parse(localStorage.getItem('chess-rating')),OLD=[1090,1405,1530,1375,2050,2260,2800];
+    if(R&&R.games){
+      let S={rating:1500,rd:350,vol:0.06};
+      for(const h of R.history||[]){const opp=OLD[h.level]??1500;S=glicko2(S,opp,h.score);h.label='예전 단계';h.opp=opp;h.level=-1;}
+      Object.assign(R,S);localStorage.setItem('chess-rating',JSON.stringify(R));LB.set({chessPending:true});
+    }
+    localStorage.setItem('chess-scale','lichess');
+  }catch(e){}
+})();
+const RB=ratingBoard({game:'chess',start:1500,levels:LEVELS.map(l=>({name:l.name,rating:l.elo})),fmt:r=>String(Math.round(r)),prefix:'레이팅 ',
   sub:R=>`레이팅 대국 ${R.games}판 · 편차 ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`});
 const loadRating=RB.get,ratingText=RB.text;
 function updateRating(){
@@ -642,7 +656,7 @@ function oppUi(){const pvp=document.querySelector('input[name=opp]:checked').val
 document.querySelectorAll('input[name=opp]').forEach(el=>el.onchange=oppUi);
 function recommend(){const R=loadRating();if(!R.games)return -1;let bi=0;LEVELS.forEach((l,i)=>{if(Math.abs(l.elo-R.rating)<Math.abs(LEVELS[bi].elo-R.rating))bi=i;});return bi;}
 function lvDesc(){
-  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`레이팅 ${l.elo} · ${l.desc}`;
+  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`리체스 레이팅 약 ${l.elo}${l.full?'+':''} · ${l.desc}`;
   const i=recommend(),R=loadRating();$('#recLevel').textContent=i>=0?`내 레이팅 ${ratingText(R)} → 추천: ${LEVELS[i].name}`:'';
 }
 segL.addEventListener('change',lvDesc);

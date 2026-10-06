@@ -1,21 +1,21 @@
 /* 체스 AI(Stockfish) 연결.
  * - Stockfish 19 Lite WASM (GPL-3.0, github.com/nmrugg/stockfish.js) 을 Web Worker 로 띄워 UCI 로 대화한다
- * - AI 단계: 1320 이상은 Stockfish 의 UCI_Elo(레이팅 보정 기능), 그보다 약한 단계는
- *   여러 후보 수(MultiPV)를 얕게 읽고 일부러 덜 좋은 수도 고르게 해서 만든다 (레이팅은 1320 단계와 대국해 추정)
+ * - AI 단계: 여러 후보 수(MultiPV)를 정해진 깊이로 읽고, 최선과의 차이에 따라 일부러 덜 좋은 수도 고르게 해서 세기를 맞춘다. 최강만 전력
  * - 내 레이팅(Glicko-2)은 common/rating.js
  */
 
-// 단계: elo 는 화면에 보이는 레이팅 (Stockfish UCI_Elo 척도).
-// 입문·초보·초급은 1400 단계와 대국해 잰 값: 초급은 1400 상대 20판 2.5점(약 1060), 초보는 초급 상대 20판 3.5점(약 790),
-// 입문은 초보보다 한 단계 약한 설정을 거쳐 약 575
+// 단계: elo 는 화면에 보이는 레이팅으로, 리체스(래피드) 기준 추정치 (2026-10 측정).
+// 리체스 사람 기보로 배운 엔진 Maia(maia-1100·1500·1900, 1노드)와 단계마다 60판씩 둬서 쟀다.
+// 기준은 이 Maia 들이 리체스에서 사람과 둬서 얻은 래피드 레이팅: maia1 1477, maia5 1691, maia9 1749.
+// 최강은 Maia 를 모두 압도해서 2300 이상이라는 것만 확인했다.
 export const LEVELS = [
-  { name: '입문', elo: 600, weak: { depth: 1, multipv: 8, temp: 180 }, desc: '체스를 처음 배우는 분께. 말을 자주 거저 줍니다.' },
-  { name: '초보', elo: 800, weak: { depth: 1, multipv: 8, temp: 100 }, desc: '규칙을 막 익힌 분께. 말을 가끔 거저 줍니다.' },
-  { name: '초급', elo: 1050, weak: { depth: 3, multipv: 8, temp: 120 }, desc: '규칙을 알고 몇 판 둬 본 분께.' },
-  { name: '중급', elo: 1400, uciElo: 1400, movetime: 700, desc: '기본 전술을 아는 분께.' },
-  { name: '고급', elo: 1800, uciElo: 1800, movetime: 900, desc: '클럽에서 두는 수준.' },
-  { name: '상급', elo: 2200, uciElo: 2200, movetime: 1100, desc: '대회에 나가는 수준.' },
-  { name: '최강', elo: 2800, full: true, movetime: 2000, desc: 'Stockfish 전력. 한 수에 2초 동안 읽습니다. (레이팅은 추정치)' },
+  { name: '입문', elo: 1100, weak: { depth: 1, multipv: 8, temp: 180 }, desc: '체스를 처음 배우는 분께. 말을 자주 거저 줍니다.' },
+  { name: '초보', elo: 1200, weak: { depth: 1, multipv: 8, temp: 140 }, desc: '규칙을 막 익힌 분께. 말을 가끔 거저 줍니다.' },
+  { name: '초급', elo: 1400, weak: { depth: 1, multipv: 8, temp: 100 }, desc: '규칙을 알고 몇 판 둬 본 분께.' },
+  { name: '중급', elo: 1550, weak: { depth: 3, multipv: 8, temp: 80 }, desc: '기본 전술을 아는 분께.' },
+  { name: '고급', elo: 1700, weak: { depth: 4, multipv: 8, temp: 80 }, desc: '전술을 곧잘 찾는 수준.' },
+  { name: '상급', elo: 1900, weak: { depth: 4, multipv: 6, temp: 60 }, desc: '클럽에서 꾸준히 두는 수준.' },
+  { name: '최강', elo: 2400, full: true, movetime: 2000, desc: 'Stockfish 전력. 한 수에 2초 동안 읽습니다. (2300 이상만 확인한 추정치)' },
 ];
 
 // 평가(센티폰)를 이길 확률로 (리체스와 같은 식)

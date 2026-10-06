@@ -107,7 +107,7 @@ function ratingBoard(cfg) {
     $('#rkBig').textContent = text(R);
     $('#rkSub').textContent = R.games ? cfg.sub(R) : '아직 기록이 없습니다. 무르기·힌트 없이 끝까지 두면 반영됩니다.';
     $('#rkList').innerHTML = list.map(h => {
-      const L = cfg.levels[h.level] || { name: '' };
+      const L = cfg.levels[h.level] || { name: h.label || '', rating: h.opp };
       const res = h.score === 1 ? ['w', '승'] : h.score === 0 ? ['l', '패'] : ['', '무'];
       return `<div class="rank-row"><span class="d">${h.date.slice(5)}</span><span>${L.name} (${cfg.fmt(L.rating)})</span><span class="${res[0]}">${res[1]}</span><span>${cfg.fmt(h.before)} → ${cfg.fmt(h.after)}</span></div>`;
     }).join('');
