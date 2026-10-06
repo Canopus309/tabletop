@@ -181,7 +181,7 @@ const turnName=c=>c===ST_B?'흑':'백';
 const dot=c=>`<span class="dot ${c===ST_B?'b':'w'}"></span>`;
 function openItem(it){
   cur={it};
-  $('#pTags').innerHTML='';$('#pNote').textContent='';$('#pSteps').classList.add('hidden');
+  $('#pTags').innerHTML='';$('#pNote').textContent='';
   $('#pBtns').classList.remove('hidden');$('#bHint').classList.remove('hidden');
   const nx=it.set.items[it.idx+1];
   $('#bNext').textContent=nx?(LC.nextLabel?LC.nextLabel(it):'다음 문제 ›'):'목록으로';

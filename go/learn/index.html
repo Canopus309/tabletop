@@ -43,7 +43,6 @@
         <div class="tags" id="pTags"></div>
         <p class="msg" id="pMsg"></p>
         <p class="note" id="pNote"></p>
-        <div class="steps hidden" id="pSteps"><button id="stPrev" aria-label="이전 수">‹</button><span id="stText"></span><button id="stNext" aria-label="다음 수">›</button></div>
       </div>
       <div class="card">
         <div class="btns" id="pBtns">
@@ -221,67 +220,6 @@ async function showAnswer(){
   }catch(e){}
 }
 
-// ---------- 끝내기 ----------
-function openYose(it){
-  const n=it.size,b=new Board(n);
-  for(const s of it.moves)b.play(s==='tt'?PASS:sgP(b,s));
-  cur.b0=b;cur.toPlay=b.turn;
-  $('#pTitle').textContent=`${it.set.name} · ${LV[it.lv]} ${it.idx+1}`;
-  $('#pPrompt').innerHTML=`${dot(b.turn)} ${turnName(b.turn)} 차례 · 가장 큰 곳은?`;
-  $('#bShowT').textContent='정답';
-  $('#bHint').classList.add('hidden');
-  $('#bRetry').onclick=()=>{stopDemo();resetY();};
-  $('#bShow').onclick=()=>{cur.helped=true;revealY(null);};
-  setView(n,0,0,n-1,n-1);
-  cur.helped=false;cur.failed=false;
-  resetY(true);
-}
-function resetY(first){
-  $('#pSteps').classList.add('hidden');
-  const b=new Board(cur.b0.n);b.copyFrom(cur.b0);
-  setD(b,{last:cur.b0.last>0?cur.b0.last:-1});
-  cur.state='play';$('#pNote').textContent='';
-  msg(first?`집이 가장 많이 나는 ${turnName(b.turn)}의 한 수를 찾아 두세요.`:'다시 골라 보세요.');
-  onBoard=yPlay;draw();
-}
-function yPlay(p){
-  if(cur.state!=='play')return;
-  const b=D.b,it=cur.it;
-  if(!b.isLegal(p,b.turn)){toast(b.c[p]===EMPTY?'둘 수 없는 자리입니다':'이미 돌이 있습니다');return;}
-  const k=sgS(b,p),loss=it.best.includes(k)?0:(k in it.loss?it.loss[k]:it.maxLoss);
-  if(loss<=it.okLoss){mark(it,cur.helped||cur.failed?2:1);sound('win');
-    revealY(p,'정답입니다!'+(it.best.length>1||loss>0?' (최선과 거의 같은 수)':''),'ok');return;}
-  cur.failed=true;sound('bad');
-  revealY(p,`아쉬워요 — 최선의 수보다 약 <b>${loss>=it.maxLoss?it.maxLoss+'집 이상':fmt(loss)+'집'}</b> 손해입니다.`,'bad');
-}
-const fmt=v=>(Math.round(v*2)/2).toFixed(1).replace(/\.0$/,'');
-// 둔 수와 정답 자리(☆)를 보여 주고, 정답에서 이어지는 수순은 ‹ › 로 한 수씩 넘겨 본다
-function revealY(played,text,cls){
-  stopDemo();const it=cur.it;cur.state='done';onBoard=null;
-  cur.yPlayed=played;cur.yHead=text||'☆ 표시가 가장 큰 곳입니다.';cur.yCls=cls;
-  $('#pSteps').classList.remove('hidden');
-  $('#stPrev').onclick=()=>yStep(cur.yk-1);$('#stNext').onclick=()=>yStep(cur.yk+1);
-  yStep(0);
-}
-function yStep(k){
-  const it=cur.it,n=it.pv.length;k=Math.max(0,Math.min(n,k));cur.yk=k;
-  const b=new Board(cur.b0.n);b.copyFrom(cur.b0);
-  if(k===0){
-    const good=it.best.map(s=>sgP(b,s)),played=cur.yPlayed;
-    setD(b,{good,last:cur.b0.last>0?cur.b0.last:-1});
-    if(played&&!good.includes(played)){b.play(played);D.bad=played;D.last=-1;}
-    $('#pNote').textContent=(it.note||'')+' › 를 누르면 ☆ 자리에서 이어지는 수순을 한 수씩 볼 수 있습니다.';
-  }else{
-    setD(b);
-    for(let i=0;i<k;i++){const p=sgP(b,it.pv[i]);if(!b.isLegal(p,b.turn))break;b.play(p);D.nums.set(p,i+1);D.last=p;}
-    for(const [p] of D.nums)if(b.c[p]===EMPTY)D.nums.delete(p);
-    $('#pNote').textContent=k===n?'이어지는 수순 끝입니다. ‹ 로 되돌려 볼 수 있습니다.':`${k}수째 · ${turnName(k%2===1?cur.toPlay:3-cur.toPlay)}`;
-  }
-  msg(cur.yHead,cur.yCls);
-  $('#stPrev').disabled=k===0;$('#stNext').disabled=k===n;$('#stText').textContent=`${k} / ${n}`;
-  draw();
-}
-
 // ---------- 정석: 조셉키피디아 링크 ----------
 function renderSet(s,body){
   if(s.kind!=='link')return false;
@@ -294,7 +232,7 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.
 const STAR={19:[3,9,15],13:[3,6,9],9:[2,4,6]};
 startLearn({cols:'ABCDEFGHJKLMNOPQRST',storeKey:'go-learn',title:'바둑 학습',backHref:'../',levels:LV,summaryKey:'learn',renderSet,
   stars:n=>{const s=STAR[n]||[];return n===9?[[2,2],[6,2],[2,6],[6,6],[4,4]]:s.flatMap(a=>s.map(c=>[a,c]));},
-  open:{tsumego:openTsumego,yose:openYose}});
+  open:{tsumego:openTsumego}});
 </script>
 </body>
 </html>
