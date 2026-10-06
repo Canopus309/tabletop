@@ -301,8 +301,8 @@ const LEVELS=[
   {name:'입문',bot:'형준봇',rank:'18급',desc:'바둑을 처음 배우는 분께. 수를 몇 개만 살펴보고 둡니다.',kata:{mode:'rank',kyu:18},playouts:120,time:250,temp:1},
   {name:'초보',bot:'규형봇',rank:'15급',desc:'바둑을 막 배운 분께. 단수와 따내기를 알면 둘 만합니다.',kata:{mode:'rank',kyu:15},playouts:400,time:400,temp:0.7},
   {name:'초급',bot:'제일봇',rank:'12급',desc:'규칙을 알고 몇 판 둬 본 분께.',kata:{mode:'rank',kyu:12},playouts:1200,time:700,temp:0.35},
-  {name:'중급',bot:'어깨 힘 뺀 제일봇',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
-  {name:'고급',bot:'택희한테 과외받은 제일봇',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
+  {name:'중급',bot:'컨디션 좋은 제일봇',rank:'5급',desc:'기본 정석과 사활을 아는 분께.',kata:{mode:'rank',kyu:5},playouts:6000,time:1500,temp:0},
+  {name:'고급',bot:'각성한 제일봇',rank:'1단',desc:'유단자 수준. 한 수에 한 번만 계산해 휴대폰에서도 빠릅니다.',kata:{mode:'rank',kyu:0},playouts:1e9,time:3500,temp:0},
   {name:'최강',bot:'택희봇',get rank(){return TOP_RANK[curModel()]||'3단+';},desc:'KataGo가 1,200수 이상 읽고, 내 차례에도 미리 읽습니다. 기력은 추정치입니다.',kata:{mode:'search',visits:1200,time:7000},playouts:1e9,time:8000,temp:0},
 ];
 // 최강 단계 추정 기력 (신경망별)
