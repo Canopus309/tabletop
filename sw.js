@@ -1,5 +1,5 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
-const CACHE = 'tabletop-v30';
+const CACHE = 'tabletop-v31';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -12,7 +12,7 @@ const FILES = [
   './go/vendor/tfjs-backend-wasm.wasm', './go/vendor/tfjs-backend-wasm-simd.wasm', './go/vendor/tfjs-backend-wasm-threaded-simd.wasm',
   './go/models/g170e-b10c128.bin.gz',
   // 오목
-  './omok/', './omok/index.html', './omok/home/', './omok/home/index.html', './omok/renju.js',
+  './omok/', './omok/index.html', './omok/home/', './omok/home/index.html', './omok/renju.js', './omok/rapfi-worker.js', './omok/vendor/rapfi/rapfi-single-simd128.js', './omok/vendor/rapfi/rapfi-single-simd128.wasm', './omok/vendor/rapfi/rapfi-single-simd128.data',
   './omok/learn/', './omok/learn/index.html', './omok/learn/vcf.js', './omok/learn/problems.js',
   // 체스
   './chess/', './chess/index.html', './chess/home/', './chess/home/index.html', './chess/engine.js', './chess/vendor/chess.js',

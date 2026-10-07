@@ -10,7 +10,8 @@ function check(def,opts={}){
   const oppFirst=T.status(pr,b2,{koFree:0,limit:opts.limit||300000});
   // 경계 검사: 수비 돌·영역 칸 옆에 영역 밖 빈칸이 있으면 안 된다
   const reg=new Set(pr.region),def3=3-pr.attacker;let leak=0;
-  for(const p of b.pts){if(!(reg.has(p)||b.c[p]===def3))continue;for(const d of b.d){const r=p+d;if(b.c[r]===0&&!reg.has(r))leak++;}}
+  // 영역에는 돌 자리도 들어 있으므로, 영역의 빈칸과 수비 돌만 본다 (공격 벽이 바깥과 닿는 것은 괜찮다)
+  for(const p of b.pts){if(!((reg.has(p)&&b.c[p]===0)||b.c[p]===def3))continue;for(const d of b.d){const r=p+d;if(b.c[r]===0&&!reg.has(r))leak++;}}
   const res={id:def.id,strict:strict.moves,normal:normal.moves,oppFirst,aborted:strict.aborted||normal.aborted,nodes:strict.nodes+normal.nodes,leak,ms:0,line:[]};
   if(strict.moves.length&&!res.aborted){
     // 주 수순

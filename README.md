@@ -27,8 +27,8 @@
 - 15×15, 흑 첫 수는 천원. 흑은 33 · 44 · 장목 금수 (거짓 3 판정 포함), 백은 제한 없음
 - 흑 차례에 금수 자리 표시, 5목 승리선 표시, 복기
 - 대국 후 수마다 흑 승률 그래프와 실수·블런더 찾기, 실수한 장면에서 AI 추천 수(☆) 표시. 승률은 필승 수순(연속 4) 탐색 + 가상 대국 96판을 AI 대국 1703국면의 실제 결과로 보정한 값
-- AI 6단계: 패턴 평가 + 알파베타 탐색 + 연속 4 승리 수순(VCF) 탐색. 백일 때는 흑을 금수 자리로 몰아넣는 수도 노림. 초반 몇 수는 무작위로 변화
-- 급수: 입문 18급 · 초보 15급 · 초급 12급 · 중급 9급 · 고급 7급 · 최강 1단. 앱 자체 척도로, AI 단계끼리 대국해 잰 레이팅 차이를 입문=18급, 80점=1급으로 환산
+- AI 6단계: 입문·초급은 직접 만든 엔진(패턴 평가 + 알파베타 탐색 + 연속 4(VCF) 탐색, 열린 3과 4는 반드시 막음), 중급부터는 [Rapfi](https://github.com/dhbloo/rapfi)(Gomocup 우승 엔진, WebAssembly, 읽는 노드 수로 세기 조절), 최강은 Rapfi + 렌주 신경망(처음 고를 때 약 19MB 받음). 힌트와 변화도 AI 수도 Rapfi
+- 급수: 앱 자체 척도(600 = 18급, 80점 = 1급). 입문·초급은 예전 측정값, Rapfi 단계는 그 둘과 단계끼리 20판씩 대국해 이어 잰 값 (사람 기준과 비교할 방법은 없음)
 - 내 급수(Glicko-2 레이팅을 급수로 표시, 무르기·힌트 쓴 대국 제외)와 온라인 순위표
 - 오목 퍼즐 (`omok/learn/`): 연속 4로 이기기 41문제 (2~8수, 열린 4 · 4·4 · 4·3 · 금수 이용) · 상대의 연속 4 막기 23문제. AI끼리 둔 대국 1,800판에서 골라, 렌주 규칙을 따르는 연속 4 풀이기(`omok/learn/vcf.js`)로 정답이 하나인 것만 남겼고, 화면에서도 같은 풀이기로 채점합니다
 
@@ -60,6 +60,8 @@
 | [Stockfish](https://github.com/official-stockfish/Stockfish) 19 Lite WASM ([nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js)) (`chess/vendor/`) | GPL-3.0 |
 | [chess.js](https://github.com/jhlywa/chess.js) 1.4.0 (`chess/vendor/chess.js`) | BSD-2-Clause |
 | [Lichess 퍼즐 데이터베이스](https://database.lichess.org/#puzzles) (`chess/learn/problems.js`, 652개 발췌) | CC0 |
+| [Rapfi](https://github.com/dhbloo/rapfi) 오목·렌주 엔진 (`omok/vendor/rapfi/`, 빌드: `tools/rapfi/`) | GPL-3.0 |
+| [rapfi-networks](https://github.com/dhbloo/rapfi-networks) 렌주 신경망 mix9svq, 고전 평가 모델 (`omok/vendor/rapfi/`) | CC0 |
 | cburnett 체스 말 그림 (`chess/pieces/`, lichess) | GPL-2.0+ |
 
-바둑 엔진의 입력 특징·축 판독·모델 형식은 KataGo의 `nninputs.cpp`, `board.cpp`, `desc.cpp`를 따랐고, 브라우저 구현은 [web-katrain](https://github.com/Sir-Teo/web-katrain)(MIT)을 참고했습니다. 오목 엔진은 직접 작성했습니다.
+바둑 엔진의 입력 특징·축 판독·모델 형식은 KataGo의 `nninputs.cpp`, `board.cpp`, `desc.cpp`를 따랐고, 브라우저 구현은 [web-katrain](https://github.com/Sir-Teo/web-katrain)(MIT)을 참고했습니다. 오목은 입문·초급 엔진을 직접 작성했고, 윗단계는 Rapfi 입니다.

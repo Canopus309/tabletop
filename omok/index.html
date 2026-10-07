@@ -159,19 +159,24 @@
 const {N,BLACK,WHITE,EMPTY,CENTER}=RJ;
 const NAME={1:'흑',2:'백'};
 const COLS='ABCDEFGHIJKLMNO';
-// 초보는 입문 상대 31승 9패, 초급 상대 13승 27패 (입문·초급 직접 대결과 합쳐 약 860)
-const LEVEL_RATING=[600,860,1080,1320,1500,2050];
-// 레이팅 → 급수 (입문 600 = 18급, 80점 = 1급, 0급 이하는 단)
+// AI 단계 (2026-10): 열린 3을 놓치던 예전 입문·초보·초급은 없앴다.
+// 입문·초급은 직접 만든 엔진(renju.js 단계 3·4: 열린 3과 4는 반드시 막음), 그 위는 Rapfi (읽는 노드 수로 세기 조절, 최강은 렌주 신경망)
+// rating: 앱 안의 오목 레이팅. 입문 1320·초급 1500 은 예전 측정값이고, Rapfi 단계는 그 둘과 서로 단계끼리 20판씩 대국해 이어 잰 값
+// (상급·최강은 둘 다 흑을 잡으면 거의 이겨 대국으로는 차이가 잘 안 드러난다. 최강은 신경망을 쓰는 Rapfi 의 가장 센 설정이고 레이팅은 추정치)
+const AI=[{name:'입문',rj:3,rating:1320},{name:'초급',rj:4,rating:1500},{name:'중급',rapfi:{nodes:300},rating:1690},{name:'고급',rapfi:{nodes:3000},rating:1940},{name:'상급',rapfi:{nodes:30000},rating:2120},{name:'최강',rapfi:{nodes:50000,nnue:true},rating:2250}];
+const LEVEL_RATING=AI.map(l=>l.rating);
+// 레이팅 → 급수 (600 = 18급, 80점 = 1급, 0급 이하는 단)
 function omokRank(r){const k=Math.min(30,Math.round(18-(r-600)/80));return k>=1?k+'급':(1-k)+'단';}
 migrateLevels('omok',['omok-game','omok-newopts','omok-rating']);
-const LEVEL_DESC=[
-  '오목을 처음 두는 분께. 수를 대충 보고 가끔 큰 위협도 놓칩니다.',
-  '규칙을 막 익힌 분께. 4는 대체로 막지만 열린 3을 자주 놓칩니다.',
-  '기본은 지키지만 열린 3을 가끔 놓칩니다.',
-  '두 수 앞을 읽고, 4로 몰아붙이는 수순(VCF)을 찾습니다.',
-  '네 수 앞을 읽고, 더 긴 연속 4 수순을 찾습니다.',
-  '한 수에 최대 3.5초 동안 깊게 읽습니다. 백일 때는 흑을 금수 자리로 몰아넣습니다.',
-];
+// 예전 단계 번호 옮기기 (입문·초보·초급·중급 → 입문, 고급 → 초급, 최강 → 최강). 예전 레이팅 기록은 '예전 ○○'으로 남긴다
+(function(){try{
+  if(localStorage.getItem('omok-levels-v')==='3')return;
+  const OLD=[['입문',600],['초보',860],['초급',1080],['중급',1320],['고급',1500],['최강',2050]],MAP=[0,0,0,0,1,AI.length-1];
+  for(const k of ['omok-game','omok-newopts']){const v=JSON.parse(localStorage.getItem(k));if(v&&typeof v.level==='number'){v.level=MAP[v.level]??0;localStorage.setItem(k,JSON.stringify(v));}}
+  const R=JSON.parse(localStorage.getItem('omok-rating'));
+  if(R&&R.history){for(const x of R.history)if(x.level>=0&&OLD[x.level]){x.label='예전 '+OLD[x.level][0];x.opp=OLD[x.level][1];x.level=-1;}localStorage.setItem('omok-rating',JSON.stringify(R));}
+  localStorage.setItem('omok-levels-v','3');
+}catch(e){}})();
 const settings=load('omok-settings',{forbid:true,coords:true,numbers:false,sound:true,confirm:matchMedia('(pointer:coarse)').matches});
 function soundEnabled(){return settings.sound;}
 
@@ -189,13 +194,32 @@ function initWorker(){
     worker.onerror=()=>{worker=null;};
   }catch(e){worker=null;}
 }
-function aiMove(moves,level){
+function engineMove(moves,rjLevel){
   const id=++reqId;
   return new Promise(res=>{
-    if(worker){waiters.set(id,res);worker.postMessage({id,moves,level});}
-    else setTimeout(()=>res(RJ.chooseMove(moves,level)),30);
+    if(worker){waiters.set(id,res);worker.postMessage({id,moves,level:rjLevel});}
+    else setTimeout(()=>res(RJ.chooseMove(moves,rjLevel)),30);
   });
 }
+// Rapfi (Web Worker, omok/rapfi-worker.js). 쓸 수 없는 기기면 직접 만든 엔진의 가장 센 단계로 대신 둔다
+let rapfi=null,rapfiId=0,rapfiFail=false;const rapfiWait=new Map();
+function rapfiMove(moves,o){
+  if(!rapfiFail&&!rapfi){try{if(!location.protocol.startsWith('http'))throw 0;rapfi=new Worker('rapfi-worker.js');
+    rapfi.onmessage=e=>{const d=e.data,f=rapfiWait.get(d.id);if(!f)return;if(d.status){aiStatus=d.status;ui();return;}rapfiWait.delete(d.id);aiStatus='';f(d);};
+    rapfi.onerror=()=>{rapfiFail=true;for(const f of rapfiWait.values())f({move:-1,error:'worker'});rapfiWait.clear();};
+  }catch(e){rapfiFail=true;}}
+  if(rapfiFail)return engineMove(moves,5);
+  const id=++rapfiId;
+  return new Promise(res=>{rapfiWait.set(id,d=>{
+    if(d.move>=0){res(d);return;}
+    // 실패(오래된 기기 등): 이번 수는 직접 만든 엔진으로
+    if(!rapfiFail){rapfiFail=true;toast('이 기기에서는 강한 AI(Rapfi)를 쓸 수 없어 기본 AI로 둡니다');}
+    engineMove(moves,5).then(res);
+  });rapfi.postMessage({id,moves,...o});});
+}
+let aiStatus=''; // 신경망 받는 중 같은 안내
+const STRONG={nodes:100000}; // 힌트·변화도 AI 수
+function aiMove(moves,level){const L=AI[level];return L.rapfi?rapfiMove(moves,L.rapfi):engineMove(moves,L.rj);}
 // 분석 요청: type 'analyze' → {p: 두는 쪽 승률}, 'eval' → {best: AI 추천 수}
 function aiEval(moves,type){
   const id=++reqId;
@@ -218,7 +242,7 @@ function newGame(o){
   if(pvp)game.pvp=true;
   view=null;vari=null;hint=-1;pending=-1;
   rebuild();save();
-  toast(pvp?'두 사람 대국을 시작합니다 · 한 수씩 번갈아 두세요':`${NAME[human]}으로 시작합니다 · ${RJ.LEVELS[o.level].name}`);
+  toast(pvp?'두 사람 대국을 시작합니다 · 한 수씩 번갈아 두세요':`${NAME[human]}으로 시작합니다 · ${AI[o.level].name}`);
   maybeAI();
 }
 function rebuild(){g=RJ.Game.from(game.moves);winLine=null;
@@ -233,12 +257,12 @@ const recPut=g=>REC.put('omok',g,recMeta(g),sgfText(g));
 const recGame=()=>recView?Object.assign({},game,{over:recView.over,result:recView.result}):game;
 function recMeta(g){
   const r=g.over&&g.result;
-  return{opp:g.pvp?'두 사람':`AI ${RJ.LEVELS[g.level].name} (${omokRank(LEVEL_RATING[g.level])})`,side:g.pvp?'':NAME[g.human],info:'렌주',len:g.moves.length+'수',
+  return{opp:g.pvp?'두 사람':`AI ${AI[g.level].name} (${omokRank(LEVEL_RATING[g.level])})`,side:g.pvp?'':NAME[g.human],info:'렌주',len:g.moves.length+'수',
     out:!r?'open':r.draw?'draw':g.pvp?'done':r.youWin?'win':'loss',res:!r?'끝나지 않은 대국':r.draw?'무승부 · '+r.how:`${NAME[r.winner]} 승 · ${r.how}`};
 }
 // 기보 파일: SGF (GM[4] = 오목·렌주)
 function sgfText(g){
-  const d=new Date(g.id),c=p=>String.fromCharCode(97+p%N)+String.fromCharCode(97+((p/N)|0)),ai='AI '+RJ.LEVELS[g.level].name;
+  const d=new Date(g.id),c=p=>String.fromCharCode(97+p%N)+String.fromCharCode(97+((p/N)|0)),ai='AI '+AI[g.level].name;
   let s=`(;GM[4]FF[4]CA[UTF-8]AP[TableTop]SZ[15]RU[Renju]DT[${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}]`;
   s+=g.pvp?'PB[흑]PW[백]':`PB[${g.human===BLACK?'나':ai}]PW[${g.human===WHITE?'나':ai}]`;
   if(g.over&&g.result)s+=`RE[${g.result.draw?'0':(g.result.winner===BLACK?'B':'W')+'+'+(g.result.how==='기권'?'R':'')}]`;
@@ -316,12 +340,12 @@ async function showHint(){
   if(game.over||thinking||!isPerson(g.turn))return;
   if(hint>=0){hint=-1;draw();ui();return;}
   const ep=epoch;thinking=true;ui();
-  const r=await aiMove(game.moves.slice(),RJ.LEVELS.length-2); // 힌트는 고급 단계로
+  const r=await rapfiMove(game.moves.slice(),STRONG); // 힌트는 강한 AI(Rapfi)로
   if(ep!==epoch)return;
   thinking=false;hint=r.move;game.assisted=true;save();draw();ui();
 }
 // ---------- 급수 (Glicko-2 레이팅을 급수로 표시, 순위표: common/rating.js) ----------
-const RB=ratingBoard({game:'omok',start:LEVEL_RATING[1],levels:RJ.LEVELS.map((l,i)=>({name:l.name,rating:LEVEL_RATING[i]})),fmt:omokRank,prefix:'급수 ',
+const RB=ratingBoard({game:'omok',start:LEVEL_RATING[1],levels:AI.map(l=>({name:l.name,rating:l.rating})),fmt:omokRank,prefix:'급수 ',
   sub:R=>`대국 ${R.games}판 · 레이팅 ${Math.round(R.rating)} ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`});
 function updateRating(){
   if(game.pvp||game.assisted||game.ratingApplied!=null||(game.moves.length<6&&!game.result.youWin&&game.result.how!=='기권'))return;
@@ -391,12 +415,12 @@ function variPlay(p){
 }
 function variStep(d){vari.k=Math.max(0,Math.min(vari.moves.length,vari.k+d));draw();ui();}
 function variExit(){if(!vari)return;view=vari.base;vari=null;draw();ui();}
-// 변화도 장면에서 AI 가 둘 수 (힌트와 같은 고급 단계)
+// 변화도 장면에서 AI 가 둘 수 (힌트와 같은 강한 AI)
 async function variAi(){
   if(thinking||analyzing||variWon())return;
   const m=vari?variMoves():game.moves.slice(0,view??game.moves.length),ep=epoch;
   thinking=true;ui();
-  const r=await aiMove(m,RJ.LEVELS.length-2);
+  const r=await rapfiMove(m,STRONG);
   thinking=false;if(ep!==epoch){ui();return;}
   if(r.move<0||RJ.Game.from(m).b[r.move]!==EMPTY){toast('AI가 둘 곳을 찾지 못했습니다');ui();return;}
   toast('AI: '+pname(r.move));variPush(r.move);
@@ -553,7 +577,7 @@ new ResizeObserver(resize).observe(wrap);
 // ---------- 화면 상태 ----------
 function ui(){
   if(!game)return;
-  const len=view!==null?view:game.moves.length,lv=RJ.LEVELS[game.level].name;
+  const len=view!==null?view:game.moves.length,lv=AI[game.level].name;
   for(const col of [BLACK,WHITE]){
     const el=col===BLACK?$('#pB'):$('#pW');
     el.querySelector('.who').textContent=game.pvp?'사람':col===game.human?'나 · '+RB.text(RB.get()):`AI · ${lv} (${omokRank(LEVEL_RATING[game.level])})`;
@@ -562,7 +586,7 @@ function ui(){
   }
   const st=$('#statusText');
   if(game.over)st.innerHTML='<b>대국 종료</b>';
-  else if(thinking)st.innerHTML=isPerson(g.turn)?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
+  else if(thinking)st.innerHTML=aiStatus?`<b>${aiStatus}</b>`:isPerson(g.turn)?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
   else st.innerHTML=`<b>${NAME[g.turn]}</b> 차례${game.pvp?'':g.turn===game.human?' · 내 차례':''}`;
   $('#moveText').textContent=len+'수';
   const myTurn=!game.over&&!thinking&&isPerson(g.turn);
@@ -655,12 +679,12 @@ document.addEventListener('keydown',e=>{
 
 // 새 게임 대화상자
 const segL=$('#segLevel');
-RJ.LEVELS.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${omokRank(LEVEL_RATING[i])}</small></label>`));
+AI.forEach((l,i)=>segL.insertAdjacentHTML('beforeend',`<input type="radio" name="level" id="lv${i}" value="${i}"><label for="lv${i}">${l.name}<small>${omokRank(LEVEL_RATING[i])}</small></label>`));
 const lastOpt=load('omok-newopts',{color:1,level:2,opp:'ai'});
 function oppUi(){const pvp=document.querySelector('input[name=opp]:checked').value==='pvp';$('#fColor').classList.toggle('hidden',pvp);$('#fLevel').classList.toggle('hidden',pvp);}
 document.querySelectorAll('input[name=opp]').forEach(el=>el.onchange=oppUi);
 function lvDesc(){
-  const rec=RB.recommend();$('#recLevel').textContent=rec>=0?`내 급수 ${RB.text(RB.get())} → 추천 난이도: ${RJ.LEVELS[rec].name}`:'';
+  const rec=RB.recommend();$('#recLevel').textContent=rec>=0?`내 급수 ${RB.text(RB.get())} → 추천 난이도: ${AI[rec].name}`:'';
 }
 segL.addEventListener('change',lvDesc);
 function openNew(){
