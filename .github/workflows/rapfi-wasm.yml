@@ -1,0 +1,21 @@
+# 오목 AI 엔진 Rapfi 를 웹용(WebAssembly)으로 빌드 (손으로 실행). 결과물은 omok/vendor/rapfi/ 에 넣는다
+name: Rapfi WASM 빌드
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Emscripten 설치
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install latest
+          "$RUNNER_TEMP/emsdk/emsdk" activate latest
+      - name: 빌드
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cd "$RUNNER_TEMP" && bash "$GITHUB_WORKSPACE/tools/rapfi/build.sh"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rapfi-wasm
+          path: out/
