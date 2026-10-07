@@ -105,7 +105,6 @@
       </div></div>
     <div class="field" id="fLevel"><span class="flabel">AI 난이도</span>
       <div class="seg" id="segLevel"></div>
-      <div class="lvdesc" id="lvDesc"></div>
       <div class="lvdesc rec" id="recLevel"></div></div>
     <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">대국 시작</button></div>
   </div>
@@ -661,7 +660,6 @@ const lastOpt=load('omok-newopts',{color:1,level:2,opp:'ai'});
 function oppUi(){const pvp=document.querySelector('input[name=opp]:checked').value==='pvp';$('#fColor').classList.toggle('hidden',pvp);$('#fLevel').classList.toggle('hidden',pvp);}
 document.querySelectorAll('input[name=opp]').forEach(el=>el.onchange=oppUi);
 function lvDesc(){
-  const i=+document.querySelector('input[name=level]:checked').value;$('#lvDesc').textContent=`기력 약 ${omokRank(LEVEL_RATING[i])} · ${LEVEL_DESC[i]}`;
   const rec=RB.recommend();$('#recLevel').textContent=rec>=0?`내 급수 ${RB.text(RB.get())} → 추천 난이도: ${RJ.LEVELS[rec].name}`:'';
 }
 segL.addEventListener('change',lvDesc);

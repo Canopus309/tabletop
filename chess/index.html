@@ -128,7 +128,6 @@
       </div></div>
     <div class="field" id="fLevel"><span class="flabel">AI 레이팅</span>
       <div class="seg" id="segLevel"></div>
-      <div class="lvdesc" id="lvDesc"></div>
       <div class="lvdesc rec" id="recLevel"></div></div>
     <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">대국 시작</button></div>
   </div>
@@ -656,7 +655,6 @@ function oppUi(){const pvp=document.querySelector('input[name=opp]:checked').val
 document.querySelectorAll('input[name=opp]').forEach(el=>el.onchange=oppUi);
 function recommend(){const R=loadRating();if(!R.games)return -1;let bi=0;LEVELS.forEach((l,i)=>{if(Math.abs(l.elo-R.rating)<Math.abs(LEVELS[bi].elo-R.rating))bi=i;});return bi;}
 function lvDesc(){
-  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`리체스 레이팅 약 ${l.elo}${l.full?'+':''} · ${l.desc}`;
   const i=recommend(),R=loadRating();$('#recLevel').textContent=i>=0?`내 레이팅 ${ratingText(R)} → 추천: ${LEVELS[i].name}`:'';
 }
 segL.addEventListener('change',lvDesc);

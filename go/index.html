@@ -107,7 +107,6 @@
       </div></div>
     <div class="field" id="fLevel"><span class="flabel">AI 상대</span>
       <div class="seg grid2" id="segLevel"></div>
-      <div class="lvdesc" id="lvDesc"></div>
       <div class="lvdesc rec" id="recLevel"></div></div>
     <div class="row2">
       <div class="field"><label for="selHandi">접바둑 (흑 미리 놓기)</label>
@@ -417,7 +416,18 @@ function moveLogLik(mq,kyu,squares){
   const eps=0.03; // 사람은 가끔 이 모델로 설명되지 않는 수도 둔다
   return Math.log((1-eps)*p+eps/L);
 }
-const RANK_MIN=-4,RANK_MAX=20; // 5단 ~ 20급 (KaTrain 보정 범위)
+const RANK_MIN=-12,RANK_MAX=19; // 탐색하는 공식 급수 범위
+// KaTrain 공식의 급수 → 실제 급수. 2026-10 측정: 공식 설정별 급수 봇을 KataGo 사람 흉내 신경망(Human-SL)과
+// 1,100판 대국시켜 잰 기력에 2차식을 맞춘 값 (평균 오차 약 0.9급). 공식 -4(실제 2급)보다 센 쪽은 측정이 없어 기울기 0.5로 늘였다
+const RANK_MAP=[[-4,2.2],[0,3.9],[5,6.8],[10,10.7],[15,15.5],[18,18.9]];
+function realKyu(f){
+  const M=RANK_MAP,L=M.length-1;
+  if(f<=M[0][0])return M[0][1]+(f-M[0][0])*0.5;
+  if(f>=M[L][0])return M[L][1]+(f-M[L][0]);
+  for(let i=1;i<=L;i++)if(f<=M[i][0]){const [x0,y0]=M[i-1],[x1,y1]=M[i];return y0+(y1-y0)*(f-x0)/(x1-x0);}
+}
+// 예전에 공식 급수로 저장된 기력도 실제 급수로 (v:2 = 실제 급수, f = 공식 급수)
+function normRank(r){return !r||r.v===2?r:{kyu:realKyu(r.kyu),weak:realKyu(r.weak),strong:realKyu(r.strong),n:r.n,f:r.kyu,v:2};}
 function estimateRank(samples){
   if(samples.length<10)return null;
   let best=null;const curve=[];
@@ -426,13 +436,13 @@ function estimateRank(samples){
     curve.push([kyu,ll]);if(!best||ll>best[1])best=[kyu,ll];
   }
   const ok=curve.filter(c=>c[1]>=best[1]-1.92).map(c=>c[0]); // 약 95% 구간
-  return{kyu:best[0],weak:Math.max(...ok),strong:Math.min(...ok),n:samples.length};
+  return{kyu:realKyu(best[0]),weak:realKyu(Math.max(...ok)),strong:realKyu(Math.min(...ok)),n:samples.length,f:best[0],v:2};
 }
 const rankName=k=>{k=Math.round(k);return k>0?k+'급':(1-k)+'단';};
 function rankText(r){
-  if(!r)return'';
-  if(r.kyu<=RANK_MIN)return rankName(RANK_MIN)+' 이상';
-  if(r.kyu>=RANK_MAX)return rankName(RANK_MAX)+' 이하';
+  r=normRank(r);if(!r)return'';
+  if(r.f<=RANK_MIN)return rankName(realKyu(RANK_MIN))+' 이상';
+  if(r.f>=RANK_MAX)return rankName(realKyu(RANK_MAX))+' 이하';
   const a=rankName(r.weak),b=rankName(r.strong);
   return '약 '+rankName(r.kyu)+(a===b?'':` (${a}~${b})`);
 }
@@ -1146,7 +1156,6 @@ function fillHandi(){
   sel.value=String(Math.min(cur,max));
 }
 function lvDesc(){
-  const l=LEVELS[+document.querySelector('input[name=level]:checked').value];$('#lvDesc').textContent=`기력 약 ${l.rank} · ${l.desc}`;
   const{rank}=overallRank();$('#recLevel').textContent=rank?`내 기력 ${rankText(rank).replace(/ \(.*\)/,'')} → 추천 상대: ${LEVELS[recommendLevel(rank.kyu)].bot}`:'';
 }
 document.querySelectorAll('input[name=size]').forEach(el=>el.onchange=fillHandi);
@@ -1194,6 +1203,7 @@ async function switchModel(key){
 for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('baduk-settings',settings);pending=0;resize();ui();};
 
 // ---------- 시작 ----------
+try{if(localStorage.getItem('baduk-rank-v')!=='2'){localStorage.setItem('baduk-rank-v','2');if(loadRating().length)LB.set({pending:true});}}catch(e){}
 initWorker();startKata();setTimeout(lbSync,3000);saveSummary();
 function resume(){
   const saved=load('baduk-game',null);
