@@ -1,0 +1,3 @@
+config-classical.toml@config.toml
+config-nnue.toml@nnue.toml
+classical/model210901.bin@model210901.bin
