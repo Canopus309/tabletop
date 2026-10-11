@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>온라인 대국 · 바둑 · Table Top</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../common/base.css">
+<link rel="stylesheet" href="../../common/hub.css">
+<style>
+.on-me{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.on-me small{display:block;font-size:12.5px;color:var(--muted)}
+.on-me .v{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:2px 0}
+.on-me a{flex:none;padding:9px 12px;border-radius:10px;border:1px solid var(--line);font-weight:600;font-size:13px;text-decoration:none;color:var(--text)}
+.on-name{margin-top:12px}
+.on-name p{margin:0 2px 8px;font-size:13px;color:var(--muted)}
+.on-btns{display:flex;gap:8px;margin-top:14px}
+.on-btns .primary{flex:1.5}.on-btns .ghost{flex:1;width:auto;white-space:nowrap}
+.on-status{margin:10px 2px 0;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.on-status button{border:0;background:none;color:var(--accent);font-weight:600;font-size:12px;cursor:pointer;padding:0}
+.hub-row .ic.b{background:#1d1d1d;color:#fff}.hub-row .ic.w{background:#f4f4f2;color:#222;border:1px solid #ccc}
+.hub-row .ic b{font-size:13px}
+.hub-row .late{color:var(--danger);font-weight:600}
+.hub-row.mine{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset,var(--shadow)}
+.empty{padding:14px 4px;color:var(--muted);font-size:13.5px}
+.note{margin:22px 4px 0;font-size:12.5px;color:var(--muted);line-height:1.65}
+.code-big{font-size:34px;font-weight:800;letter-spacing:.18em;text-align:center;margin:6px 0 2px;font-variant-numeric:tabular-nums}
+.code-in{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:24px;font-weight:700;letter-spacing:.2em;text-align:center;text-transform:uppercase}
+.dlg p.info{margin:0 0 14px;font-size:14px;line-height:1.6}
+.code-row{display:flex;gap:8px}.code-row .code-in{flex:1;min-width:0}.code-row .ghost{width:auto;flex:none;padding:0 14px}
+.app-join{margin:4px 0 6px;padding:12px;border-radius:12px;background:var(--chip)}
+.app-join p{margin:0 0 10px;font-size:13px;line-height:1.6;color:var(--muted)}
+.app-join .steps{margin:10px 0 0;color:var(--text);font-weight:600}
+.dlg p.small{margin:10px 0 0;font-size:12.5px;color:var(--muted);line-height:1.6}
+.hist{margin-top:6px;border-top:1px solid var(--line)}
+.hist div{display:grid;grid-template-columns:3.2em 1fr auto auto;gap:8px;padding:7px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.hist .d{color:var(--muted)}.hist .w{color:var(--accent);font-weight:700}.hist .l{color:var(--danger);font-weight:700}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../home/" title="바둑 홈" aria-label="바둑 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#d9a956"/><circle cx="12" cy="13" r="7" fill="#151515"/><circle cx="20.5" cy="19.5" r="7" fill="#fafafa" stroke="#bbb"/></svg>
+    온라인 대국
+  </div>
+</header>
+<main class="hub">
+  <div class="card">
+    <div class="on-me">
+      <div><small>사람 대국 레이팅</small><div class="v" id="myR">–</div><small id="myRSub"></small></div>
+      <a href="../../ranks/#gor">순위표 ›</a>
+    </div>
+    <div class="on-name hidden" id="nameBox">
+      <p>온라인 대국에서 상대에게 보일 닉네임을 정하세요 (순위표와 같은 이름).</p>
+      <div class="lb-name"><input id="nameIn" maxlength="12" placeholder="닉네임" autocomplete="off"><button type="button" id="nameSave">저장</button></div>
+    </div>
+    <div class="on-btns"><button type="button" class="primary" id="btnCreate">새 대국 만들기</button><button type="button" class="ghost" id="btnJoin">코드로 참가</button></div>
+  </div>
+  <div class="on-status"><span id="status"></span><button type="button" id="btnRefresh">새로고침</button></div>
+
+  <h2 id="hMine">내 차례</h2><div class="hub-list" id="lMine"></div>
+  <h2>상대 차례</h2><div class="hub-list" id="lTheirs"></div>
+  <h2 id="hOpen">초대 중</h2><div class="hub-list" id="lOpen"></div>
+  <h2>끝난 대국</h2><div class="hub-list" id="lDone"></div>
+
+  <p class="note">편지 대국: 두 사람이 각자 시간 날 때 한 수씩 둡니다. 상대가 두어도 알림은 오지 않으니 가끔 열어 보세요 (홈 화면에 '내 차례' 수가 보입니다).
+  한 수 기한이 지나면 상대가 시간승을 받을 수 있습니다. 두 사람이 이어서 패스하면 계가: 한 사람이 죽은 돌을 표시해 제안하고, 상대가 동의하면 끝납니다.
+  레이팅 대국의 결과는 '사람 대국 레이팅'에 반영되고(3판부터 순위표), AI 대국으로 재는 '내 기력'에도 내가 둔 수가 더해집니다.</p>
+</main>
+
+<dialog id="dlgCreate">
+  <div class="dlg">
+    <h2>새 온라인 대국</h2>
+    <div class="field"><span class="flabel">판 크기</span>
+      <div class="seg">
+        <input type="radio" name="size" id="s9" value="9"><label for="s9">9 × 9</label>
+        <input type="radio" name="size" id="s13" value="13"><label for="s13">13 × 13</label>
+        <input type="radio" name="size" id="s19" value="19" checked><label for="s19">19 × 19</label>
+      </div></div>
+    <div class="field"><span class="flabel">내 돌</span>
+      <div class="seg">
+        <input type="radio" name="color" id="cB" value="1"><label for="cB">흑</label>
+        <input type="radio" name="color" id="cW" value="2"><label for="cW">백</label>
+        <input type="radio" name="color" id="cR" value="0" checked><label for="cR">무작위</label>
+      </div></div>
+    <div class="row2">
+      <div class="field"><label for="selHandi">접바둑 (흑이 미리 놓기)</label>
+        <select id="selHandi"><option value="0">없음 (호선 · 덤 7.5)</option></select></div>
+      <div class="field"><label for="selDays">한 수 기한</label>
+        <select id="selDays"><option value="1">1일</option><option value="3" selected>3일</option><option value="7">7일</option></select></div>
+    </div>
+    <label class="toggle"><div>레이팅 대국<small>끄면 친선 대국 (레이팅이 바뀌지 않음)</small></div><span class="sw"><input type="checkbox" id="optRated" checked><span></span></span></label>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">만들기</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgInvite">
+  <div class="dlg">
+    <h2>상대를 초대하세요</h2>
+    <p class="info" id="invInfo"></p>
+    <div class="code-big" id="invCode"></div>
+    <p class="small">링크를 카카오톡 등으로 보내거나, 상대에게 방 코드를 알려 주세요. 상대는 Table Top → 바둑 → 온라인 대국 → '코드로 참가'에서 코드를 넣으면 됩니다.</p>
+    <div class="dlg-actions"><button type="button" class="ghost" id="invCancel">초대 취소</button><button type="button" class="primary" id="invShare">초대 보내기</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgJoin">
+  <div class="dlg">
+    <h2>코드로 참가</h2>
+    <div class="code-row"><input class="code-in" id="joinCode" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234"><button type="button" class="ghost" id="joinPaste">붙여넣기</button></div>
+    <p class="small">초대한 사람에게 받은 여섯 글자 방 코드를 넣으세요. 초대 글이나 코드를 복사해 왔다면 '붙여넣기'를 누르세요.</p>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">다음</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgJoinInfo">
+  <div class="dlg">
+    <h2 id="jiTitle">대국 초대</h2>
+    <p class="info" id="jiInfo"></p>
+    <div class="on-name hidden" id="jiName"><p>상대에게 보일 닉네임</p><div class="lb-name"><input id="jiNameIn" maxlength="12" placeholder="닉네임" autocomplete="off"></div></div>
+    <div class="app-join" id="jiApp">
+      <p>홈 화면에 Table Top을 설치해 쓰고 있다면 <b>앱에서 참가</b>하세요. 앱과 이 브라우저는 기록이 따로 저장되어, 여기서 참가한 대국은 앱에 보이지 않습니다.</p>
+      <button type="button" class="primary" id="jiCopy">코드 복사하고 앱에서 참가</button>
+      <p class="steps hidden" id="jiSteps"></p>
+    </div>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">닫기</button><button type="button" class="primary" data-close="ok" id="jiOk">참가</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgConfirm">
+  <div class="dlg">
+    <h2 id="cfTitle"></h2>
+    <p id="cfText" style="margin:0 0 16px;color:var(--muted);font-size:14px"></p>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="no">취소</button><button type="button" class="primary" data-close="yes" id="cfYes"></button></div>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="../../common/ui.js"></script>
+<script src="../../common/leaderboard.js"></script>
+<script src="../../common/rating.js"></script>
+<script src="../../common/online.js"></script>
+<script src="core.js"></script>
+<script>
+'use strict';
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const NAME={1:'흑',2:'백'};
+let busy=false,lastAt=0;
+
+function renderMe(){
+  const R=GO_ON.get(),s=LB.state(),played=!!localStorage.getItem('go-online-rating');
+  $('#myR').textContent=GO_ON.text(R);
+  $('#myRSub').textContent=`약 ${GO_ON.rankOf(R.rating)} · ${R.games||0}판${played?'':' · 첫 대국 전 (내 기력 기준)'}`;
+  $('#nameBox').classList.toggle('hidden',!!s.name);
+}
+const gameInfo=d=>`${d.n}줄${d.handi?' · '+d.handi+'점 접바둑':''} · 한 수 ${d.days}일${d.rated?'':' · 친선'}`;
+function row(d){
+  const st=GO_ON.stage(d),col=GO_ON.colorOf(d),o=GO_ON.opp(d),dl=GO_ON.deadline(d),late=dl<Date.now();
+  const ic=`<span class="ic ${col===1?'b':'w'}"><b>${NAME[col]||''}</b></span>`;
+  let title,desc,href='../#online='+d.code;
+  if(st==='open'){title=`상대 기다리는 중 · ${d.code}`;desc=`${gameInfo(d)} · 눌러서 초대 보내기`;href='#invite='+d.code;}
+  else if(st==='done'){
+    const r=d.res||{},win=r.w===col,how=r.how==='score'?`${r.d}집`:r.how==='time'?'시간':'불계';
+    const ch=GO_ON.change(d.code);
+    title=`${esc(o.name)} · ${win?'승':'패'} (${how}${win?'승':'패'})`;
+    desc=`${GO_ON.when(d.mt)} · ${gameInfo(d)} · ${d.moves.length}수${ch?` · 레이팅 ${ch.before} → ${ch.after}`:''}`;
+  }else{
+    const sc=d.st==='score';
+    title=`${esc(o.name)}${o.r?` (${Math.round(o.r)})`:''} · ${sc?'계가 중':d.moves.length+'수'}`;
+    const what=sc?(st==='mine'?(d.prop?'상대 계가 제안 확인하기':'죽은 돌 표시해 계가 제안하기'):'상대가 계가 확인 중'):(st==='mine'?'내 차례':'상대 차례');
+    desc=`${what} · ${gameInfo(d)}<br>기한 ${GO_ON.when(dl)} · <span class="${late?'late':''}">${GO_ON.left(dl)}${late&&st==='theirs'?' (시간승을 받을 수 있음)':''}</span>`;
+  }
+  return `<a class="hub-row${st==='mine'?' mine':''}" href="${href}">${ic}<span class="t"><b>${title}</b><small>${desc}</small></span><span class="go">›</span></a>`;
+}
+function render(){
+  renderMe();
+  // 진행 중인 대국은 기한이 가까운 것부터
+  const l=GO_ON.cached(),by=k=>{const a=l.filter(d=>GO_ON.stage(d)===k);if(k==='mine'||k==='theirs')a.sort((x,y)=>GO_ON.deadline(x)-GO_ON.deadline(y));return a;};
+  const fill=(id,arr,empty)=>{$(id).innerHTML=arr.length?arr.map(row).join(''):`<div class="empty">${empty}</div>`;};
+  const mine=by('mine'),open=by('open');
+  fill('#lMine',mine,'지금 내 차례인 대국이 없습니다.');
+  fill('#lTheirs',by('theirs'),'상대 차례인 대국이 없습니다.');
+  fill('#lOpen',open,'');$('#hOpen').classList.toggle('hidden',!open.length);$('#lOpen').classList.toggle('hidden',!open.length);
+  fill('#lDone',by('done').slice(0,15),'아직 끝난 대국이 없습니다.');
+  $('#hMine').textContent=mine.length?`내 차례 (${mine.length})`:'내 차례';
+  $('#status').textContent=busy?'받는 중…':!navigator.onLine?'오프라인 · 마지막으로 받은 목록':lastAt?'갱신 '+new Date(lastAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'';
+}
+async function refresh(){
+  if(busy)return;
+  if(!LB.state().uid){render();return;} // 아직 온라인 대국을 한 적 없는 기기
+  busy=true;render();
+  try{await GO_ON.refresh();lastAt=Date.now();}
+  catch(e){console.warn('[온라인]',e);if(e.status!==0)toast('목록을 받지 못했습니다');}
+  busy=false;render();
+}
+$('#btnRefresh').onclick=refresh;
+
+// 닉네임 (순위표 닉네임과 같은 값)
+function saveName(v){const name=String(v||'').trim().slice(0,12);if(!name){toast('닉네임을 입력하세요');return false;}LB.set({name,pending:true,gorPending:true});renderMe();return true;}
+$('#nameSave').onclick=()=>{if(saveName($('#nameIn').value))toast('닉네임을 저장했습니다');};
+
+// ---------- 새 대국 ----------
+const lastOpt=load('go-online-newopts',{size:19,color:0,handicap:0,days:3,rated:true});
+function fillHandi(){
+  const n=+document.querySelector('input[name=size]:checked').value,sel=$('#selHandi'),cur=+sel.value||0,max=n===9?5:9;
+  sel.innerHTML='<option value="0">없음 (호선 · 덤 7.5)</option>';for(let h=2;h<=max;h++)sel.insertAdjacentHTML('beforeend',`<option value="${h}">${h}점 (덤 0.5)</option>`);
+  sel.value=String(Math.min(cur,max));
+}
+document.querySelectorAll('input[name=size]').forEach(el=>el.onchange=fillHandi);
+$('#btnCreate').onclick=()=>{
+  if(!LB.state().name){$('#nameBox').classList.remove('hidden');$('#nameIn').focus();toast('먼저 닉네임을 정하세요');return;}
+  document.querySelector(`input[name=size][value="${lastOpt.size}"]`).checked=true;
+  document.querySelector(`input[name=color][value="${lastOpt.color}"]`).checked=true;
+  fillHandi();$('#selHandi').value=String(lastOpt.handicap);if(!$('#selHandi').value)$('#selHandi').value='0';
+  $('#selDays').value=String(lastOpt.days);$('#optRated').checked=lastOpt.rated;
+  openDlg($('#dlgCreate'),async v=>{
+    if(v!=='ok')return;
+    const o={size:+document.querySelector('input[name=size]:checked').value,color:+document.querySelector('input[name=color]:checked').value,handicap:+$('#selHandi').value,days:+$('#selDays').value,rated:$('#optRated').checked};
+    Object.assign(lastOpt,o);store('go-online-newopts',lastOpt);
+    toast('대국을 만드는 중…');
+    try{const code=await GO_ON.create({n:o.size,color:o.color,handi:o.handicap,days:o.days,rated:o.rated});render();showInvite(code);}
+    catch(e){console.warn(e);toast(e.status===0?'인터넷에 연결되어야 대국을 만들 수 있습니다':'대국을 만들지 못했습니다 ('+e.message+')');}
+  });
+};
+// 초대 보내기 / 취소
+function showInvite(code){
+  const d=GO_ON.cachedOne(code);if(!d)return;
+  const col=GO_ON.colorOf(d);
+  $('#invInfo').textContent=`${gameInfo(d)} · 나: ${NAME[col]}${d.handi&&col===1?' (접바둑 받음)':''}`;
+  $('#invCode').textContent=code;
+  $('#invShare').onclick=async()=>{const r=await ONL.share(GO_ON.inviteText(d),GO_ON.link(code));if(r==='copied')toast('초대 글과 링크를 복사했습니다');else if(r==='fail')toast('방 코드를 직접 알려 주세요: '+code);};
+  $('#invCancel').onclick=async()=>{
+    closeDlg($('#dlgInvite'));
+    if(!(await ask('초대를 취소할까요?','아직 아무도 들어오지 않은 대국을 지웁니다.','초대 취소')))return;
+    try{await ONL.remove(code);toast('초대를 취소했습니다');}catch(e){if(e.status!==404){toast('취소하지 못했습니다 ('+e.message+')');return;}}
+    try{localStorage.setItem('go-online-list',JSON.stringify(GO_ON.cached().filter(x=>x.code!==code)));}catch(e){}
+    GO_ON.summary();render();
+  };
+  openDlg($('#dlgInvite'));
+}
+
+// ---------- 참가 ----------
+$('#btnJoin').onclick=()=>{$('#joinCode').value='';openDlg($('#dlgJoin'),v=>{if(v==='ok')openJoin(ONL.normCode($('#joinCode').value));});setTimeout(()=>$('#joinCode').focus(),50);};
+$('#joinCode').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();closeDlg($('#dlgJoin'),'ok');}});
+// 복사해 온 글(초대 글 전체, 링크, 코드만)에서 방 코드 찾기
+function codeIn(t){
+  t=String(t||'');
+  const m=/#join=([A-Za-z0-9]{6})/.exec(t)||/코드\s*([A-Za-z0-9]{6})/.exec(t)||/\b([A-HJ-NP-Za-hj-np-z2-9]{6})\b/.exec(t.trim());
+  return m?ONL.normCode(m[1]):'';
+}
+$('#joinPaste').onclick=async()=>{
+  let t='';
+  try{t=await navigator.clipboard.readText();}catch(e){toast('붙여넣기를 쓸 수 없습니다. 입력칸을 길게 눌러 붙여넣으세요');$('#joinCode').focus();return;}
+  const c=codeIn(t);
+  if(!c){toast('복사한 내용에 방 코드가 없습니다');return;}
+  $('#joinCode').value=c;closeDlg($('#dlgJoin'),'ok');
+};
+async function openJoin(code){
+  if(code.length!==6){toast('방 코드는 여섯 글자입니다');return;}
+  let d;
+  try{d=await ONL.get(code);}catch(e){toast(e.status===0?'인터넷에 연결되어야 참가할 수 있습니다':'대국을 찾지 못했습니다');return;}
+  if(!d||d.g!=='go'){toast('없는 방 코드입니다: '+code);return;}
+  const me=ONL.uid();
+  if(me&&d.players.includes(me)){location.href='../#online='+code;return;} // 이미 들어 있는 대국
+  if(d.st!=='open'){toast('이미 시작한 대국입니다');return;}
+  const hostCol=d.bu?1:2,myCol=3-hostCol,host=hostCol===1?d.bn:d.wn;
+  $('#jiTitle').textContent=`${host}님의 초대`;
+  $('#jiInfo').textContent=`${gameInfo(d)} · 나: ${NAME[myCol]}${d.handi&&myCol===1?' (접바둑 받음)':d.handi?' (접바둑 줌)':''}${d.rated?' · 레이팅 대국':''}`;
+  const needName=!LB.state().name;$('#jiName').classList.toggle('hidden',!needName);$('#jiNameIn').value='';
+  // 홈 화면 앱이 아닌 브라우저(카카오톡 안 브라우저 등)로 열었을 때: 코드를 복사해 앱에서 참가하는 길을 먼저 보여 준다
+  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  $('#jiApp').classList.toggle('hidden',!!standalone);$('#jiSteps').classList.add('hidden');
+  $('#jiOk').textContent=standalone?'참가':'이 브라우저에서 참가';$('#jiOk').className=standalone?'primary':'ghost';
+  $('#jiCopy').onclick=async()=>{
+    let ok=true;try{await navigator.clipboard.writeText(code);}catch(e){ok=false;}
+    const s=$('#jiSteps');s.classList.remove('hidden');
+    s.innerHTML=`${ok?`코드 <b>${code}</b>를 복사했습니다.`:`코드 <b>${code}</b>를 기억해 두세요.`}<br>홈 화면의 Table Top → 바둑 → 온라인 대국 → 코드로 참가 → ${ok?'붙여넣기':'코드 입력'}`;
+  };
+  openDlg($('#dlgJoinInfo'),async v=>{
+    if(v!=='ok')return;
+    if(needName&&!saveName($('#jiNameIn').value))return;
+    toast('참가하는 중…');
+    try{await GO_ON.join(d);location.href='../#online='+code;}
+    catch(e){console.warn(e);toast(e.status===0?'인터넷 연결을 확인하세요':'참가하지 못했습니다 · 다른 사람이 먼저 들어왔을 수 있습니다');}
+  });
+}
+
+// 주소: #join=코드 (초대 링크), #invite=코드 (목록의 초대 중 대국)
+function route(){
+  const j=/^#join=([A-Za-z0-9]{6})$/.exec(location.hash),i=/^#invite=([A-Z0-9]{6})$/.exec(location.hash);
+  // 안드로이드 카카오톡 안 브라우저로 연 초대 링크는 바깥 브라우저로 넘긴다. 크롬으로 설치한 앱이 있으면 앱이 열린다
+  if(j&&/KAKAOTALK/i.test(navigator.userAgent)&&/Android/i.test(navigator.userAgent)&&!sessionStorage.getItem('kakaoOut')){
+    try{sessionStorage.setItem('kakaoOut','1');}catch(e){}
+    location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(location.href);
+    toast('앱(또는 브라우저)으로 여는 중…');
+  }
+  if(j||i)history.replaceState(null,'',location.pathname);
+  if(j)openJoin(ONL.normCode(j[1]));else if(i)showInvite(i[1]);
+}
+window.addEventListener('hashchange',route);
+window.addEventListener('online',refresh);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastAt>20000)refresh();});
+setInterval(()=>{if(document.visibilityState==='visible'&&Date.now()-lastAt>110000)refresh();},30000); // 목록은 2분마다
+render();route();refresh();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
+</script>
+</body>
+</html>

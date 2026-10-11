@@ -14,3 +14,5 @@
 .hub-row.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .hub-row.primary .ic{background:rgba(255,255,255,.18);color:inherit}
 .hub-row.primary .t small,.hub-row.primary .go{color:inherit;opacity:.85}
+.hub-row.mine{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset,var(--shadow)}
+.hub-row.mine .t small{color:var(--accent);font-weight:600}

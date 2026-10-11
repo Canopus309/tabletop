@@ -47,6 +47,8 @@
       </div>
     </div>
 
+    <div class="card on-card hidden" id="onCard"><p class="on-text" id="onText"></p><div class="on-btns" id="onBtns"></div></div>
+
     <div class="card" id="playCard">
       <div class="actions">
         <button class="act" id="aUndo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>무르기</button>
@@ -294,6 +296,10 @@ self.onmessage=e=>self.postMessage(handleMessage(e.data));
 <script src="../common/ui.js"></script>
 <script src="../common/leaderboard.js"></script>
 <script src="../common/records.js"></script>
+<script src="../common/rating.js"></script>
+<script src="../common/online.js"></script>
+<script src="online/core.js"></script>
+<script src="online/play.js"></script>
 
 <!-- ================= APP ================= -->
 <script>
@@ -366,7 +372,7 @@ const kataBatch=(n,visits)=>n>=19?(visits>=600?32:16):8;
 // 휴대폰은 배터리와 메모리를 아끼려고 미리 읽기를 짧게 한다
 const IS_MOBILE=matchMedia('(pointer:coarse)').matches||/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
 function startPonder(){
-  if(kataState!=='ready'||game.over||game.pvp||board.turn!==game.human||LEVELS[game.level].kata.mode!=='search'||game.level<LEVELS.length-1)return;
+  if(kataState!=='ready'||game.over||game.pvp||game.online||board.turn!==game.human||LEVELS[game.level].kata.mode!=='search'||game.level<LEVELS.length-1)return;
   if(document.visibilityState==='hidden')return;
   const n=game.n;
   const visits=IS_MOBILE?(n>=19?2000:n>=13?3000:4000):(n>=19?6000:n>=13?8000:12000);
@@ -458,7 +464,7 @@ function recordGameRank(){
   const s=samplesOf(game);game.myRank=estimateRank(s);
   if(s.length>=10&&game.result&&!recView){
     const list=loadRating().filter(r=>r.id!==game.id);
-    list.push({id:game.id||Date.now(),date:new Date().toISOString().slice(0,10),n:game.n,level:game.level,win:!!game.result.youWin,rank:game.myRank,s:s.map(v=>v.mq)});
+    list.push({id:game.id||Date.now(),date:new Date().toISOString().slice(0,10),n:game.n,level:game.level,opp:game.online?game.online.opp.name:undefined,win:!!game.result.youWin,rank:game.myRank,s:s.map(v=>v.mq)});
     store('baduk-rating',list.slice(-30));
     LB.set({pending:true});lbSync();
   }
@@ -468,7 +474,8 @@ function recordGameRank(){
 // 홈 화면에 보여 줄 요약 (내 기력)
 function saveSummary(){
   try{const s=JSON.parse(localStorage.getItem('tt-summary'))||{},{rank}=overallRank();
-    s.go=rank?rankText(rank).replace(/ \(.*\)/,''):null;localStorage.setItem('tt-summary',JSON.stringify(s));}catch(e){}
+    s.go=rank?rankText(rank).replace(/ \(.*\)/,''):null;s.goKyu=rank?rank.kyu:null; // goKyu: 온라인 대국 첫 레이팅
+    localStorage.setItem('tt-summary',JSON.stringify(s));}catch(e){}
 }
 // 최근 10판의 수를 모두 합쳐 추정
 function overallRank(){
@@ -485,7 +492,7 @@ function showRank(){
   $('#rkSub').textContent=rank
     ?`범위 ${rankName(rank.weak)}~${rankName(rank.strong)} · 최근 ${games}판, 내 수 ${rank.n}개 기준 · 추천 상대: ${LEVELS[recommendLevel(rank.kyu)].bot}`
     :'아직 기록이 없습니다. 대국을 마치면 자동으로 측정됩니다.';
-  $('#rkList').innerHTML=list.map(r=>`<div class="rank-row"><span class="d">${r.date.slice(5)}</span><span>${r.n}줄 · ${LEVELS[r.level]?LEVELS[r.level].bot:''}</span><span class="${r.win?'w':'l'}">${r.win?'승':'패'}</span><span>${rankText(r.rank).replace('약 ','')}</span></div>`).join('');
+  $('#rkList').innerHTML=list.map(r=>`<div class="rank-row"><span class="d">${r.date.slice(5)}</span><span>${r.n}줄 · ${r.opp?esc(r.opp)+' (온라인)':LEVELS[r.level]?LEVELS[r.level].bot:''}</span><span class="${r.win?'w':'l'}">${r.win?'승':'패'}</span><span>${rankText(r.rank).replace('약 ','')}</span></div>`).join('');
   openDlg($('#dlgRank'));
 }
 // ---------- 온라인 순위표 ----------
@@ -589,7 +596,7 @@ const aiColor=()=>3-game.human;
 const isPerson=c=>!!game.pvp||c===game.human;
 
 function newGame(o){
-  if(recView){recView=null;history.replaceState(null,'',location.pathname);}
+  if(recView||(game&&game.online)){recView=null;history.replaceState(null,'',location.pathname);clearInterval(onPoll);onUnlisten();}
   cancelEngine();stopPonder();epoch++;
   if(kataState==='ready')Kata.resetSession();
   const pvp=o.opp==='pvp',human=pvp?BLACK:o.color===0?(Math.random()<.5?1:2):o.color;
@@ -607,6 +614,7 @@ function resetView(){view=null;vari=null;cands=null;hints=null;ownMap=null;deadS
 function rebuild(){board=Board.fromState(stateOf());resize();ui();}
 function save(){
   if(recView){recPut(recGame());return;} // 지난 대국은 분석 결과만 기록에 더한다
+  if(isOnline()){if(game.human)recPut(game);return;} // 온라인 대국은 두던 대국 자리를 쓰지 않는다
   store('baduk-game',game);recPut(game);
 }
 // ---------- 지난 대국 기록 (common/records.js) ----------
@@ -615,7 +623,7 @@ const recPut=g=>REC.put('go',g,recMeta(g),sgfText(g));
 const recGame=()=>recView?Object.assign({},game,{over:recView.over,result:recView.result}):game;
 function recMeta(g){
   const done=g.over&&g.result;
-  return{opp:g.pvp?'두 사람':`${LEVELS[g.level].bot} (${LEVELS[g.level].rank})`,side:g.pvp?'':NAME[g.human],
+  return{opp:g.pvp?'두 사람':g.online?`${g.online.opp.name} (온라인)`:`${LEVELS[g.level].bot} (${LEVELS[g.level].rank})`,side:g.pvp?'':NAME[g.human]||'',
     info:`${g.n}줄${g.setup.length?' · '+g.setup.length+'점 접바둑':''}`,len:g.moves.length+'수',
     out:!done?'open':g.pvp?'done':g.result.youWin?'win':'loss',res:done?g.result.title:'끝나지 않은 대국'};
 }
@@ -632,9 +640,13 @@ async function openRecord(id){
 function route(){
   const m=/^#rec=(\d+)$/.exec(location.hash);
   if(m){openRecord(+m[1]);return;}
+  // 온라인 대국 (#online=방코드)
+  const on=/^#online=([A-Z0-9]{6})$/.exec(location.hash);
+  if(on){openOnline(on[1]);return;}
+  const leave=()=>{if(!game||recView||game.online){epoch++;thinking=false;recView=null;clearInterval(onPoll);onUnlisten();resume();}};
   // 게임 홈의 '새 대국'
-  if(location.hash==='#new'){history.replaceState(null,'',location.pathname);if(!game||recView){epoch++;thinking=false;recView=null;resume();}openNew();return;}
-  if(!game||recView){epoch++;thinking=false;recView=null;resume();}
+  if(location.hash==='#new'){history.replaceState(null,'',location.pathname);leave();openNew();return;}
+  leave();
 }
 function closeRecord(){history.replaceState(null,'',location.pathname);route();}
 
@@ -643,12 +655,13 @@ function playMove(p){
   hints=null;ownMap=null;pending=0;
   if(p===PASS)sound('pass');else{sound(cap?'cap':'stone',cap);if(settings.sound&&navigator.vibrate)try{navigator.vibrate(cap?[12,40,12]:12);}catch(e){}}
   save();draw();ui();
+  if(isOnline()){onMoved();return;}
   if(board.passes>=2){finishGame();return;}
   maybeAI();
 }
 
 async function maybeAI(){
-  if(game.over||isPerson(board.turn))return;
+  if(game.over||isOnline()||isPerson(board.turn))return;
   const ep=epoch,lv=LEVELS[game.level],t0=performance.now();
   thinking=true;thinkFor=board.turn;ui();
   let r;
@@ -672,6 +685,7 @@ function setWr(col,wr){game.wr=col===BLACK?wr:1-wr;ui();}
 
 function humanPlay(p){
   if(game.over||thinking||view!==null||!isPerson(board.turn))return;
+  if(isOnline()&&!onCanMove())return;
   if(board.c[p]!==EMPTY)return;
   if(!board.isLegal(p,board.turn)){
     toast(p===board.ko?'패: 바로 되따낼 수 없습니다. 다른 곳에 한 수 두세요.':'착수 금지: 스스로 활로가 없어지는 자리입니다.');
@@ -680,7 +694,7 @@ function humanPlay(p){
   if(settings.confirm){pending=p;draw();ui();return;}
   playMove(p);
 }
-const canPlace=()=>settings.confirm&&game&&!game.over&&!thinking&&view===null&&isPerson(board.turn);
+const canPlace=()=>settings.confirm&&game&&!game.over&&!thinking&&view===null&&isPerson(board.turn)&&(!isOnline()||onCanMove());
 
 async function finishGame(){
   thinking=true;thinkFor=0;ui();toast('계가 중…');
@@ -790,7 +804,7 @@ function endGame(winner,detail,how){
 }
 
 function undo(){
-  if(recView||!game.moves.length)return;
+  if(recView||isOnline()||!game.moves.length)return;
   cancelEngine();stopPonder();epoch++;thinking=false;
   const first=game.setup.length?WHITE:BLACK;
   const turnAt=len=>len%2===0?first:3-first;
@@ -803,7 +817,7 @@ function undo(){
 }
 
 async function hint(){
-  if(game.over||thinking||!isPerson(board.turn))return;
+  if(game.over||thinking||isOnline()||!isPerson(board.turn))return; // 사람끼리 대국에서는 AI 도움을 쓰지 않는다
   if(hints){hints=null;draw();ui();return;}
   const ep=epoch,me=board.turn;thinking=true;thinkFor=me;ui();
   let top;
@@ -824,7 +838,7 @@ async function hint(){
 }
 
 async function estimateNow(){
-  if(thinking)return;
+  if(thinking||(isOnline()&&!game.over))return;
   if(ownMap&&!game.over){ownMap=null;draw();ui();return;}
   const ep=epoch;thinking=true;thinkFor=0;ui();
   let r,s;
@@ -919,9 +933,11 @@ function sgfText(g){
   const tmp=new Board(g.n),c=p=>{const [x,y]=tmp.xy(p);return String.fromCharCode(97+x)+String.fromCharCode(97+y);};
   const d=new Date(g.id||Date.now()),ai=LEVELS[g.level].bot;
   let s=`(;GM[1]FF[4]CA[UTF-8]AP[TableTop]SZ[${g.n}]KM[${g.komi}]DT[${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}]RU[Chinese]`;
-  s+=g.pvp?'PB[흑]PW[백]':`PB[${g.human===1?'나':ai}]PW[${g.human===2?'나':ai}]`;
+  const sgfEsc=t=>String(t||'').replace(/[\]\\]/g,'\\$&'),opp=g.online?sgfEsc(g.online.opp.name):ai;
+  s+=g.pvp?'PB[흑]PW[백]':`PB[${g.human===1?'나':opp}]PW[${g.human===2?'나':opp}]`;
+  if(g.online)s+=`GN[온라인 ${g.online.code}]`;
   if(g.setup.length)s+=`HA[${g.setup.length}]AB`+g.setup.map(p=>`[${c(p)}]`).join('');
-  if(g.over&&g.result)s+=`RE[${g.result.winner===1?'B':'W'}+${g.result.title.includes('불계')?'R':g.result.title.match(/[\d.]+/)[0]}]`;
+  if(g.over&&g.result&&g.result.winner){const t=g.result.title;s+=`RE[${g.result.winner===1?'B':'W'}+${t.includes('불계')?'R':t.includes('시간')?'T':(t.match(/[\d.]+/)||['?'])[0]}]`;}
   let col=g.setup.length?'W':'B';
   for(const m of g.moves){s+=`;${col}[${m===PASS?'':c(m)}]`;col=col==='B'?'W':'B';}
   return s+')';
@@ -987,7 +1003,7 @@ function draw(){
   // 돌
   for(const p of b.pts){
     const v=b.c[p];if(v===EMPTY)continue;
-    const [x,y]=b.xy(p),dead=ownMap&&!vari&&((v===BLACK&&ownMap[p]<-0.4)||(v===WHITE&&ownMap[p]>0.4));
+    const [x,y]=b.xy(p),dead=!vari&&(deadSet&&b===board?deadSet.has(p):!!ownMap&&((v===BLACK&&ownMap[p]<-0.4)||(v===WHITE&&ownMap[p]>0.4)));
     drawStone(X(x),X(y),r,v,dead?0.45:1);
     if(dead){const q=cell*0.15;ctx.fillStyle=v===BLACK?'#fff':'#111';ctx.fillRect(X(x)-q/2,X(y)-q/2,q,q);}
     if(nums&&nums.has(p)){
@@ -1062,6 +1078,7 @@ cv.addEventListener('pointermove',e=>{
   if(e.pointerType!=='mouse')return;const p=pointAt(e);if(p!==hover){hover=p;draw();}});
 cv.addEventListener('pointerleave',()=>{hover=0;draw();});
 cv.addEventListener('click',e=>{const p=pointAt(e);if(game&&game.over){if(p)variPlay(p);return;}
+  if(isOnline()&&game.online.st==='score'){onTap(p);return;} // 계가: 죽은 돌 고르기
   if(canPlace()){if(p&&board.c[p]===EMPTY&&!board.isLegal(p,board.turn))humanPlay(p);return;} // 착수 버튼 방식은 pointerdown 에서 위치를 정한다
   if(p)humanPlay(p);});
 $('#placeOk').onclick=()=>{if(pending&&canPlace()&&board.c[pending]===EMPTY)playMove(pending);};
@@ -1074,18 +1091,20 @@ function ui(){
   const b=displayBoard(),lv=LEVELS[game.level].bot;
   for(const col of [1,2]){
     const el=col===1?$('#pB'):$('#pW');
-    el.querySelector('.who').textContent=game.pvp?'사람':col===game.human?'나':`${lv} (${LEVELS[game.level].rank})`;
+    el.querySelector('.who').textContent=game.pvp?'사람':game.online?(col===game.human?'나':game.online.opp.name+(game.online.opp.r?` (${Math.round(game.online.opp.r)})`:'')):col===game.human?'나':`${lv} (${LEVELS[game.level].rank})`;
     el.querySelector('.caps').textContent='따낸 돌 '+b.caps[col];
     el.classList.toggle('active',!game.over&&b.turn===col);
     el.classList.toggle('think',thinking&&thinkFor===col&&!isPerson(col));
   }
   const st=$('#statusText');
   if(game.over)st.innerHTML='<b>대국 종료</b>';
+  else if(isOnline())st.innerHTML=onStatus();
   else if(thinking&&thinkFor&&!isPerson(thinkFor))st.innerHTML='<b>AI</b> 생각 중…';
   else if(thinking)st.innerHTML='<b>분석 중…</b>';
   else st.innerHTML=`<b>${NAME[board.turn]}</b> 차례${game.pvp?'':board.turn===game.human?' · 내 차례':''}`;
   $('#moveText').textContent=`${view!==null?view:game.moves.length}수`;
-  $('#wrBox').classList.toggle('hidden',!(game.over||settings.showWr));
+  const live=isOnline()&&!game.over; // 사람끼리 두는 중에는 AI 형세·힌트를 숨긴다
+  $('#wrBox').classList.toggle('hidden',!(game.over||(settings.showWr&&!live)));
   const vi=view!==null?view:game.moves.length,ev=game.evals&&game.evals[vi];
   const wb=Math.round((game.over&&ev?ev[0]:game.wr)*100);
   $('#wrB').textContent=wb+'%';$('#wrW').textContent=(100-wb)+'%';$('#wrBar').style.width=wb+'%';
@@ -1094,19 +1113,23 @@ function ui(){
   $('#aPass').disabled=!myTurn;$('#aHint').disabled=!myTurn&&!hints;$('#aResign').disabled=game.over;
   $('#aEst').disabled=thinking;
   $('#aHint').classList.toggle('on',!!hints);$('#aEst').classList.toggle('on',!!ownMap&&!game.over);
-  $('#playCard').classList.toggle('hidden',game.over);
+  for(const id of ['#aUndo','#aHint','#aEst'])$(id).classList.toggle('hidden',live);
+  if(live){$('#aPass').disabled=!onCanMove();$('#aResign').disabled=!game.human||game.online.st==='open'||!!game.online.sending;}
+  $('#playCard').classList.toggle('hidden',game.over||(live&&game.online.st!=='play'));
+  onUi();
   const rc=$('#resultCard');rc.classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
     if(recView){const m=recMeta(recGame());$('#resTitle').textContent=`지난 대국 · ${REC.when(game.id)}`;$('#resDetail').textContent=`${m.res} · ${m.opp}${m.side?' · 나 '+m.side:''}`;}
     else{$('#resTitle').textContent=game.pvp?'🎉 '+game.result.title:(game.result.youWin?'🎉 승리! ':'아쉬운 패배 · ')+game.result.title;
     $('#resDetail').textContent=game.result.detail;}
-    $('#resUndo').textContent=recView?'돌아가기':'무르기';
+    $('#resUndo').textContent=recView?'돌아가기':game.online?'온라인 목록':'무르기';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=view===null?game.moves.length:view;
     $('#rvText').textContent=`${rg.value}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(vi);
     $('#variBar').classList.toggle('hidden',!vari);$('#variHint').classList.toggle('hidden',!!vari);
     if(vari){const tb=Board.fromState(variState());$('#variText').innerHTML=`<b>변화도</b> ${vari.k}/${vari.moves.length}수 · ${NAME[tb.turn]} 차례`;$('#variAi').disabled=thinking||!!game.analyzing;$('#variPass').disabled=thinking;}
-    $('#rankLine').textContent=game.analyzing||game.pvp?'':game.myRank?`이번 대국 내 기력: ${rankText(game.myRank)} · 내 수 ${game.myRank.n}개 기준`:(game.evals&&game.evals.length?'둔 수가 적어 기력을 재지 못했습니다':'');
+    const rch=game.online&&!recView&&game.online.rchg?`사람 대국 레이팅 ${game.online.rchg.before} → ${game.online.rchg.after}`:'';
+    $('#rankLine').textContent=game.analyzing||game.pvp?rch:[rch,game.myRank?`이번 대국 내 기력: ${rankText(game.myRank)} · 내 수 ${game.myRank.n}개 기준`:(game.evals&&game.evals.length?'둔 수가 적어 기력을 재지 못했습니다':'')].filter(Boolean).join(' · ');
     const mine=mistakes().filter(m=>isPerson(m.mover)),mb=$('#nextMistake');
     mb.classList.toggle('hidden',!!game.analyzing||!game.evals);
     const cnt=game.pvp?`흑 ${mine.filter(m=>m.mover===BLACK).length} · 백 ${mine.filter(m=>m.mover===WHITE).length}`:`${mine.length}개`;
@@ -1117,17 +1140,18 @@ function ui(){
   if(showPlace)$('#placeOk').textContent='착수 · '+moveName(pending);
   document.body.classList.toggle('placing',showPlace);document.body.classList.toggle('docked',!!game.over);
   if(game.over){candUi();document.body.style.setProperty('--dock-h',$('#rvDock').offsetHeight+'px');}
-  $('#metaText').textContent=`${game.pvp?'두 사람 · ':''}${game.n}×${game.n} · 덤 ${game.komi}${game.setup.length?' · '+game.setup.length+'점 접바둑':''} · ${kataInfo}`;
+  $('#metaText').textContent=`${game.pvp?'두 사람 · ':game.online?`온라인 ${game.online.code} · ${game.online.rated?'레이팅 대국':'친선'} · 한 수 ${game.online.days}일 · `:''}${game.n}×${game.n} · 덤 ${game.komi}${game.setup.length?' · '+game.setup.length+'점 접바둑':''} · ${kataInfo}`;
 }
 
 // ---------- 버튼 ----------
-$('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():undo();$('#resDl').onclick=exportSgf;
-$('#aPass').onclick=async()=>{if(!isPerson(board.turn)||thinking||game.over)return;
+$('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():game.online?location.href='online/':undo();$('#resDl').onclick=exportSgf;
+$('#aPass').onclick=async()=>{if(!isPerson(board.turn)||thinking||game.over||(isOnline()&&!onCanMove()))return;
   if(board.last!==PASS&&game.moves.length<game.n*game.n*0.3&&!(await ask('패스할까요?','아직 둘 곳이 많이 남아 있습니다.','패스')))return;
   playMove(PASS);};
 $('#aHint').onclick=hint;$('#aEst').onclick=estimateNow;$('#aSgf').onclick=exportSgf;
 $('#aResign').onclick=async()=>{
   if(game.over)return;
+  if(isOnline()){if(game.human)onResign();return;}
   const loser=game.pvp?board.turn:game.human;
   if(await ask(game.pvp?`${NAME[loser]}이 기권할까요?`:'기권할까요?',game.pvp?`이번 대국을 ${NAME[3-loser]}의 승리로 끝냅니다.`:'이번 대국을 AI의 승리로 끝냅니다.','기권')){
     cancelEngine();epoch++;thinking=false;endGame(3-loser,game.pvp?`${NAME[loser]}이 기권했습니다`:'기권으로 대국이 끝났습니다','불계승');}

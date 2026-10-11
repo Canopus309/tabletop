@@ -82,5 +82,5 @@ const LB = (() => {
   const upload = entry => uploadTo('players', entry);
   const remove = () => removeFrom('players');
   const fetchTop = () => fetchTopFrom('players', 'kyu', 'ASCENDING', 'cache');
-  return { configured, upload, remove, fetchTop, uploadTo, removeFrom, fetchTopFrom, state, set };
+  return { configured, auth, upload, remove, fetchTop, uploadTo, removeFrom, fetchTopFrom, state, set };
 })();

@@ -15,6 +15,7 @@
     trophy:'<path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
     rules:'<circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.2a2.9 2.9 0 0 1 5.6 1c0 2-2.8 2.4-2.8 4.3"/><path d="M12 17.6h.01"/>',
     link:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    online:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 10h8M8 13h5"/>',
   };
   const svg=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
   const row=(href,icon,title,desc,cls='',ext=false)=>`<a class="hub-row${cls?' '+cls:''}" href="${href}"${ext?' target="_blank" rel="noopener"':''}><span class="ic">${svg(icon)}</span><span class="t"><b>${esc(title)}</b>${desc?`<small>${esc(desc)}</small>`:''}</span><span class="go">${ext?'↗':'›'}</span></a>`;
@@ -31,6 +32,12 @@
   if(live)play+=row('../','play','이어 두기','두던 대국으로 돌아갑니다','primary');
   play+=row('../#new','plus','새 대국',live?'두던 대국은 지난 대국에 남습니다':'AI 또는 한 폰으로 두 사람',live?'':'primary');
   if(done)play+=row('../','review','방금 끝난 대국 복기','승률 그래프 · 실수 찾기 · 변화도');
+  // 온라인 대국 (편지 대국): 마지막으로 받은 목록 기준 '내 차례' 수
+  if(H.online){
+    let o=null;try{o=JSON.parse(localStorage.getItem(H.online.sum));}catch(e){}
+    const desc=o&&(o.mine||o.active||o.open)?[o.mine?`내 차례 ${o.mine}판`:'',o.active-o.mine>0?`상대 차례 ${o.active-o.mine}판`:'',o.open?`초대 중 ${o.open}`:''].filter(Boolean).join(' · '):H.online.desc;
+    play+=row(H.online.href,'online','온라인 대국',desc,o&&o.mine?'mine':'');
+  }
   play+=row('../../records/#'+H.type,'review','지난 대국','둔 대국을 모두 다시 보고 기보 내려받기');
   $('#hubPlay').innerHTML=play;
 

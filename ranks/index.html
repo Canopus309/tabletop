@@ -17,7 +17,7 @@
 <style>
 .wrap{max-width:720px;margin:0 auto;padding:6px 16px 32px;padding-bottom:max(32px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
 .tabs{display:flex;gap:6px;margin:6px 0 14px}
-.tab{flex:1;padding:10px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px;cursor:pointer;color:var(--muted)}
+.tab{flex:1;padding:10px 6px;word-break:keep-all;line-height:1.25;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-weight:700;font-size:15px;cursor:pointer;color:var(--muted)}
 .tab.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .mine{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .mine .v{font-size:24px;font-weight:800;letter-spacing:-.02em}
@@ -45,6 +45,7 @@
 <main class="wrap">
   <nav class="tabs" id="tabs">
     <button class="tab" data-k="go">바둑</button>
+    <button class="tab" data-k="gor">온라인 바둑</button>
     <button class="tab" data-k="omok">오목</button>
     <button class="tab" data-k="chess">체스</button>
   </nav>
@@ -57,7 +58,7 @@
 
   <div class="card name">
     <div class="lb-name"><input id="lbName" maxlength="12" placeholder="닉네임 (세 게임 공통)" autocomplete="off"><button type="button" id="lbSave">저장</button></div>
-    <p>닉네임은 바둑·오목·체스 순위표에 함께 쓰입니다. 기록은 각 게임을 열 때 자동으로 올라가고, 바둑은 3판, 오목·체스는 레이팅 대국 3판 이상이면 순위표에 나옵니다.</p>
+    <p>닉네임은 바둑·오목·체스 순위표에 함께 쓰입니다. 기록은 각 게임을 열 때 자동으로 올라가고, 바둑은 3판, 오목·체스·온라인 바둑은 레이팅 대국 3판 이상이면 순위표에 나옵니다.</p>
   </div>
 </main>
 
@@ -69,9 +70,12 @@
 // 게임마다 순위표 컬렉션·정렬·값 표시. 캐시 키는 각 게임 화면과 같아서 오프라인에서도 마지막 목록이 보인다
 const rankName=k=>{k=Math.round(k);return k>0?k+'급':(1-k)+'단';};
 const goRank=r=>r.kyu<=-4?'5단 이상':r.kyu>=20?'20급 이하':rankName(r.kyu);
+// 온라인 바둑 레이팅 → 급수 (1단 = 2100, 한 급마다 100)
+const goRating=r=>r<=100?'20급 이하':rankName((2100-r)/100);
 const omokRank=r=>{const k=Math.min(30,Math.round(18-(r-600)/80));return k>=1?k+'급':(1-k)+'단';};
 const GAMES={
   go:{name:'바둑',col:'players',field:'kyu',dir:'ASCENDING',cache:'cache',url:'../go/',label:'내 기력',sumKey:'go',fmt:r=>goRank(r),unit:'기력'},
+  gor:{name:'온라인 바둑',col:'gor',field:'rating',dir:'DESCENDING',cache:'gorCache',url:'../go/online/',label:'사람 대국 레이팅',sumKey:'gor',fmt:r=>Math.round(r.rating)+(r.rd>110?'?':'')+' · '+goRating(r.rating),unit:'레이팅'},
   omok:{name:'오목',col:'omok',field:'rating',dir:'DESCENDING',cache:'omokCache',url:'../omok/',label:'내 급수',sumKey:'omok',fmt:r=>omokRank(r.rating)+(r.rd>110?'?':''),unit:'급수'},
   chess:{name:'체스',col:'chess',field:'rating',dir:'DESCENDING',cache:'chessCache',url:'../chess/',label:'내 레이팅',sumKey:'chess',fmt:r=>Math.round(r.rating)+(r.rd>110?'?':''),unit:'레이팅'},
 };
@@ -111,7 +115,7 @@ $('#lbSave').onclick=()=>{
   const name=$('#lbName').value.trim().slice(0,12);
   if(!name){toast('닉네임을 입력하세요');return;}
   // 세 게임 모두 다음에 열 때 새 닉네임으로 다시 올린다
-  LB.set({name,pending:true,chessPending:true,omokPending:true});
+  LB.set({name,pending:true,chessPending:true,omokPending:true,gorPending:true});
   toast('저장했습니다. 각 게임을 열 때 순위표에 반영됩니다');render();
 };
 window.addEventListener('online',()=>refresh(true));
