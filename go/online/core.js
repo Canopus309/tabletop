@@ -85,7 +85,10 @@ const GO_ON = (() => {
     const l = cached().filter(x => x.code !== d.code); l.push(d); saveList(l);
   }
   function saveList(l) {
-    try { localStorage.setItem(LIST, JSON.stringify(l.filter(d => d.g === 'go').sort((a, b) => b.mt - a.mt).slice(0, 60))); } catch (e) { }
+    // 진행 중인 대국은 모두, 끝난 대국은 최근 40판만 기기에 둔다
+    const go = l.filter(d => d.g === 'go').sort((a, b) => b.mt - a.mt);
+    const keep = go.filter(d => d.st !== 'done').concat(go.filter(d => d.st === 'done').slice(0, 40));
+    try { localStorage.setItem(LIST, JSON.stringify(keep)); } catch (e) { }
     summary(l);
   }
   // 홈 화면에 보일 요약과 앱 아이콘 배지 (내 차례인 대국 수)

@@ -50,14 +50,26 @@ const ONL = (() => {
     try { return fromDoc(await call(api('/games/' + code))); }
     catch (e) { if (e.status === 404) return null; throw e; }
   }
-  // 내가 들어 있는 대국 모두
+  // 내가 들어 있는 대국: 진행 중인 대국(초대 중·두는 중·계가 중)은 모두, 끝난 대국은 최근 50판
+  // (색인 firestore.indexes.json 이 필요하다. 아직 없으면 예전처럼 순서 없이 200판)
   async function mine() {
     const { uid } = await LB.auth();
-    const j = await call(api(':runQuery'), { method: 'POST', body: JSON.stringify({ structuredQuery: {
-      from: [{ collectionId: 'games' }],
-      where: { fieldFilter: { field: { fieldPath: 'players' }, op: 'ARRAY_CONTAINS', value: { stringValue: uid } } },
-      limit: 200 } }) });
-    return j.filter(x => x.document).map(x => fromDoc(x.document));
+    const has = { fieldFilter: { field: { fieldPath: 'players' }, op: 'ARRAY_CONTAINS', value: { stringValue: uid } } };
+    const run = async q => (await call(api(':runQuery'), { method: 'POST', body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'games' }], ...q } }) }))
+      .filter(x => x.document).map(x => fromDoc(x.document));
+    try {
+      const live = { fieldFilter: { field: { fieldPath: 'st' }, op: 'IN', value: { arrayValue: { values: ['open', 'play', 'score'].map(s => ({ stringValue: s })) } } } };
+      const [act, recent] = await Promise.all([
+        run({ where: { compositeFilter: { op: 'AND', filters: [has, live] } }, limit: 500 }),
+        run({ where: has, orderBy: [{ field: { fieldPath: 'mt' }, direction: 'DESCENDING' }], limit: 50 }),
+      ]);
+      const m = new Map(); for (const d of recent.concat(act)) m.set(d.code, d);
+      return [...m.values()];
+    } catch (e) {
+      if (e.status !== 400 && e.status !== 412) throw e; // 색인이 아직 만들어지는 중
+      console.warn('[온라인] 색인 없이 목록 받기', e.message);
+      return run({ where: has, limit: 200 });
+    }
   }
   // fields 의 값으로 고친다. mask 에 있는데 fields 에 없는 키는 지운다.
   // stamp: 서버 시각을 넣을 필드, ut: 그 시각 이후 아무도 안 고쳤을 때만 쓴다 (동시에 고치는 것 막기)

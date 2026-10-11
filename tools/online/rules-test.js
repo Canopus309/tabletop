@@ -85,6 +85,13 @@ const code = () => 'TS' + Math.random().toString(36).slice(2, 6).toUpperCase().r
   expect('코드로 읽기 (로그인 없이)', await req(null, '/games/' + g1), true);
   const q = (u, uid) => req(u, ':runQuery', { method: 'POST', body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'games' }], ...(uid ? { where: { fieldFilter: { field: { fieldPath: 'players' }, op: 'ARRAY_CONTAINS', value: { stringValue: uid } } } } : {}), limit: 5 } }) });
   expect('내 대국 목록', await q(A, A.uid), true);
+  // 목록 화면이 쓰는 두 질의 (색인 firestore.indexes.json 필요)
+  const has = { fieldFilter: { field: { fieldPath: 'players' }, op: 'ARRAY_CONTAINS', value: { stringValue: A.uid } } };
+  const live = { fieldFilter: { field: { fieldPath: 'st' }, op: 'IN', value: { arrayValue: { values: ['open', 'play', 'score'].map(s => ({ stringValue: s })) } } } };
+  const run = (u, sq) => req(u, ':runQuery', { method: 'POST', body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'games' }], ...sq } }) });
+  expect('진행 중인 내 대국 (색인)', await run(A, { where: { compositeFilter: { op: 'AND', filters: [has, live] } }, limit: 5 }), true);
+  expect('최근 내 대국 (색인)', await run(A, { where: has, orderBy: [{ field: { fieldPath: 'mt' }, direction: 'DESCENDING' }], limit: 5 }), true);
+  expect('남의 진행 중 대국', await run(C, { where: { compositeFilter: { op: 'AND', filters: [has, live] } }, limit: 5 }), false);
   expect('남의 대국 목록', await q(C, A.uid), false);
   expect('전체 목록', await q(C, null), false);
   const g3 = code();
