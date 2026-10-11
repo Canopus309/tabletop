@@ -1,10 +1,10 @@
 // 오프라인 캐시: 한 번 열면 인터넷 없이도 실행됩니다. (Table Top 전체: 홈 + 각 게임)
-const CACHE = 'tabletop-v36';
+const CACHE = 'tabletop-v37';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './icon.svg',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
   './rules/', './rules/index.html', './ranks/', './ranks/index.html', './records/', './records/index.html',
-  './common/base.css', './common/learn.css', './common/learn.js', './common/ui.js', './common/leaderboard.js', './common/rating.js', './common/records.js', './common/hub.js', './common/hub.css', './common/online.js',
+  './common/base.css', './common/learn.css', './common/learn.js', './common/ui.js', './common/leaderboard.js', './common/rating.js', './common/records.js', './common/hub.js', './common/hub.css', './common/online.js', './common/online-core.js', './common/online-list.js', './common/online-play.js', './common/online.css',
   // 바둑
   './go/', './go/index.html', './go/home/', './go/home/index.html', './go/online/', './go/online/index.html', './go/online/core.js', './go/online/play.js', './go/board.js', './go/katago.js',
   './go/learn/', './go/learn/index.html', './go/learn/problems.js', './go/learn/tsumego.js',
@@ -12,10 +12,10 @@ const FILES = [
   './go/vendor/tfjs-backend-wasm.wasm', './go/vendor/tfjs-backend-wasm-simd.wasm', './go/vendor/tfjs-backend-wasm-threaded-simd.wasm',
   './go/models/g170e-b10c128.bin.gz',
   // 오목
-  './omok/', './omok/index.html', './omok/home/', './omok/home/index.html', './omok/renju.js', './omok/rapfi-worker.js', './omok/vendor/rapfi/rapfi-single-simd128.js', './omok/vendor/rapfi/rapfi-single-simd128.wasm', './omok/vendor/rapfi/rapfi-single-simd128.data',
+  './omok/', './omok/index.html', './omok/home/', './omok/home/index.html', './omok/online/', './omok/online/index.html', './omok/online/core.js', './omok/renju.js', './omok/rapfi-worker.js', './omok/vendor/rapfi/rapfi-single-simd128.js', './omok/vendor/rapfi/rapfi-single-simd128.wasm', './omok/vendor/rapfi/rapfi-single-simd128.data',
   './omok/learn/', './omok/learn/index.html', './omok/learn/vcf.js', './omok/learn/problems.js',
   // 체스
-  './chess/', './chess/index.html', './chess/home/', './chess/home/index.html', './chess/engine.js', './chess/vendor/chess.js',
+  './chess/', './chess/index.html', './chess/home/', './chess/home/index.html', './chess/online/', './chess/online/index.html', './chess/online/core.js', './chess/engine.js', './chess/vendor/chess.js',
   './chess/learn/', './chess/learn/index.html', './chess/learn/problems.js',
   './chess/vendor/stockfish-19-lite-single.js', './chess/vendor/stockfish-19-lite-single.wasm',
   ...['w', 'b'].flatMap(c => ['K', 'Q', 'R', 'B', 'N', 'P'].map(p => `./chess/pieces/${c}${p}.svg`)),

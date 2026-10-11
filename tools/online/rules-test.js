@@ -13,9 +13,10 @@ const enc = v => v === null ? { nullValue: null } : typeof v === 'boolean' ? { b
   : typeof v === 'number' ? (Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v })
   : typeof v === 'string' ? { stringValue: v } : Array.isArray(v) ? { arrayValue: { values: v.map(enc) } }
   : { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, enc(x)])) } };
-async function write(u, code, fields, mask, create = false) {
+// stamp: 서버 시각을 mt 에 넣는다 (무승부 제안·거절은 기한을 바꾸지 않으므로 false)
+async function write(u, code, fields, mask, create = false, stamp = true) {
   const w = { update: { name: `${ROOT}/games/${code}`, fields: Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, enc(v)])) },
-    updateTransforms: [{ fieldPath: 'mt', setToServerValue: 'REQUEST_TIME' }] };
+    updateTransforms: stamp ? [{ fieldPath: 'mt', setToServerValue: 'REQUEST_TIME' }] : [] };
   if (create) w.currentDocument = { exists: false }; else w.updateMask = { fieldPaths: mask };
   const r = await fetch(`${API}:commit`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + u.token }, body: JSON.stringify({ writes: [w] }) });
   return r.status;
@@ -80,6 +81,44 @@ const code = () => 'TS' + Math.random().toString(36).slice(2, 6).toUpperCase().r
   expect('시간승 (기한 전)', await write(B, g2, { st: 'done', res: { w: 2, how: 'time', d: 0, by: B.uid } }, ['st', 'res']), false);
   expect('상대 승으로 기권 처리 안 하고 자기 승으로', await write(A, g2, { st: 'done', res: { w: 1, how: 'resign', d: 0, by: A.uid } }, ['st', 'res']), false);
   expect('기권', await write(A, g2, { st: 'done', res: { w: 2, how: 'resign', d: 0, by: A.uid } }, ['st', 'res']), true);
+
+  // 오목: 흑 먼저, 칸 번호 0~224, 5목은 둔 사람 승으로 끝, 무승부 제안·동의
+  const omok = o => newGame({ g: 'omok', n: 15, komi: 0, handi: 0, ...o });
+  expect('오목: 판 크기 틀림', await write(A, code(), omok({ n: 19 }), null, true), false);
+  const o1 = code();
+  expect('오목 만들기', await write(A, o1, omok(), null, true), true);
+  await write(B, o1, { ...join, players: [A.uid, B.uid] }, JM);
+  expect('오목: 판 밖 칸', await write(A, o1, { moves: [300], st: 'play' }, ['moves', 'st']), false);
+  expect('오목: 흑 첫 수', await write(A, o1, { moves: [112], st: 'play' }, ['moves', 'st']), true);
+  expect('오목: 무승부 제안', await write(A, o1, { offer: A.uid }, ['offer'], false, false), true);
+  expect('오목: 또 제안', await write(B, o1, { offer: B.uid }, ['offer'], false, false), false);
+  expect('오목: 자기 제안에 동의', await write(A, o1, { st: 'done', res: { w: 0, how: 'agree', d: 0, by: A.uid } }, ['st', 'res', 'offer']), false);
+  expect('오목: 수를 두며 제안 거절', await write(B, o1, { moves: [112, 113], st: 'play' }, ['moves', 'st', 'offer']), true);
+  expect('오목: 상대 승으로 5목 주장', await write(A, o1, { moves: [112, 113, 114], st: 'done', res: { w: 2, how: 'five', d: 0, by: A.uid } }, ['moves', 'st', 'res']), false);
+  expect('오목: 5목으로 끝', await write(A, o1, { moves: [112, 113, 114], st: 'done', res: { w: 1, how: 'five', d: 0, by: A.uid } }, ['moves', 'st', 'res']), true);
+  const o2 = code();
+  await write(A, o2, omok(), null, true); await write(B, o2, { ...join, players: [A.uid, B.uid] }, JM);
+  await write(B, o2, { offer: B.uid }, ['offer'], false, false);
+  expect('오목: 상대 제안에 동의', await write(A, o2, { st: 'done', res: { w: 0, how: 'agree', d: 0, by: A.uid } }, ['st', 'res', 'offer']), true);
+  // 체스: 백 먼저(흑 A, 백 B), 수는 'e2e4' 같은 글자, 체크메이트·무승부로 끝
+  const chess = o => newGame({ g: 'chess', n: 8, komi: 0, handi: 0, ...o });
+  const c1 = code();
+  expect('체스 만들기', await write(A, c1, chess(), null, true), true);
+  await write(B, c1, { ...join, players: [A.uid, B.uid] }, JM);
+  expect('체스: 흑이 먼저 두기', await write(A, c1, { moves: ['e7e5'], st: 'play' }, ['moves', 'st']), false);
+  expect('체스: 숫자 수', await write(B, c1, { moves: [12], st: 'play' }, ['moves', 'st']), false);
+  expect('체스: 백 첫 수', await write(B, c1, { moves: ['f2f3'], st: 'play' }, ['moves', 'st']), true);
+  await write(A, c1, { moves: ['f2f3', 'e7e5'], st: 'play' }, ['moves', 'st']);
+  await write(B, c1, { moves: ['f2f3', 'e7e5', 'g2g4'], st: 'play' }, ['moves', 'st']);
+  expect('체스: 체크메이트 (흑 승)', await write(A, c1, { moves: ['f2f3', 'e7e5', 'g2g4', 'd8h4'], st: 'done', res: { w: 1, how: 'mate', d: 0, by: A.uid } }, ['moves', 'st', 'res']), true);
+  const c2 = code();
+  await write(A, c2, chess(), null, true); await write(B, c2, { ...join, players: [A.uid, B.uid] }, JM);
+  expect('체스: 스테일메이트를 승으로', await write(B, c2, { moves: ['e2e4'], st: 'done', res: { w: 2, how: 'stalemate', d: 0, by: B.uid } }, ['moves', 'st', 'res']), false);
+  expect('체스: 무승부로 끝', await write(B, c2, { moves: ['e2e4'], st: 'done', res: { w: 0, how: 'stalemate', d: 0, by: B.uid } }, ['moves', 'st', 'res']), true);
+  // 바둑에는 무승부 제안이 없다
+  const g4 = code();
+  await write(A, g4, newGame(), null, true); await write(B, g4, { ...join, players: [A.uid, B.uid] }, JM);
+  expect('바둑: 무승부 제안', await write(A, g4, { offer: A.uid }, ['offer'], false, false), false);
 
   // 읽기 · 목록 · 지우기
   expect('코드로 읽기 (로그인 없이)', await req(null, '/games/' + g1), true);

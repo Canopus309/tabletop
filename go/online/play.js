@@ -8,27 +8,11 @@
 'use strict';
 const ONQ='go-online-q'; // 보내지 못한 수순 {방코드: moves}
 let onPoll=0,onPulling=false,onPullAgain=false,onLastPull=0,scoreEdit=false;
-// ---------- 실시간 구독 ----------
-// Firebase 공식 라이브러리(Firestore)로 대국 문서가 바뀌는 순간 알림을 받는다 (온라인 대국 화면에서만 불러옴).
-// 대국 문서는 로그인 없이 읽을 수 있어서 구독은 로그인 없이 하고, 알림을 받으면 REST로 최신 상태를 받아 반영한다.
-// 구독이 안 되면(라이브러리를 못 받음 등) 15초마다 확인하는 방식으로 둔다
-const FB_SDK='https://www.gstatic.com/firebasejs/11.10.0/';
-let onLive=null,onLiveOk=false,onLiveCode='';
-async function onListen(code){
-  onUnlisten();onLiveCode=code;
-  try{
-    const[{initializeApp,getApps},{getFirestore,doc,onSnapshot}]=await Promise.all([import(FB_SDK+'firebase-app.js'),import(FB_SDK+'firebase-firestore.js')]);
-    if(onLiveCode!==code)return;
-    const app=getApps().find(a=>a.name==='tt')||initializeApp({apiKey:FIREBASE.apiKey,projectId:FIREBASE.projectId},'tt');
-    let first=true;
-    onLive=onSnapshot(doc(getFirestore(app),'games',code),()=>{
-      onLiveOk=true;
-      if(first){first=false;return;} // 처음 한 번은 지금 상태 (이미 받아 둠)
-      if(isOnline()&&game.online.code===code)onPull();
-    },e=>{console.warn('[실시간]',e);onLiveOk=false;});
-  }catch(e){console.warn('[실시간] 라이브러리를 불러오지 못했습니다',e);onLiveOk=false;}
-}
-function onUnlisten(){if(onLive){try{onLive();}catch(e){}}onLive=null;onLiveOk=false;onLiveCode='';}
+// ---------- 실시간 구독 (common/online.js 의 ONL.listen). 안 되면 15초마다 확인 ----------
+let onLive=null;
+const onLiveOkNow=()=>!!(onLive&&onLive.ok());
+function onListen(code){onUnlisten();onLive=ONL.listen(code,()=>{if(isOnline()&&game.online.code===code)onPull();});}
+function onUnlisten(){if(onLive)onLive.stop();onLive=null;}
 const isOnline=()=>!!(game&&game.online&&!recView);
 const onCanMove=()=>isOnline()&&game.online.st==='play'&&!game.online.sending&&board.turn===game.human;
 function onQueue(code,moves){
@@ -65,7 +49,7 @@ async function openOnline(code){
   // 실시간 구독이 되면 1분마다, 안 되면 15초마다 확인 (구독이 끊겼을 때를 대비)
   onPoll=setInterval(()=>{
     if(!isOnline()||game.over||document.visibilityState!=='visible')return;
-    if(onLiveOk&&Date.now()-onLastPull<60000)return;
+    if(onLiveOkNow()&&Date.now()-onLastPull<60000)return;
     onPull();
   },15000);
 }

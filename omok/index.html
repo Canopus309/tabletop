@@ -53,6 +53,8 @@
       <p class="rule-note" id="ruleNote">렌주 룰: 흑은 <b>33 · 44 · 장목(6목 이상)</b>을 둘 수 없고 정확히 5목이어야 이깁니다. 백은 제한 없이 5목 이상이면 이깁니다.</p>
     </div>
 
+    <div class="card on-card hidden" id="onCard"><p class="on-text" id="onText"></p><div class="on-btns" id="onBtns"></div></div>
+
     <div class="card" id="playCard">
       <div class="actions">
         <button class="act" id="aUndo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>무르기</button>
@@ -154,6 +156,10 @@
 <script src="../common/leaderboard.js"></script>
 <script src="../common/records.js"></script>
 <script src="../common/rating.js"></script>
+<script src="../common/online.js"></script>
+<script src="../common/online-core.js"></script>
+<script src="online/core.js"></script>
+<script src="../common/online-play.js"></script>
 <script>
 "use strict";
 const {N,BLACK,WHITE,EMPTY,CENTER}=RJ;
@@ -235,7 +241,7 @@ const turnOf=len=>len%2===0?BLACK:WHITE;
 // 이 폰에서 사람이 두는 색인가 (두 사람 대국이면 둘 다)
 const isPerson=c=>!!game.pvp||c===game.human;
 function newGame(o){
-  if(recView){recView=null;history.replaceState(null,'',location.pathname);}
+  if(recView||(game&&game.online)){recView=null;history.replaceState(null,'',location.pathname);OP.stop();}
   cancelAI();epoch++;thinking=false;
   const pvp=o.opp==='pvp',human=pvp?BLACK:o.color===0?(Math.random()<.5?BLACK:WHITE):o.color;
   game={id:Date.now(),human,level:o.level,moves:[],over:false,result:null,assisted:false};
@@ -250,6 +256,7 @@ function rebuild(){g=RJ.Game.from(game.moves);winLine=null;
   updateForbid();resize();ui();}
 function save(){
   if(recView){recPut(recGame());return;} // 지난 대국은 분석 결과만 기록에 더한다
+  if(OP.active()){if(game.online.col)recPut(game);return;} // 온라인 대국은 두던 대국 자리를 쓰지 않는다
   store('omok-game',game);recPut(game);
 }
 // ---------- 지난 대국 기록 (common/records.js) ----------
@@ -257,12 +264,12 @@ const recPut=g=>REC.put('omok',g,recMeta(g),sgfText(g));
 const recGame=()=>recView?Object.assign({},game,{over:recView.over,result:recView.result}):game;
 function recMeta(g){
   const r=g.over&&g.result;
-  return{opp:g.pvp?'두 사람':`AI ${AI[g.level].name} (${omokRank(LEVEL_RATING[g.level])})`,side:g.pvp?'':NAME[g.human],info:'렌주',len:g.moves.length+'수',
+  return{opp:g.pvp?'두 사람':g.online?`${g.online.opp.name} (온라인)`:`AI ${AI[g.level].name} (${omokRank(LEVEL_RATING[g.level])})`,side:g.pvp?'':NAME[g.human]||'',info:'렌주',len:g.moves.length+'수',
     out:!r?'open':r.draw?'draw':g.pvp?'done':r.youWin?'win':'loss',res:!r?'끝나지 않은 대국':r.draw?'무승부 · '+r.how:`${NAME[r.winner]} 승 · ${r.how}`};
 }
 // 기보 파일: SGF (GM[4] = 오목·렌주)
 function sgfText(g){
-  const d=new Date(g.id),c=p=>String.fromCharCode(97+p%N)+String.fromCharCode(97+((p/N)|0)),ai='AI '+AI[g.level].name;
+  const d=new Date(g.id),c=p=>String.fromCharCode(97+p%N)+String.fromCharCode(97+((p/N)|0)),ai=g.online?String(g.online.opp.name).replace(/[\]\\]/g,''):'AI '+AI[g.level].name;
   let s=`(;GM[4]FF[4]CA[UTF-8]AP[TableTop]SZ[15]RU[Renju]DT[${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}]`;
   s+=g.pvp?'PB[흑]PW[백]':`PB[${g.human===BLACK?'나':ai}]PW[${g.human===WHITE?'나':ai}]`;
   if(g.over&&g.result)s+=`RE[${g.result.draw?'0':(g.result.winner===BLACK?'B':'W')+'+'+(g.result.how==='기권'?'R':'')}]`;
@@ -283,9 +290,13 @@ async function openRecord(id){
 function route(){
   const m=/^#rec=(\d+)$/.exec(location.hash);
   if(m){openRecord(+m[1]);return;}
+  // 온라인 대국 (#online=방코드)
+  const on=/^#online=([A-Z0-9]{6})$/.exec(location.hash);
+  if(on){OP.open(on[1]);return;}
+  const leave=()=>{if(!game||recView||game.online){OP.stop();cancelAI();epoch++;thinking=false;analyzing=false;recView=null;resume();}};
   // 게임 홈의 '새 대국'
-  if(location.hash==='#new'){history.replaceState(null,'',location.pathname);if(!game||recView){epoch++;thinking=false;recView=null;resume();}openNew();return;}
-  if(!game||recView){cancelAI();epoch++;thinking=false;analyzing=false;recView=null;resume();}
+  if(location.hash==='#new'){history.replaceState(null,'',location.pathname);leave();openNew();return;}
+  leave();
 }
 function closeRecord(){history.replaceState(null,'',location.pathname);route();}
 function updateForbid(){forbid=!game.over&&settings.forbid&&g.turn===BLACK?RJ.forbiddenPoints(game.moves):[];}
@@ -294,13 +305,14 @@ function playMove(p){
   g.play(p);game.moves.push(p);
   hint=-1;pending=-1;
   sound('stone');if(settings.sound&&navigator.vibrate)try{navigator.vibrate(12);}catch(e){}
+  if(OP.active()){updateForbid();save();draw();ui();OP.moved();return;} // 온라인: 끝났는지는 보낸 뒤 서버 상태로
   if(g.isWin(p)){winLine=RJ.winLine(g.b,p);endGame(g.b[p],'5목 완성');return;}
   if(game.moves.length>=N*N){endGame(0,'판이 가득 찼습니다');return;}
   updateForbid();save();draw();ui();
   maybeAI();
 }
 async function maybeAI(){
-  if(game.over||isPerson(g.turn))return;
+  if(game.over||OP.active()||isPerson(g.turn))return;
   const ep=epoch,t0=performance.now();
   thinking=true;ui();
   const r=await aiMove(game.moves.slice(),game.level);
@@ -312,13 +324,14 @@ async function maybeAI(){
 }
 function humanPlay(p){
   if(game.over||thinking||view!==null||!isPerson(g.turn))return;
+  if(OP.active()&&!OP.canMove())return;
   if(g.b[p]!==EMPTY)return;
   if(!game.moves.length&&p!==CENTER){toast('렌주 룰: 흑의 첫 수는 판 가운데(천원)입니다');sound('bad');pending=-1;draw();return;}
   if(g.turn===BLACK&&RJ.isForbidden(g.b,p)){toast('금수입니다. 흑은 33 · 44 · 장목 자리에 둘 수 없습니다');sound('bad');return;}
   if(settings.confirm){pending=p;draw();ui();return;}
   playMove(p);
 }
-const canPlace=()=>settings.confirm&&game&&!game.over&&!thinking&&view===null&&isPerson(g.turn);
+const canPlace=()=>settings.confirm&&game&&!game.over&&!thinking&&view===null&&isPerson(g.turn)&&(!OP.active()||OP.canMove());
 function endGame(winner,how){
   game.over=true;thinking=false;
   const youWin=game.pvp?null:winner===game.human;
@@ -328,7 +341,7 @@ function endGame(winner,how){
   analyzeGame();
 }
 function undo(){
-  if(recView||!game.moves.length)return;
+  if(recView||OP.active()||!game.moves.length)return;
   cancelAI();epoch++;thinking=false;
   const mv=game.moves.slice();
   do{mv.pop();}while(!game.pvp&&mv.length&&turnOf(mv.length)!==game.human);
@@ -337,7 +350,7 @@ function undo(){
   rebuild();save();maybeAI();
 }
 async function showHint(){
-  if(game.over||thinking||!isPerson(g.turn))return;
+  if(game.over||thinking||OP.active()||!isPerson(g.turn))return; // 사람끼리 대국에서는 AI 도움을 쓰지 않는다
   if(hint>=0){hint=-1;draw();ui();return;}
   const ep=epoch;thinking=true;ui();
   const r=await rapfiMove(game.moves.slice(),STRONG); // 힌트는 강한 AI(Rapfi)로
@@ -348,7 +361,7 @@ async function showHint(){
 const RB=ratingBoard({game:'omok',start:LEVEL_RATING[1],levels:AI.map(l=>({name:l.name,rating:l.rating})),fmt:omokRank,prefix:'급수 ',
   sub:R=>`대국 ${R.games}판 · 레이팅 ${Math.round(R.rating)} ±${Math.round(R.rd)}${R.rd>110?' (아직 잠정)':''}`});
 function updateRating(){
-  if(game.pvp||game.assisted||game.ratingApplied!=null||(game.moves.length<6&&!game.result.youWin&&game.result.how!=='기권'))return;
+  if(game.pvp||game.online||game.assisted||game.ratingApplied!=null||(game.moves.length<6&&!game.result.youWin&&game.result.how!=='기권'))return;
   const r=RB.apply(game.level,game.result.draw?0.5:game.result.youWin?1:0,game.id);
   game.ratingApplied={before:Math.round(r.before),after:Math.round(r.after)};
 }
@@ -580,19 +593,23 @@ function ui(){
   const len=view!==null?view:game.moves.length,lv=AI[game.level].name;
   for(const col of [BLACK,WHITE]){
     const el=col===BLACK?$('#pB'):$('#pW');
-    el.querySelector('.who').textContent=game.pvp?'사람':col===game.human?'나 · '+RB.text(RB.get()):`AI · ${lv} (${omokRank(LEVEL_RATING[game.level])})`;
+    el.querySelector('.who').textContent=game.pvp?'사람':game.online?(col===game.human?'나 · '+RB.text(RB.get()):`${game.online.opp.name}${game.online.opp.r?' · '+omokRank(game.online.opp.r):''}`):col===game.human?'나 · '+RB.text(RB.get()):`AI · ${lv} (${omokRank(LEVEL_RATING[game.level])})`;
     el.classList.toggle('active',!game.over&&g.turn===col);
     el.classList.toggle('think',thinking&&!isPerson(col)&&g.turn===col);
   }
   const st=$('#statusText');
   if(game.over)st.innerHTML='<b>대국 종료</b>';
+  else if(OP.active())st.innerHTML=OP.status();
   else if(thinking)st.innerHTML=aiStatus?`<b>${aiStatus}</b>`:isPerson(g.turn)?'<b>힌트</b> 찾는 중…':'<b>AI</b> 생각 중…';
   else st.innerHTML=`<b>${NAME[g.turn]}</b> 차례${game.pvp?'':g.turn===game.human?' · 내 차례':''}`;
   $('#moveText').textContent=len+'수';
   const myTurn=!game.over&&!thinking&&isPerson(g.turn);
   $('#aUndo').disabled=!game.moves.length;$('#aHint').disabled=!myTurn&&hint<0;$('#aResign').disabled=game.over;
   $('#aHint').classList.toggle('on',hint>=0);
-  $('#assistNote').textContent=game.pvp?'두 사람 대국은 급수에 반영되지 않습니다.':game.assisted?'무르기나 힌트를 써서 이 대국은 급수에 반영되지 않습니다.':'무르기나 힌트를 쓰면 이 대국은 급수에 반영되지 않습니다.';
+  const live=OP.active()&&!game.over; // 사람끼리 두는 중에는 무르기·힌트를 쓰지 않는다
+  for(const id of ['#aUndo','#aHint'])$(id).classList.toggle('hidden',live);
+  if(live)$('#aResign').disabled=!game.online.col||game.online.st!=='play'||!!game.online.sending;
+  $('#assistNote').textContent=game.online?(game.online.rated?'레이팅 대국: 결과가 내 급수에 반영됩니다.':'친선 대국: 급수에 반영되지 않습니다.'):game.pvp?'두 사람 대국은 급수에 반영되지 않습니다.':game.assisted?'무르기나 힌트를 써서 이 대국은 급수에 반영되지 않습니다.':'무르기나 힌트를 쓰면 이 대국은 급수에 반영되지 않습니다.';
   $('#playCard').classList.toggle('hidden',game.over);
   $('#resultCard').classList.toggle('hidden',!game.over);
   if(game.over&&game.result){
@@ -600,11 +617,11 @@ function ui(){
     if(recView){const m=recMeta(recGame());$('#resTitle').textContent=`지난 대국 · ${REC.when(game.id)}`;$('#resDetail').textContent=`${m.res} · ${m.opp}${m.side?' · 나 '+m.side:''}`;}
     else{$('#resTitle').textContent=r.draw?'무승부':game.pvp?`🎉 ${NAME[r.winner]} 승`:(r.youWin?'🎉 승리! ':'아쉬운 패배 · ')+`${NAME[r.winner]} 승`;
     $('#resDetail').textContent=r.how;}
-    $('#resUndo').textContent=recView?'돌아가기':'무르기';
+    $('#resUndo').textContent=recView?'돌아가기':game.online?'온라인 목록':'무르기';
     const rc=$('#ratingChange'),ra=game.ratingApplied;
     if(recView)rc.textContent='';
     else if(ra){const d=ra.after-ra.before;rc.innerHTML=`내 급수 ${omokRank(ra.before)} → ${RB.text(RB.get())} <span class="${d>=0?'up':'down'}">(레이팅 ${d>=0?'+':''}${d})</span>`;}
-    else rc.textContent=game.pvp?'':game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
+    else rc.textContent=game.pvp?'':game.online?(game.online.rated?'':'친선 대국이라 급수에 반영하지 않았습니다'):game.assisted?'무르기·힌트를 써서 급수에 반영하지 않았습니다':'';
     const rg=$('#rvRange');rg.max=game.moves.length;rg.value=len;$('#rvText').textContent=`${len}/${game.moves.length}`;
     $('#anaText').innerHTML=reviewText(len);
     $('#variBar').classList.toggle('hidden',!vari);$('#variHint').classList.toggle('hidden',!!vari);
@@ -618,7 +635,8 @@ function ui(){
   if(showPlace)$('#placeOk').textContent='착수 · '+pname(pending);
   document.body.classList.toggle('placing',showPlace);document.body.classList.toggle('docked',!!game.over);
   if(game.over){candUi();document.body.style.setProperty('--dock-h',$('#rvDock').offsetHeight+'px');}
-  $('#metaText').textContent=game.pvp?'15×15 · 렌주 · 두 사람':`15×15 · 렌주 · AI ${lv} (${omokRank(LEVEL_RATING[game.level])})`+(worker?'':' · 계산: 화면');
+  OP.ui();
+  $('#metaText').textContent=game.online?`15×15 · 렌주 · 온라인 ${game.online.code} · ${game.online.rated?'레이팅 대국':'친선'} · 한 수 ${game.online.days}일`:game.pvp?'15×15 · 렌주 · 두 사람':`15×15 · 렌주 · AI ${lv} (${omokRank(LEVEL_RATING[game.level])})`+(worker?'':' · 계산: 화면');
 }
 
 // ---------- 버튼 ----------
@@ -659,9 +677,10 @@ function candPv(){
 }
 $('#candBtn').onclick=()=>{candOn=!candOn;cands=null;draw();ui();};
 $('#variAi').onclick=variAi;$('#variExit').onclick=variExit;
-$('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():undo();$('#resDl').onclick=exportSgf;$('#aHint').onclick=showHint;
+$('#aUndo').onclick=undo;$('#resUndo').onclick=()=>recView?closeRecord():game.online?location.href='online/':undo();$('#resDl').onclick=exportSgf;$('#aHint').onclick=showHint;
 $('#aResign').onclick=async()=>{
   if(game.over)return;
+  if(OP.active()){OP.resign();return;}
   const loser=game.pvp?g.turn:game.human;
   if(await ask(game.pvp?`${NAME[loser]}이 기권할까요?`:'기권할까요?',game.pvp?`이번 대국을 ${NAME[3-loser]}의 승리로 끝냅니다.`:'이번 대국을 AI의 승리로 끝냅니다.','기권')){cancelAI();epoch++;endGame(3-loser,'기권');}
 };
@@ -703,6 +722,26 @@ $('#btnNew').onclick=openNew;$('#resNew').onclick=openNew;
 const OPT={forbid:'#optForbid',coords:'#optCoords',numbers:'#optNumbers',confirm:'#optConfirm',sound:'#optSound'};
 $('#btnSettings').onclick=()=>{for(const k in OPT)$(OPT[k]).checked=settings[k];openDlg($('#dlgSettings'));};
 for(const k in OPT)$(OPT[k]).onchange=e=>{settings[k]=e.target.checked;store('omok-settings',settings);pending=-1;updateForbid();resize();ui();};
+
+// ---------- 온라인 대국 (common/online-play.js) ----------
+const OP=onlinePlay({
+  core:OMOK_ON,get:()=>game,recView:()=>!!recView,
+  stop(){cancelAI();epoch++;thinking=false;recView=null;hint=-1;pending=-1;analyzing=false;closeDlg($('#dlgNew'),'cancel');},
+  leave(){resume();},
+  load(d,col){game={id:d.created,human:col,level:2,moves:d.moves.slice(),over:false,result:null,assisted:false};view=null;vari=null;hint=-1;pending=-1;return game;},
+  reload:()=>rebuild(),
+  play(m,snd){g.play(m);game.moves.push(m);hint=-1;pending=-1;if(snd)sound('stone');updateForbid();},
+  turn:()=>g.turn,
+  endOf(){const m=game.moves[game.moves.length-1];if(m!==undefined&&g.isWin(m))return{w:g.b[m],how:'five'};return game.moves.length>=N*N?{w:0,how:'full'}:null;},
+  finish(w,how,ch){
+    if(ch)game.ratingApplied={before:ch.before,after:ch.after};
+    const last=game.moves[game.moves.length-1];if(w&&last!==undefined&&g.isWin(last))winLine=RJ.winLine(g.b,last);
+    endGame(w,how);
+  },
+  refresh(){draw();ui();},save:()=>save(),
+  moveName:i=>pname(game.moves[i]),
+  analyzed:x=>!!x.evalsDone,
+});
 
 // ---------- 시작 ----------
 initWorker();

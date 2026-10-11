@@ -100,6 +100,27 @@ const ONL = (() => {
     }
     try { await navigator.clipboard.writeText(text + '\n' + url); return 'copied'; } catch (e) { return 'fail'; }
   }
+  // 실시간 구독: Firebase 공식 라이브러리(Firestore)로 대국 문서가 바뀌는 순간 onChange() 를 부른다 (대국 화면에서만 불러옴).
+  // 대국 문서는 로그인 없이 읽을 수 있어서 구독은 로그인 없이 하고, 알림을 받으면 화면 쪽에서 REST로 최신 상태를 받는다.
+  // 반환: {stop(), ok()} — ok() 가 거짓이면(라이브러리를 못 받음 등) 화면 쪽에서 자주 확인한다
+  const FB_SDK = 'https://www.gstatic.com/firebasejs/11.10.0/';
+  function listen(code, onChange) {
+    let off = null, ok = false, stopped = false;
+    (async () => {
+      try {
+        const [{ initializeApp, getApps }, { getFirestore, doc, onSnapshot }] = await Promise.all([import(FB_SDK + 'firebase-app.js'), import(FB_SDK + 'firebase-firestore.js')]);
+        if (stopped) return;
+        const app = getApps().find(a => a.name === 'tt') || initializeApp({ apiKey: FIREBASE.apiKey, projectId: FIREBASE.projectId }, 'tt');
+        let first = true;
+        off = onSnapshot(doc(getFirestore(app), 'games', code), () => {
+          ok = true;
+          if (first) { first = false; return; } // 처음 한 번은 지금 상태 (이미 받아 둠)
+          onChange();
+        }, e => { console.warn('[실시간]', e); ok = false; });
+      } catch (e) { console.warn('[실시간] 라이브러리를 불러오지 못했습니다', e); }
+    })();
+    return { stop() { stopped = true; ok = false; if (off) try { off(); } catch (e) { } off = null; }, ok: () => ok };
+  }
   const uid = () => LB.state().uid || '';
-  return { get, mine, write, create, remove, share, uid, normCode, NetErr };
+  return { get, mine, write, create, remove, share, listen, uid, normCode, NetErr };
 })();
