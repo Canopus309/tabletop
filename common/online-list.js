@@ -63,8 +63,8 @@ function row(d){
     desc=`${ON.when(d.mt)} · ${esc(ON.info(d))} · ${d.moves.length}수${ch?` · 레이팅 ${ch.before} → ${ch.after}`:''}`;
   }else{
     const sc=d.st==='score',offer=d.offer&&d.offer!==ONL.uid();
-    title=`${esc(o.name)}${o.r?` (${Math.round(o.r)})`:''} · ${d.st==='pick'?'증강 고르기':sc?'계가 중':d.moves.length+'수'}`;
-    const what=d.st==='pick'?(st==='mine'?'증강 고르기':'상대가 증강 고르는 중'):sc?(st==='mine'?(d.prop?'상대 계가 제안 확인하기':'죽은 돌 표시해 계가 제안하기'):'상대가 계가 확인 중')
+    title=`${esc(o.name)}${o.r?` (${Math.round(o.r)})`:''} · ${d.st==='pick'?'증강 경매':sc?'계가 중':d.moves.length+'수'}`;
+    const what=d.st==='pick'?(d.bt?(st==='mine'?'경매: 내가 부를 차례':'경매: 상대가 부를 차례'):(st==='mine'?`${d.bv}집에 낙찰 · 증강 고르기`:'상대가 증강 고르는 중'))+(d.bt&&d.bv>=0?` (지금 ${d.bv}집)`:''):sc?(st==='mine'?(d.prop?'상대 계가 제안 확인하기':'죽은 돌 표시해 계가 제안하기'):'상대가 계가 확인 중')
       :offer?'상대가 무승부를 제안했습니다':(st==='mine'?'내 차례':'상대 차례')+(d.offer?' · 무승부 제안 중':'');
     desc=`${what} · ${esc(ON.info(d))}<br>기한 ${ON.when(dl)} · <span class="${late?'late':''}">${ON.left(dl)}${late&&st==='theirs'?' (시간승을 받을 수 있음)':''}</span>`;
   }

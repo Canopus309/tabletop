@@ -3,8 +3,8 @@
 const fs=require('fs'),vm=require('vm'),path=require('path');
 const ctx={console};vm.createContext(ctx);
 const src=['go/board.js','go/aug/aug.js'].map(f=>fs.readFileSync(path.join(__dirname,'../..',f),'utf8')).join('\n');
-vm.runInContext(src+'\n;this.Board=Board;this.AugGame=AugGame;this.AUGS=AUGS;this.augOffers=augOffers;',ctx);
-const {AugGame,augOffers}=ctx;
+vm.runInContext(src+'\n;this.Board=Board;this.AugGame=AugGame;this.AUGS=AUGS;this.augOffers=augOffers;this.augTier=augTier;this.augKomi=augKomi;this.augCoin=augCoin;',ctx);
+const {AugGame,augOffers,augTier,augKomi}=ctx;
 let pass=0,fail=0;
 const ok=(name,cond)=>{console.log((cond?'OK  ':'FAIL')+' '+name);cond?pass++:fail++;};
 const throws=(name,f)=>{let t=false;try{f();}catch(e){t=true;}ok(name,t);};
@@ -12,7 +12,7 @@ const P=(x,y)=>(y+1)*11+x+1; // 9줄 자리 번호
 const G=(a1,a2)=>new AugGame({n:9,aug:{1:a1,2:a2}});
 
 // 덤
-ok('덤: 흑 슈퍼선수(13) - 백 패왕(4) = 7.5+9', G('double','kowang').komi===16.5);
+ok('덤: 대국 덤 그대로 (증강 점수는 덤에 안 들어감)', G('double','kowang').komi===7.5);
 
 // 보통 패 (흑: c3? 모양) — 백 돌을 따낸 뒤 바로 되따내기 금지
 function koSetup(g){
@@ -121,5 +121,11 @@ function koSetup(g){
  ok('후보 3개, 서로 다름', a.length===3&&new Set(a).size===3);
  ok('같은 씨앗이면 같은 후보', a.join()===b.join());
  void c;}
+
+// 경매
+ok('경매 덤: 흑 낙찰 5집 → 12.5, 백 낙찰 5집 → 2.5', augKomi(1,5)===12.5&&augKomi(2,5)===2.5);
+ok('참고 한마디: 9줄 결계 아주 강함, 패왕 조금 약함', augTier('barrier',9)==='아주 강해요!'&&augTier('kowang',9)==='조금 약해요');
+ok('경매 후보 둘은 서로 다름', new Set(augOffers('X1',2)).size===2);
+ok('먼저 부를 색은 1 또는 2, 같은 씨앗이면 같음', [1,2].includes(ctx.augCoin('ABC'))&&ctx.augCoin('ABC')===ctx.augCoin('ABC'));
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);process.exit(fail?1:0);

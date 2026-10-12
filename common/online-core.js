@@ -32,7 +32,7 @@ function onlineCore(C) {
   function stage(d) {
     if (d.st === 'open') return 'open';
     if (d.st === 'done') return 'done';
-    if (d.st === 'pick') return (colorOf(d) === 1 ? d.ab : d.aw) ? 'theirs' : 'mine'; // 증강 고르기
+    if (d.st === 'pick') return (d.bt ? d.bt === colorOf(d) : d.bw === colorOf(d)) ? 'mine' : 'theirs'; // 증강 경매: 부를 차례 / 낙찰자가 고를 차례
     if (d.st === 'score') return !d.prop || d.prop.by !== me() ? 'mine' : 'theirs';
     if (d.offer && d.offer !== me()) return 'mine'; // 상대의 무승부 제안에 답할 차례
     return turnColor(d) === colorOf(d) ? 'mine' : 'theirs';

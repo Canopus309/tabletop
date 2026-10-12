@@ -37,10 +37,11 @@ service cloud.firestore {
     }
     function augList() { return ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier']; }
     function validAugStat(d) {
-      return d.keys().hasOnly(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at']) && d.keys().hasAll(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at'])
+      return d.keys().hasOnly(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at', 'of', 'bid', 'bwin']) && d.keys().hasAll(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at'])
         && d.n in [9, 13, 19] && d.ab in augList() && d.aw in augList() && d.komi is number
         && d.w in [1, 2] && d.how in ['score', 'resign', 'time'] && d.len is int && d.len >= 0 && d.len < 2000
-        && d.local is bool && d.at == request.time;
+        && d.local is bool && d.at == request.time
+        && (!('of' in d) || (d.of is list && d.of.size() <= 2)) && (!('bid' in d) || (d.bid is int && d.bid >= -1 && d.bid <= 80)) && (!('bwin' in d) || d.bwin in [0, 1, 2]);
     }
 
     // 온라인 대국 (편지 대국, 바둑 g='go' · 증강 바둑 'goaug' · 오목 'omok' · 체스 'chess'). 문서 하나 = 방 하나, 문서 id = 6자리 방 코드
@@ -54,16 +55,18 @@ service cloud.firestore {
       allow create: if request.auth != null && code.size() == 6 && validNewGame(request.resource.data);
       allow delete: if request.auth != null && resource.data.host == request.auth.uid && resource.data.st == 'open';
       allow update: if request.auth != null && (joinOk() || (request.auth.uid in resource.data.players
-        && (moveOk() || proposeOk() || acceptOk() || resumeOk() || resignOk() || timeOk() || offerOk() || declineOk() || drawOk() || pickOk() || pickTimeOk())));
+        && (moveOk() || proposeOk() || acceptOk() || resumeOk() || resignOk() || timeOk() || offerOk() || declineOk() || drawOk() || bidOk() || passOk() || chooseOk() || pickTimeOk())));
     }
 
     function nameOk(n) { return n is string && n.size() <= 12; }
     function validNewGame(d) {
       let me = request.auth.uid;
-      return d.keys().hasOnly(['g', 'n', 'komi', 'handi', 'days', 'rated', 'host', 'players', 'bu', 'wu', 'bn', 'wn', 'bR', 'bD', 'wR', 'wD', 'st', 'moves', 'rs', 'mt', 'created', 'ab', 'aw'])
+      return d.keys().hasOnly(['g', 'n', 'komi', 'handi', 'days', 'rated', 'host', 'players', 'bu', 'wu', 'bn', 'wn', 'bR', 'bD', 'wR', 'wD', 'st', 'moves', 'rs', 'mt', 'created', 'ab', 'aw', 'of', 'bv', 'bw', 'bt'])
         && d.keys().hasAll(['g', 'n', 'komi', 'handi', 'days', 'rated', 'host', 'players', 'bu', 'wu', 'bn', 'wn', 'bR', 'bD', 'wR', 'wD', 'st', 'moves', 'rs', 'mt', 'created'])
         && ((d.g == 'go' && d.n in [9, 13, 19] && d.komi in [0.5, 7.5] && d.handi is int && (d.handi == 0 || (d.handi >= 2 && d.handi <= 9)))
-          || (d.g == 'goaug' && d.n in [9, 13, 19] && d.komi == 7.5 && d.handi == 0 && d.rated == false && d.ab == '' && d.aw == '')
+          || (d.g == 'goaug' && d.n in [9, 13, 19] && d.komi == 7.5 && d.handi == 0 && d.rated == false && d.ab == '' && d.aw == ''
+              && d.of is list && d.of.size() == 2 && d.of[0] in augList() && d.of[1] in augList() && d.of[0] != d.of[1]
+              && d.bv == -1 && d.bw == 0 && d.bt in [1, 2])
           || (d.g == 'omok' && d.n == 15 && d.komi == 0 && d.handi == 0)
           || (d.g == 'chess' && d.n == 8 && d.komi == 0 && d.handi == 0))
         && d.days in [1, 3, 7] && d.rated is bool
@@ -115,18 +118,32 @@ service cloud.firestore {
         && ((d.res.how in ['five', 'mate'] && d.res.w == myColor(o))
           || (d.res.how in ['full', 'stalemate', 'repetition', 'material', 'fifty'] && d.res.w == 0));
     }
-    // 증강 고르기 (증강 바둑): 참가 뒤 각자 한 번. 두 사람 모두 고르면 대국 시작
-    function pickOk() {
-      let o = resource.data; let d = request.resource.data; let me = request.auth.uid;
-      return o.g == 'goaug' && o.st == 'pick' && d.mt == request.time
-        && ((me == o.bu && o.ab == '' && d.ab in augList() && d.diff(o).affectedKeys().hasOnly(['ab', 'st', 'mt']) && d.st == ((o.aw != '') ? 'play' : 'pick'))
-          || (me == o.wu && o.aw == '' && d.aw in augList() && d.diff(o).affectedKeys().hasOnly(['aw', 'st', 'mt']) && d.st == ((o.ab != '') ? 'play' : 'pick')));
+    // 증강 경매 (증강 바둑, st 'pick'): of = 증강 둘, bv = 지금 최고 값(-1 없음), bw = 최고 부른 색, bt = 부를 색 (0 = 경매 끝)
+    // 부를 차례인 사람이 더 높게 부르거나(값은 판 크기별 상한까지), 이미 누가 불렀으면 그만둘 수 있다.
+    // 끝나면 최고 부른 사람이 둘 중 하나를 고르고 남은 것은 상대 것, 덤 = 7.5 ± 낙찰 값 (흑 낙찰이면 +)
+    function bidMax(n) { return (n == 9) ? 30 : (n == 13) ? 50 : 80; }
+    function bidOk() {
+      let o = resource.data; let d = request.resource.data;
+      return o.g == 'goaug' && o.st == 'pick' && o.bt != 0 && myColor(o) == o.bt
+        && d.diff(o).affectedKeys().hasOnly(['bv', 'bw', 'bt', 'mt']) && d.mt == request.time
+        && d.bv is int && d.bv > o.bv && d.bv >= 0 && d.bv <= bidMax(o.n) && d.bw == myColor(o) && d.bt == 3 - o.bt;
     }
-    // 증강을 고른 사람은 상대가 기한 안에 고르지 않으면 시간승으로 끝낼 수 있다
+    function passOk() {
+      let o = resource.data; let d = request.resource.data;
+      return o.g == 'goaug' && o.st == 'pick' && o.bt != 0 && o.bv >= 0 && myColor(o) == o.bt
+        && d.diff(o).affectedKeys().hasOnly(['bt', 'mt']) && d.mt == request.time && d.bt == 0;
+    }
+    function chooseOk() {
+      let o = resource.data; let d = request.resource.data;
+      return o.g == 'goaug' && o.st == 'pick' && o.bt == 0 && myColor(o) == o.bw
+        && d.diff(o).affectedKeys().hasOnly(['ab', 'aw', 'komi', 'st', 'mt']) && d.mt == request.time && d.st == 'play'
+        && ((d.ab == o.of[0] && d.aw == o.of[1]) || (d.ab == o.of[1] && d.aw == o.of[0]))
+        && d.komi == 7.5 + ((o.bw == 1) ? o.bv : -o.bv);
+    }
+    // 경매에서 할 차례인 사람이 기한 안에 하지 않으면 상대가 시간승으로 끝낼 수 있다
     function pickTimeOk() {
       let o = resource.data; let d = request.resource.data; let me = request.auth.uid;
-      return o.g == 'goaug' && o.st == 'pick' && deadlinePassed(o)
-        && ((me == o.bu && o.ab != '' && o.aw == '') || (me == o.wu && o.aw != '' && o.ab == ''))
+      return o.g == 'goaug' && o.st == 'pick' && deadlinePassed(o) && myColor(o) != ((o.bt != 0) ? o.bt : o.bw)
         && d.diff(o).affectedKeys().hasOnly(['st', 'res', 'mt']) && d.mt == request.time && d.st == 'done'
         && d.res.keys().hasOnly(['w', 'how', 'd', 'by']) && d.res.by == me && d.res.how == 'time' && d.res.w == myColor(o) && d.res.d == 0;
     }

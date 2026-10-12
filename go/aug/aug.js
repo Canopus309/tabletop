@@ -8,7 +8,9 @@
  *   무적수   한 번. 내 돌 하나를 무적으로: 그 돌과 이어진 돌(나중에 이은 돌 포함)은 활로가 없어도 잡히지 않는다. 쓴 차례에 수도 둔다
  *   결계     한 번. 빈 점 하나를 상대가 끝까지 둘 수 없는 점으로. 그 점에 붙은 내 돌은 그 점이 활로로 남아 잡히지 않는다. 쓴 차례에 수도 둔다
  *
- * 덤 = 기본 7.5 + 흑 증강 점수 - 백 증강 점수. 점수(v)는 판 크기별 추정값이다 (아래 '밸런스' 참고)
+ * 증강 정하기 (경매, 2026-10): 증강 둘을 공개하고 두 사람이 번갈아 덤을 부른다. 마지막에 높게 부른 사람이 먼저 고르고
+ *   부른 만큼 상대에게 덤으로 준다 → 덤 = 7.5 + (흑이 낙찰이면 +값, 백이면 -값). 공정한 값은 두 사람이 정하므로 덤표가 필요 없다.
+ *   아래 점수(v)는 화면의 참고 한마디('아주 강해요!' 등)에만 쓴다 (augTier)
  *
  * 한 차례 = 글자 하나 (온라인 문서에도 그대로 저장. 차례가 늘 번갈아 가도록 증강도 한 차례 안에 넣는다)
  *   "123"        123 자리에 착수 (자리 번호는 Board.pt), "0" 패스
@@ -19,7 +21,7 @@
  *   "s45"        저격: 45 의 상대 돌을 들어냄 (착수 없음)
  */
 'use strict';
-// 밸런스 (2026-10 추정값, 집): 수 하나의 값(포석에서 약 14집)을 기준으로 어림했다. 실제 대국 결과가 쌓이면 고친다.
+// 증강 점수 (2026-10 추정값, 집): 수 하나의 값(포석에서 약 14집)을 기준으로 어림했다. 참고 한마디에만 쓴다.
 //  - 패왕: 패가 나면 늘 이긴다. 상대는 패를 피하면 되므로 효과가 제한적
 //  - 되감기: 큰 실수 하나를 무를 수 있고, 상대 응수를 본 뒤 다른 수를 고를 수 있다
 //  - 저격: 내 수 하나를 써서 상대 수 하나를 없애므로 수 차이는 그대로지만, 눈·연결의 급소 돌을 골라 없앨 수 있다
@@ -37,6 +39,15 @@ const AUGS={
 const AUG_IDS=Object.keys(AUGS);
 const AUG_BASE_KOMI=7.5;
 const augValue=(id,n)=>id&&AUGS[id]?AUGS[id].v[n]??AUGS[id].v[19]:0;
+// 참고 한마디 (정확한 숫자 대신): 같은 판 크기에서 가장 센 증강에 견준 비율로
+function augTier(id,n){
+  const top=Math.max(...AUG_IDS.map(a=>augValue(a,n))),r=augValue(id,n)/top;
+  return r>=0.8?'아주 강해요!':r>=0.55?'좋은 능력이에요':r>=0.4?'무난해요':'조금 약해요';
+}
+// 경매 상한 (판 크기별 최고로 부를 수 있는 덤)
+const AUG_BID_MAX={9:30,13:50,19:80};
+// 낙찰 결과로 덤: 흑이 낙찰받으면 백에게 값만큼 더 주고, 백이 낙찰받으면 흑에게 준다
+const augKomi=(win,bid)=>AUG_BASE_KOMI+(win===1?bid:win===2?-bid:0);
 
 // 한 차례 글자 ↔ 객체 {pre: {k:'i'|'b'|'r', q}, kind: 'move'|'double'|'snipe', p, p2, q}
 function augParse(s){
@@ -53,13 +64,13 @@ function augFormat(t){
 }
 
 class AugGame{
-  // o = {n, komi(기본 덤), aug: {1: 흑 증강, 2: 백 증강}}
+  // o = {n, komi(이 대국의 덤: 경매로 정한 값), aug: {1: 흑 증강, 2: 백 증강}}
   constructor(o){
     this.n=o.n;this.base=o.komi??AUG_BASE_KOMI;this.aug={1:o.aug&&o.aug[1]||'',2:o.aug&&o.aug[2]||''};
     this.entries=[];this.turns=[];this.reset();
   }
   reset(){this.b=new Board(this.n);this.inv={1:0,2:0};this.bar={1:0,2:0};this.koBan=null;this.last=-1;this.lastCol=0;this.usedNow={1:false,2:false};}
-  get komi(){return this.base+augValue(this.aug[1],this.n)-augValue(this.aug[2],this.n);}
+  get komi(){return this.base;}
   get turn(){return this.entries.length%2===0?BLACK:WHITE;}
   // 이 증강을 이미 썼는가 (판에 적용한 차례까지 기준. 되감기로 되돌린 차례의 증강은 다시 쓸 수 있다)
   used(col){return this.usedNow[col];}
@@ -188,11 +199,13 @@ class AugGame{
     return out;
   }
 }
-// 증강 후보: 방 코드 등으로 정해지는 무작위 3개 (같은 씨앗이면 늘 같은 후보 → 다시 뽑기 없음)
-function augOffers(seed){
+// 증강 후보: 방 코드 등으로 정해지는 무작위 순서 (같은 씨앗이면 늘 같음 → 다시 뽑기 없음). 경매는 앞의 둘
+function augOffers(seed,k=3){
   let h=2166136261>>>0;for(const ch of String(seed)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}
   const rnd=()=>{h^=h<<13;h>>>=0;h^=h>>>17;h^=h<<5;h>>>=0;return h/4294967296;};
   const a=AUG_IDS.slice();for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}
-  return a.slice(0,3);
+  return a.slice(0,k);
 }
-if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,augValue,augParse,augFormat,AugGame,augOffers};
+// 씨앗으로 정하는 1 또는 2 (경매를 먼저 부를 색)
+function augCoin(seed){let h=7;for(const ch of String(seed))h=(h*31+ch.charCodeAt(0))>>>0;return h%2?1:2;}
+if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,AUG_BID_MAX,augValue,augTier,augKomi,augParse,augFormat,AugGame,augOffers,augCoin};

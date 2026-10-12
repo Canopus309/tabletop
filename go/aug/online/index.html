@@ -44,7 +44,7 @@
   <h2 id="hOpen">초대 중</h2><div class="hub-list" id="lOpen"></div>
   <h2>끝난 대국</h2><div class="hub-list" id="lDone"></div>
 
-  <p class="note">증강 바둑 편지 대국: 상대가 들어오면 두 사람이 각자 무작위 증강 3개 중 하나를 고르고, 둘 다 고르면 대국이 시작됩니다. 덤은 기본 7.5에 흑 증강 점수를 더하고 백 증강 점수를 뺀 값입니다.
+  <p class="note">증강 바둑 편지 대국: 상대가 들어오면 무작위 증강 둘을 두고 경매합니다. 번갈아 덤을 부르고, 마지막에 높게 부른 사람이 먼저 고르며 부른 만큼 상대에게 덤으로 줍니다 (덤 = 7.5 ± 낙찰 값).
   둘 다 대국 화면을 보고 있으면 상대 수가 바로 뜹니다. 한 수 기한이 지나면 상대가 시간승을 받을 수 있고, 두 사람이 이어서 패스하면 계가합니다(죽은 돌 표시 → 상대 동의). 레이팅에는 반영되지 않습니다.</p>
 </main>
 
@@ -66,7 +66,7 @@
     <div class="field"><label for="selDays">한 수 기한</label>
       <select id="selDays"><option value="1">1일</option><option value="3" selected>3일</option><option value="7">7일</option></select></div>
     <input type="checkbox" id="optRated" hidden>
-    <p class="small" style="margin:0 2px 6px;font-size:12.5px;color:var(--muted)">증강은 상대가 들어온 뒤 각자 고릅니다. 친선 대국입니다.</p>
+    <p class="small" style="margin:0 2px 6px;font-size:12.5px;color:var(--muted)">증강은 상대가 들어온 뒤 경매로 정합니다. 친선 대국입니다.</p>
     <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">만들기</button></div>
   </div>
 </dialog>

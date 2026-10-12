@@ -115,25 +115,34 @@ const code = () => 'TS' + Math.random().toString(36).slice(2, 6).toUpperCase().r
   await write(A, c2, chess(), null, true); await write(B, c2, { ...join, players: [A.uid, B.uid] }, JM);
   expect('체스: 스테일메이트를 승으로', await write(B, c2, { moves: ['e2e4'], st: 'done', res: { w: 2, how: 'stalemate', d: 0, by: B.uid } }, ['moves', 'st', 'res']), false);
   expect('체스: 무승부로 끝', await write(B, c2, { moves: ['e2e4'], st: 'done', res: { w: 0, how: 'stalemate', d: 0, by: B.uid } }, ['moves', 'st', 'res']), true);
-  // 증강 바둑: 참가 → 증강 고르기(st 'pick') → 대국, 수는 글자 ('0' 패스)
-  const aug = o => newGame({ g: 'goaug', n: 13, komi: 7.5, handi: 0, rated: false, ab: '', aw: '', ...o });
+  // 증강 바둑: 참가 → 증강 경매(st 'pick': 번갈아 부르기 → 그만 → 낙찰자가 고르기, 덤 = 7.5 ± 값) → 대국, 수는 글자 ('0' 패스)
+  // A = 흑(만든 사람), B = 백. 먼저 부를 색 bt = 1 (흑)
+  const aug = o => newGame({ g: 'goaug', n: 13, komi: 7.5, handi: 0, rated: false, ab: '', aw: '', of: ['barrier', 'snipe'], bv: -1, bw: 0, bt: 1, ...o });
   expect('증강: 레이팅 대국으로 만들기', await write(A, code(), aug({ rated: true }), null, true), false);
+  expect('증강: 같은 후보 둘', await write(A, code(), aug({ of: ['snipe', 'snipe'] }), null, true), false);
   const a1 = code();
   expect('증강 만들기', await write(A, a1, aug(), null, true), true);
   expect('증강: 바로 play 로 참가', await write(B, a1, { ...join, players: [A.uid, B.uid] }, JM), false);
   expect('증강: 참가 (pick)', await write(B, a1, { ...join, players: [A.uid, B.uid], st: 'pick' }, JM), true);
-  expect('증강: 수 두기 (아직 고르는 중)', await write(A, a1, { moves: ['20'], st: 'play' }, ['moves', 'st']), false);
-  expect('증강: 없는 증강', await write(A, a1, { ab: 'god', st: 'pick' }, ['ab', 'st']), false);
-  expect('증강: 남의 칸에 고르기', await write(A, a1, { aw: 'double', st: 'pick' }, ['aw', 'st']), false);
-  expect('증강: 흑 고르기', await write(A, a1, { ab: 'invincible', st: 'pick' }, ['ab', 'st']), true);
-  expect('증강: 다시 고르기', await write(A, a1, { ab: 'double', st: 'pick' }, ['ab', 'st']), false);
-  expect('증강: 백이 고르고 대국 시작', await write(B, a1, { aw: 'kowang', st: 'play' }, ['aw', 'st']), true);
+  expect('증강: 수 두기 (경매 중)', await write(A, a1, { moves: ['20'], st: 'play' }, ['moves', 'st']), false);
+  expect('경매: 차례 아닌 백이 부르기', await write(B, a1, { bv: 3, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), false);
+  expect('경매: 처음에 그만', await write(A, a1, { bt: 0 }, ['bt']), false);
+  expect('경매: 흑 0집', await write(A, a1, { bv: 0, bw: 1, bt: 2 }, ['bv', 'bw', 'bt']), true);
+  expect('경매: 백이 같은 값', await write(B, a1, { bv: 0, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), false);
+  expect('경매: 백 상한 넘게', await write(B, a1, { bv: 51, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), false);
+  expect('경매: 백 6집', await write(B, a1, { bv: 6, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), true);
+  expect('경매: 낙찰 전에 고르기', await write(B, a1, { ab: 'snipe', aw: 'barrier', komi: 1.5, st: 'play' }, ['ab', 'aw', 'komi', 'st']), false);
+  expect('경매: 흑 그만 (백 낙찰)', await write(A, a1, { bt: 0 }, ['bt']), true);
+  expect('경매: 진 쪽이 고르기', await write(A, a1, { ab: 'barrier', aw: 'snipe', komi: 1.5, st: 'play' }, ['ab', 'aw', 'komi', 'st']), false);
+  expect('경매: 덤 틀리게', await write(B, a1, { ab: 'snipe', aw: 'barrier', komi: 13.5, st: 'play' }, ['ab', 'aw', 'komi', 'st']), false);
+  expect('경매: 후보 밖 증강', await write(B, a1, { ab: 'snipe', aw: 'double', komi: 1.5, st: 'play' }, ['ab', 'aw', 'komi', 'st']), false);
+  expect('경매: 백이 결계를 고름 (덤 7.5-6)', await write(B, a1, { ab: 'snipe', aw: 'barrier', komi: 1.5, st: 'play' }, ['ab', 'aw', 'komi', 'st']), true);
   expect('증강: 숫자 수', await write(A, a1, { moves: [20], st: 'play' }, ['moves', 'st']), false);
   expect('증강: 흑 첫 수', await write(A, a1, { moves: ['20'], st: 'play' }, ['moves', 'st']), true);
   expect('증강: 백 패스', await write(B, a1, { moves: ['20', '0'], st: 'play' }, ['moves', 'st']), true);
   expect('증강: 두 번째 패스 → 계가', await write(A, a1, { moves: ['20', '0', '0'], st: 'score' }, ['moves', 'st']), true);
   expect('증강: 무승부 제안 없음', await write(A, a1, { offer: A.uid }, ['offer'], false, false), false);
-  const st1 = { n: 13, ab: 'double', aw: 'kowang', komi: 22.5, w: 1, how: 'score', len: 120, local: false };
+  const st1 = { n: 13, ab: 'double', aw: 'kowang', komi: 1.5, w: 1, how: 'score', len: 120, local: false, of: ['double', 'kowang'], bid: 6, bwin: 2 };
   expect('증강 결과 모음: 쓰기', await req(A, ':commit', { method: 'POST', body: JSON.stringify({ writes: [{ update: { name: `${ROOT}/augstats/T${a1}`, fields: Object.fromEntries(Object.entries(st1).map(([k, v]) => [k, enc(v)])) }, currentDocument: { exists: false }, updateTransforms: [{ fieldPath: 'at', setToServerValue: 'REQUEST_TIME' }] }] }) }), true);
   expect('증강 결과 모음: 덮어쓰기', await req(A, ':commit', { method: 'POST', body: JSON.stringify({ writes: [{ update: { name: `${ROOT}/augstats/T${a1}`, fields: Object.fromEntries(Object.entries({ ...st1, w: 2 }).map(([k, v]) => [k, enc(v)])) }, updateTransforms: [{ fieldPath: 'at', setToServerValue: 'REQUEST_TIME' }] }] }) }), false);
 
