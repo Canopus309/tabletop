@@ -1,12 +1,12 @@
 /* 지난 대국 기록: 세 게임의 대국을 이 기기(IndexedDB)에 모두 저장하고 기보 파일로 내려받는다
- *  기록 = {key:'go:대국id', type:'go'|'omok'|'chess', id, t:마지막 저장 시각, game:대국 그대로, meta:목록 표시용, file:기보 파일 내용}
+ *  기록 = {key:'go:대국id', type:'go'|'omok'|'chess'|'goaug'(증강 바둑), id, t:마지막 저장 시각, game:대국 그대로, meta:목록 표시용, file:기보 파일 내용}
  *  meta = {opp:상대, side:내 색('' = 두 사람), info:판 정보, len:수 표시, out:'win'|'loss'|'draw'|'done'|'open', res:결과 글}
  *  각 게임 화면은 저장할 때마다 REC.put 을 부른다 (같은 대국은 덮어씀, 한 수도 없으면 지움)
  */
 'use strict';
 const REC=(()=>{
   const DB='tabletop-records',ST='games';
-  const EXT={go:'sgf',omok:'sgf',chess:'pgn'};
+  const EXT={go:'sgf',omok:'sgf',chess:'pgn',goaug:'sgf'};
   let dbp=null;
   function open(){
     if(!dbp)dbp=new Promise((res,rej)=>{
@@ -28,7 +28,8 @@ const REC=(()=>{
   function put(type,game,meta,file){
     if(!game||!game.id)return Promise.resolve();
     const key=type+':'+game.id;
-    const job=game.moves&&game.moves.length
+    const moves=game.moves||game.entries; // 증강 바둑은 entries
+    const job=moves&&moves.length
       ?run('readwrite',s=>{const g=JSON.parse(JSON.stringify(game));delete g.analyzing;return s.put({key,type,id:game.id,t:Date.now(),game:g,meta,file});})
       :run('readwrite',s=>s.delete(key));
     return job.catch(e=>console.warn('[기록]',e));

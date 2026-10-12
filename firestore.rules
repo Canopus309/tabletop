@@ -30,7 +30,20 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
-    // 온라인 대국 (편지 대국, 바둑 g='go' · 오목 'omok' · 체스 'chess'). 문서 하나 = 방 하나, 문서 id = 6자리 방 코드
+    // 증강 바둑 결과 모음 (덤 조정용): 판 크기·두 증강·덤·결과만. 누구나 읽고, 로그인한 기기가 새로 쓰기만
+    match /augstats/{id} {
+      allow read: if true;
+      allow create: if request.auth != null && id.size() <= 20 && validAugStat(request.resource.data);
+    }
+    function augList() { return ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier']; }
+    function validAugStat(d) {
+      return d.keys().hasOnly(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at']) && d.keys().hasAll(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at'])
+        && d.n in [9, 13, 19] && d.ab in augList() && d.aw in augList() && d.komi is number
+        && d.w in [1, 2] && d.how in ['score', 'resign', 'time'] && d.len is int && d.len >= 0 && d.len < 2000
+        && d.local is bool && d.at == request.time;
+    }
+
+    // 온라인 대국 (편지 대국, 바둑 g='go' · 증강 바둑 'goaug' · 오목 'omok' · 체스 'chess'). 문서 하나 = 방 하나, 문서 id = 6자리 방 코드
     // 서버 프로그램 없이 규칙만으로 지키는 것: 참가자만 고칠 수 있다, 차례인 사람만 한 수씩 덧붙인다,
     // 기권은 자기 패로만, 시간승은 상대 기한이 지난 뒤에만, 바둑 계가는 한 사람이 제안하고 다른 사람이 동의해야 끝난다,
     // 오목·체스 무승부 합의는 상대가 제안했을 때만. 수가 게임 규칙에 맞는지와 5목·체크메이트 판정은 각 폰이 확인한다
@@ -41,15 +54,16 @@ service cloud.firestore {
       allow create: if request.auth != null && code.size() == 6 && validNewGame(request.resource.data);
       allow delete: if request.auth != null && resource.data.host == request.auth.uid && resource.data.st == 'open';
       allow update: if request.auth != null && (joinOk() || (request.auth.uid in resource.data.players
-        && (moveOk() || proposeOk() || acceptOk() || resumeOk() || resignOk() || timeOk() || offerOk() || declineOk() || drawOk())));
+        && (moveOk() || proposeOk() || acceptOk() || resumeOk() || resignOk() || timeOk() || offerOk() || declineOk() || drawOk() || pickOk() || pickTimeOk())));
     }
 
     function nameOk(n) { return n is string && n.size() <= 12; }
     function validNewGame(d) {
       let me = request.auth.uid;
-      return d.keys().hasOnly(['g', 'n', 'komi', 'handi', 'days', 'rated', 'host', 'players', 'bu', 'wu', 'bn', 'wn', 'bR', 'bD', 'wR', 'wD', 'st', 'moves', 'rs', 'mt', 'created'])
+      return d.keys().hasOnly(['g', 'n', 'komi', 'handi', 'days', 'rated', 'host', 'players', 'bu', 'wu', 'bn', 'wn', 'bR', 'bD', 'wR', 'wD', 'st', 'moves', 'rs', 'mt', 'created', 'ab', 'aw'])
         && d.keys().hasAll(['g', 'n', 'komi', 'handi', 'days', 'rated', 'host', 'players', 'bu', 'wu', 'bn', 'wn', 'bR', 'bD', 'wR', 'wD', 'st', 'moves', 'rs', 'mt', 'created'])
         && ((d.g == 'go' && d.n in [9, 13, 19] && d.komi in [0.5, 7.5] && d.handi is int && (d.handi == 0 || (d.handi >= 2 && d.handi <= 9)))
+          || (d.g == 'goaug' && d.n in [9, 13, 19] && d.komi == 7.5 && d.handi == 0 && d.rated == false && d.ab == '' && d.aw == '')
           || (d.g == 'omok' && d.n == 15 && d.komi == 0 && d.handi == 0)
           || (d.g == 'chess' && d.n == 8 && d.komi == 0 && d.handi == 0))
         && d.days in [1, 3, 7] && d.rated is bool
@@ -63,14 +77,19 @@ service cloud.firestore {
     function blackFirst(o) { return o.g != 'chess' && o.handi < 2; }
     function toMove(o) { return ((o.moves.size() % 2 == 0) == blackFirst(o)) ? o.bu : o.wu; }
     function myColor(o) { return (request.auth.uid == o.bu) ? 1 : 2; }
-    // 수 하나의 모양: 바둑·오목은 칸 번호(바둑 0 = 패스), 체스는 'e2e4' · 'e7e8q' 같은 글자
-    function moveShape(o, v) { return (o.g == 'chess') ? (v is string && v.size() >= 4 && v.size() <= 5) : (v is int && v >= 0 && (o.g != 'omok' || v < 225)); }
+    // 수 하나의 모양: 바둑·오목은 칸 번호(바둑 0 = 패스), 체스는 'e2e4' · 'e7e8q' 같은 글자, 증강 바둑은 '123' · 'd12,34' 같은 글자 ('0' = 패스)
+    function moveShape(o, v) {
+      return (o.g == 'chess') ? (v is string && v.size() >= 4 && v.size() <= 5)
+        : (o.g == 'goaug') ? (v is string && v.size() >= 1 && v.size() <= 24)
+        : (v is int && v >= 0 && (o.g != 'omok' || v < 225));
+    }
+    function isPass(v) { return v == 0 || v == '0'; }
     function deadlinePassed(o) { return request.time > o.mt + duration.value(o.days, 'd'); }
     // 참가: 빈 자리에 내가 들어간다
     function joinOk() {
       let o = resource.data; let d = request.resource.data; let me = request.auth.uid;
       return o.st == 'open' && !(me in o.players)
-        && d.players == o.players.concat([me]) && d.st == 'play' && d.mt == request.time
+        && d.players == o.players.concat([me]) && d.st == ((o.g == 'goaug') ? 'pick' : 'play') && d.mt == request.time
         && ((o.bu == '' && d.bu == me && nameOk(d.bn) && d.bR is number && d.bD is number
               && d.diff(o).affectedKeys().hasOnly(['players', 'bu', 'bn', 'bR', 'bD', 'st', 'mt']))
           || (o.wu == '' && d.wu == me && nameOk(d.wn) && d.wR is number && d.wD is number
@@ -87,8 +106,8 @@ service cloud.firestore {
         && d.diff(o).affectedKeys().hasOnly(['moves', 'st', 'mt', 'res', 'offer']) && d.mt == request.time
         && d.moves.size() == k + 1 && (k == 0 || d.moves[0:k] == o.moves) && moveShape(o, d.moves[k])
         && (!('offer' in d) || (('offer' in o) && d.offer == o.offer))
-        && ((o.g == 'go')
-          ? (!('res' in d) && d.st == ((k >= 1 && k - 1 >= o.rs && d.moves[k] == 0 && o.moves[k - 1] == 0) ? 'score' : 'play'))
+        && ((o.g == 'go' || o.g == 'goaug')
+          ? (!('res' in d) && d.st == ((k >= 1 && k - 1 >= o.rs && isPass(d.moves[k]) && isPass(o.moves[k - 1])) ? 'score' : 'play'))
           : ((d.st == 'play' && !('res' in d)) || (d.st == 'done' && endByMove(o, d))));
     }
     function endByMove(o, d) {
@@ -96,10 +115,25 @@ service cloud.firestore {
         && ((d.res.how in ['five', 'mate'] && d.res.w == myColor(o))
           || (d.res.how in ['full', 'stalemate', 'repetition', 'material', 'fifty'] && d.res.w == 0));
     }
+    // 증강 고르기 (증강 바둑): 참가 뒤 각자 한 번. 두 사람 모두 고르면 대국 시작
+    function pickOk() {
+      let o = resource.data; let d = request.resource.data; let me = request.auth.uid;
+      return o.g == 'goaug' && o.st == 'pick' && d.mt == request.time
+        && ((me == o.bu && o.ab == '' && d.ab in augList() && d.diff(o).affectedKeys().hasOnly(['ab', 'st', 'mt']) && d.st == ((o.aw != '') ? 'play' : 'pick'))
+          || (me == o.wu && o.aw == '' && d.aw in augList() && d.diff(o).affectedKeys().hasOnly(['aw', 'st', 'mt']) && d.st == ((o.ab != '') ? 'play' : 'pick')));
+    }
+    // 증강을 고른 사람은 상대가 기한 안에 고르지 않으면 시간승으로 끝낼 수 있다
+    function pickTimeOk() {
+      let o = resource.data; let d = request.resource.data; let me = request.auth.uid;
+      return o.g == 'goaug' && o.st == 'pick' && deadlinePassed(o)
+        && ((me == o.bu && o.ab != '' && o.aw == '') || (me == o.wu && o.aw != '' && o.ab == ''))
+        && d.diff(o).affectedKeys().hasOnly(['st', 'res', 'mt']) && d.mt == request.time && d.st == 'done'
+        && d.res.keys().hasOnly(['w', 'how', 'd', 'by']) && d.res.by == me && d.res.how == 'time' && d.res.w == myColor(o) && d.res.d == 0;
+    }
     // 무승부 제안 (오목·체스): 제안은 offer 에 제안한 사람 uid. 기한(mt)은 바꾸지 않는다
     function offerOk() {
       let o = resource.data; let d = request.resource.data;
-      return o.g != 'go' && o.st == 'play' && !('offer' in o)
+      return o.g in ['omok', 'chess'] && o.st == 'play' && !('offer' in o)
         && d.diff(o).affectedKeys().hasOnly(['offer']) && d.offer == request.auth.uid;
     }
     // 제안 거절(상대) · 거두기(제안한 사람)

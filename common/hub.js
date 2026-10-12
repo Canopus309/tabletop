@@ -16,6 +16,7 @@
     rules:'<circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.2a2.9 2.9 0 0 1 5.6 1c0 2-2.8 2.4-2.8 4.3"/><path d="M12 17.6h.01"/>',
     link:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     online:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 10h8M8 13h5"/>',
+    spark:'<path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/>',
   };
   const svg=k=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[k]}</svg>`;
   const row=(href,icon,title,desc,cls='',ext=false)=>`<a class="hub-row${cls?' '+cls:''}" href="${href}"${ext?' target="_blank" rel="noopener"':''}><span class="ic">${svg(icon)}</span><span class="t"><b>${esc(title)}</b>${desc?`<small>${esc(desc)}</small>`:''}</span><span class="go">${ext?'↗':'›'}</span></a>`;
@@ -38,6 +39,8 @@
     const desc=o&&(o.mine||o.active||o.open)?[o.mine?`내 차례 ${o.mine}판`:'',o.active-o.mine>0?`상대 차례 ${o.active-o.mine}판`:'',o.open?`초대 중 ${o.open}`:''].filter(Boolean).join(' · '):H.online.desc;
     play+=row(H.online.href,'online','온라인 대국',desc,o&&o.mine?'mine':'');
   }
+  // 다른 대국 방식 (바둑: 증강 바둑)
+  for(const m of H.modes||[])play+=row(m.href,m.icon||'play',m.title,m.desc);
   play+=row('../../records/#'+H.type,'review','지난 대국','둔 대국을 모두 다시 보고 기보 내려받기');
   $('#hubPlay').innerHTML=play;
 

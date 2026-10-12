@@ -91,6 +91,12 @@ const ONL = (() => {
     throw new NetErr('방 코드를 만들지 못했습니다', 500);
   }
   const remove = code => call(api('/games/' + code), { method: 'DELETE' });
+  // 다른 컬렉션에 문서 하나 새로 만들기 (예: 증강 바둑 결과 모음 augstats). stamp: 서버 시각을 넣을 필드
+  async function createDoc(col, id, fields, stamp = []) {
+    const w = { update: { name: `${root()}/${col}/${id}`, fields: encFields(fields) }, currentDocument: { exists: false },
+      updateTransforms: stamp.map(f => ({ fieldPath: f, setToServerValue: 'REQUEST_TIME' })) };
+    await call(api(':commit'), { method: 'POST', body: JSON.stringify({ writes: [w] }) });
+  }
 
   // 초대 보내기: 공유 시트(카카오톡 등), 안 되면 클립보드
   async function share(text, url) {
@@ -122,5 +128,5 @@ const ONL = (() => {
     return { stop() { stopped = true; ok = false; if (off) try { off(); } catch (e) { } off = null; }, ok: () => ok };
   }
   const uid = () => LB.state().uid || '';
-  return { get, mine, write, create, remove, share, listen, uid, normCode, NetErr };
+  return { get, mine, write, create, remove, createDoc, share, listen, uid, normCode, NetErr };
 })();

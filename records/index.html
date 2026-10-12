@@ -56,6 +56,7 @@
     <button class="tab" data-k="go">바둑</button>
     <button class="tab" data-k="omok">오목</button>
     <button class="tab" data-k="chess">체스</button>
+    <button class="tab" data-k="goaug">증강 바둑</button>
   </nav>
   <div class="sum"><div><b id="sumTitle"></b><span id="sumSub"></span></div><button type="button" id="dlAll">전체 내려받기</button></div>
   <div class="list" id="list"></div>
@@ -68,7 +69,7 @@
 <script src="../common/records.js"></script>
 <script>
 'use strict';
-const GAMES={go:{name:'바둑',url:'../go/',cur:'baduk-game'},omok:{name:'오목',url:'../omok/',cur:'omok-game'},chess:{name:'체스',url:'../chess/',cur:'chess-game'}};
+const GAMES={go:{name:'바둑',url:'../go/',cur:'baduk-game'},omok:{name:'오목',url:'../omok/',cur:'omok-game'},chess:{name:'체스',url:'../chess/',cur:'chess-game'},goaug:{name:'증강 바둑',url:'../go/aug/',cur:'goaug-game'}};
 const OUT={win:'승',loss:'패',draw:'무',done:'끝',open:'…'};
 const PAGE=50;
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

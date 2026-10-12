@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>증강 바둑 · Table Top</title>
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../common/base.css">
+<style>
+.aug-chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);white-space:nowrap}
+.aug-chip.used{opacity:.45;text-decoration:line-through}
+.aug-chip.none{background:var(--chip);color:var(--muted)}
+.komi-line{font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.5}
+.aug-cards{display:flex;flex-direction:column;gap:8px;margin:4px 0 6px}
+.aug-card{display:block;width:100%;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font:inherit;color:var(--text)}
+.aug-card:hover{border-color:var(--accent)}
+.aug-card b{font-size:16px}
+.aug-card .v{float:right;font-size:12.5px;color:var(--accent);font-weight:700;margin-top:2px}
+.aug-card small{display:block;color:var(--muted);font-size:12.5px;line-height:1.5;margin-top:4px}
+.dlg p.sub{margin:-8px 0 12px;font-size:13.5px;color:var(--muted);line-height:1.55}
+.aug-table{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 8px}
+.aug-table td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+.aug-table td:first-child{font-weight:700;white-space:nowrap;padding-right:10px}
+.aug-table td.v{white-space:nowrap;color:var(--accent);font-weight:700;text-align:right}
+.aug-table small{color:var(--muted)}
+.act-card .on-text b{color:var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../home/" title="바둑 홈" aria-label="바둑 홈"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#7a5bd6"/><circle cx="12" cy="13" r="7" fill="#151515"/><circle cx="20.5" cy="19.5" r="7" fill="#fafafa" stroke="#bbb"/><path d="M24 4l1.3 3 3 1.3-3 1.3L24 12.6l-1.3-3-3-1.3 3-1.3z" fill="#ffd34d"/></svg>
+    증강 바둑
+  </div>
+  <div class="hbtns">
+    <a class="icon-btn" href="online/" title="온라인 대국" aria-label="온라인 대국"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 10h8M8 13h5"/></svg></a>
+    <button class="icon-btn" id="btnRules" title="증강 설명" aria-label="증강 설명"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.2a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6M12 16.8h.01"/></svg></button>
+    <button class="icon-btn" id="btnNew" title="새 대국" aria-label="새 대국"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+</header>
+
+<main class="app">
+  <div class="board-col"><div id="boardWrap"><canvas id="board" aria-label="바둑판"></canvas></div></div>
+  <aside class="panel">
+    <div class="card">
+      <div class="players">
+        <div class="player" id="pB"><div class="top"><span class="dot b"></span><span class="name">흑</span></div><div class="sub"><span class="who"></span><span class="aug"></span></div></div>
+        <div class="player" id="pW"><div class="top"><span class="dot w"></span><span class="name">백</span></div><div class="sub"><span class="who"></span><span class="aug"></span></div></div>
+      </div>
+      <div class="status"><span id="statusText"></span><span id="moveText"></span></div>
+      <p class="komi-line" id="komiLine"></p>
+    </div>
+
+    <div class="card on-card act-card hidden" id="infoCard"><p class="on-text" id="infoText"></p><div class="on-btns" id="infoBtns"></div></div>
+
+    <div class="card" id="playCard">
+      <div class="actions">
+        <button class="act" id="aPass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>패스</button>
+        <button class="act" id="aAug"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg><span id="aAugText">증강</span></button>
+        <button class="act danger" id="aResign"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4M4 4h12l-2 4 2 4H4"/></svg>기권</button>
+      </div>
+    </div>
+
+    <div class="card result hidden" id="resultCard">
+      <h3 id="resTitle"></h3>
+      <p id="resDetail"></p>
+      <div class="review">
+        <button id="rvPrev" aria-label="이전 수">‹</button>
+        <input type="range" id="rvRange" min="0" max="0" value="0" aria-label="복기">
+        <button id="rvNext" aria-label="다음 수">›</button>
+        <span id="rvText"></span>
+      </div>
+      <p class="komi-line" id="rvNote"></p>
+      <div class="res-links"><button type="button" id="resDl">기보 내려받기</button><a href="../../records/#goaug">지난 대국 모두 보기 ›</a></div>
+      <div class="dlg-actions"><button class="ghost" id="resBack">온라인 목록</button><button class="primary" id="resNew">새 대국</button></div>
+    </div>
+    <div class="meta" id="metaText"></div>
+  </aside>
+</main>
+<div class="place-bar hidden" id="placeBar"><button type="button" class="ghost" id="placeCancel">취소</button><button type="button" class="primary" id="placeOk">착수</button></div>
+
+<dialog id="dlgNew">
+  <div class="dlg">
+    <h2>새 대국 · 증강 바둑</h2>
+    <div class="field"><span class="flabel">판 크기</span>
+      <div class="seg">
+        <input type="radio" name="size" id="s9" value="9"><label for="s9">9 × 9</label>
+        <input type="radio" name="size" id="s13" value="13" checked><label for="s13">13 × 13</label>
+        <input type="radio" name="size" id="s19" value="19"><label for="s19">19 × 19</label>
+      </div></div>
+    <div class="field"><span class="flabel">상대</span>
+      <div class="seg">
+        <input type="radio" name="mode" id="mLocal" value="local" checked><label for="mLocal">한 폰으로 두 사람</label>
+        <input type="radio" name="mode" id="mOnline" value="online"><label for="mOnline">온라인<small>친구 초대</small></label>
+      </div></div>
+    <p class="sub" style="margin:0 0 6px;font-size:12.5px;color:var(--muted);line-height:1.55">흑과 백이 각자 무작위 증강 3개 중 하나를 고릅니다. 덤 = 7.5 + 흑 증강 점수 − 백 증강 점수.</p>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">시작</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgPick">
+  <div class="dlg">
+    <h2 id="pkTitle"></h2>
+    <p class="sub" id="pkSub"></p>
+    <div class="aug-cards" id="pkCards"></div>
+  </div>
+</dialog>
+
+<dialog id="dlgRules">
+  <div class="dlg">
+    <h2>증강 바둑</h2>
+    <p class="sub">대국 시작 때 흑과 백이 각자 무작위로 받은 증강 3개 중 하나를 고릅니다. 고른 증강은 서로 공개됩니다. 증강마다 점수가 있어 덤 = 7.5 + 흑 증강 점수 − 백 증강 점수로 밸런스를 맞춥니다 (점수는 추정값이고, 대국 결과가 쌓이면 고칩니다). 계가는 중국식(산 돌 + 집)입니다.</p>
+    <table class="aug-table" id="rulesTable"></table>
+    <div class="dlg-actions"><button type="button" class="primary" data-close="ok">닫기</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgConfirm">
+  <div class="dlg">
+    <h2 id="cfTitle"></h2>
+    <p id="cfText" style="margin:0 0 16px;color:var(--muted);font-size:14px"></p>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="no">취소</button><button type="button" class="primary" data-close="yes" id="cfYes"></button></div>
+  </div>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="../board.js"></script>
+<script src="aug.js"></script>
+<script src="../../common/ui.js"></script>
+<script src="../../common/leaderboard.js"></script>
+<script src="../../common/records.js"></script>
+<script src="../../common/rating.js"></script>
+<script src="../../common/online.js"></script>
+<script src="../../common/online-core.js"></script>
+<script src="online/core.js"></script>
+<script>
+"use strict";
+const settings=load('goaug-settings',{coords:true,sound:true});
+function soundEnabled(){return settings.sound;}
+const COLS='ABCDEFGHJKLMNOPQRST',NAME={1:'흑',2:'백'};
+const STARS={9:[[2,2],[6,6],[6,2],[2,6],[4,4]],13:[[3,3],[9,9],[9,3],[3,9],[6,6],[3,6],[9,6],[6,3],[6,9]],19:[[3,3],[15,15],[15,3],[3,15],[9,9],[3,9],[15,9],[9,3],[9,15]]};
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// game: {id, n, aug:{1,2}, entries, over, result, rs(계가를 멈추고 이어 둔 시점), dead, local | online:{...}}
+// phase: 'pick' 증강 고르기 · 'wait' 상대 기다림 · 'play' · 'score' 계가 · 'done'
+let game=null,G=null,phase='play',view=null,act=null,PG=null,pending=0,deadSet=null,recView=false;
+
+// ---------- 증강 설명 ----------
+function augLabel(id){return id?AUGS[id].name:'고르는 중';}
+function komiText(){
+  const a=game.aug,n=game.n,v1=augValue(a[1],n),v2=augValue(a[2],n);
+  if(!a[1]||!a[2])return '덤: 두 사람이 증강을 고르면 정해집니다';
+  return `덤 ${(AUG_BASE_KOMI+v1-v2)} = 기본 ${AUG_BASE_KOMI} + 흑 ${AUGS[a[1]].name} ${v1} − 백 ${AUGS[a[2]].name} ${v2}${AUG_BASE_KOMI+v1-v2<0?' (흑이 받음)':''}`;
+}
+function rulesTable(n){
+  return AUG_IDS.map(id=>{const A=AUGS[id];return `<tr><td>${A.name}</td><td>${A.desc}<br><small>점수 9줄 ${A.v[9]} · 13줄 ${A.v[13]} · 19줄 ${A.v[19]}</small></td><td class="v">${n?A.v[n]+'집':''}</td></tr>`;}).join('');
+}
+$('#btnRules').onclick=()=>{$('#rulesTable').innerHTML=rulesTable(game&&game.n);openDlg($('#dlgRules'));};
+
+// ---------- 저장 · 기록 ----------
+const live=()=>!!(game&&!recView);
+const isOnline=()=>!!(game&&game.online&&!recView);
+function save(){
+  if(!game||recView)return;
+  game.entries=G?G.entries.slice():game.entries;game.dead=deadSet?[...deadSet]:null;
+  if(!game.online)store('goaug-game',game);
+  if(G&&game.entries.length&&(!game.online||game.online.col))REC.put('goaug',game,recMeta(game),sgfText(game));
+}
+function recMeta(g){
+  const r=g.over&&g.result,me=g.online?g.online.col:0;
+  return{opp:g.online?`${g.online.opp.name} (온라인)`:'두 사람',side:me?NAME[me]:'',info:`${g.n}줄 · ${augLabel(g.aug[1])} 대 ${augLabel(g.aug[2])}`,len:G.turns.length+'수',
+    out:!r?'open':me?(r.winner===me?'win':'loss'):'done',res:r?resTitle(r):'끝나지 않은 대국'};
+}
+function sgfText(g){
+  const tmp=new Board(g.n),c=p=>{const [x,y]=tmp.xy(p);return String.fromCharCode(97+x)+String.fromCharCode(97+y);};
+  const d=new Date(g.id||Date.now()),p2=n=>String(n).padStart(2,'0'),nm=t=>String(t||'').replace(/[\]\\]/g,'');
+  const komi=AUG_BASE_KOMI+augValue(g.aug[1],g.n)-augValue(g.aug[2],g.n);
+  let s=`(;GM[1]FF[4]CA[UTF-8]AP[TableTop]SZ[${g.n}]KM[${komi}]RU[Chinese]DT[${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}]`;
+  const me=g.online&&g.online.col,opp=g.online?nm(g.online.opp.name):'';
+  s+=`PB[${g.online?(me===1?'나':opp):'흑'}]PW[${g.online?(me===2?'나':opp):'백'}]GN[증강 바둑]GC[흑 증강: ${augLabel(g.aug[1])}, 백 증강: ${augLabel(g.aug[2])}]`;
+  if(g.over&&g.result){const r=g.result;s+=`RE[${r.winner===1?'B':'W'}+${r.how==='resign'?'R':r.how==='time'?'T':r.d}]`;}
+  for(const m of G?G.record():[]){
+    const C=m.col===1?'B':'W';
+    if(m.snipe!==undefined){s+=`;${C}[]AE[${c(m.snipe)}]C[저격: ${c(m.snipe)} 돌을 들어냄]`;continue;}
+    s+=`;${C}[${m.p?c(m.p):''}]`;if(m.note)s+=`C[${m.note}${m.q?' '+c(m.q):''}]`;
+  }
+  return s+')';
+}
+$('#resDl').onclick=()=>REC.download(REC.fileName('goaug',game.id),sgfText(game));
+// 결과 모음 (덤 조정용): 대국 결과·증강·판 크기만 보낸다 (이름 없음). 이 기기가 온라인 기능을 한 번이라도 썼을 때만
+function postStats(r){
+  try{
+    if(!navigator.onLine||!LB.state().uid||!G)return;
+    const id=game.online?game.online.code:'L'+game.id;
+    ONL.createDoc('augstats',id,{n:game.n,ab:game.aug[1],aw:game.aug[2],komi:G.komi,w:r.winner,how:r.how,len:G.turns.length,local:!game.online},['at']).catch(e=>console.warn('[증강 결과]',e));
+  }catch(e){}
+}
+
+// ---------- 새 대국 (한 폰으로 두 사람) ----------
+function openNew(){
+  const last=load('goaug-newopts',{size:13});document.querySelector(`input[name=size][value="${last.size}"]`).checked=true;
+  openDlg($('#dlgNew'),v=>{
+    if(v!=='ok')return;
+    const n=+document.querySelector('input[name=size]:checked').value;store('goaug-newopts',{size:n});
+    if(document.querySelector('input[name=mode]:checked').value==='online'){location.href='online/';return;}
+    leaveOnline();recView=false;history.replaceState(null,'',location.pathname);
+    game={id:Date.now(),n,aug:{1:'',2:''},entries:[],over:false,result:null,rs:0,dead:null,local:true};
+    G=null;view=null;act=null;PG=null;pending=0;deadSet=null;phase='pick';
+    save();rebuild();pickFlow();
+  });
+}
+$('#btnNew').onclick=openNew;$('#resNew').onclick=openNew;
+// 증강 고르기: 흑 → (폰 넘기기) → 백 → 공개
+function showPick(col,offers,sub,onPick){
+  $('#pkTitle').textContent=`${NAME[col]} 증강 고르기`;$('#pkSub').textContent=sub;
+  $('#pkCards').innerHTML=offers.map(id=>{const A=AUGS[id];return `<button type="button" class="aug-card" data-id="${id}"><span class="v">점수 ${A.v[game.n]}집</span><b>${A.name}</b><small>${A.desc}</small></button>`;}).join('');
+  $('#pkCards').onclick=e=>{const b=e.target.closest('.aug-card');if(!b)return;closeDlg($('#dlgPick'),'x');onPick(b.dataset.id);};
+  openDlg($('#dlgPick'));
+}
+async function pickFlow(){
+  if(!game.aug[1]){showPick(1,augOffers(game.id+':1'),'백은 화면을 보지 마세요. 흑이 고른 증강은 백이 고른 뒤 함께 공개됩니다.',id=>{game.aug[1]=id;save();pickFlow();});return;}
+  if(!game.aug[2]){
+    await ask('백 차례','폰을 백에게 넘겨 주세요. 흑은 화면을 보지 마세요.','백이 고르기');
+    showPick(2,augOffers(game.id+':2'),'흑은 화면을 보지 마세요.',id=>{game.aug[2]=id;save();pickFlow();});return;
+  }
+  await ask('증강 공개',`흑: ${AUGS[game.aug[1]].name} · 백: ${AUGS[game.aug[2]].name} — ${komiText()}`,'대국 시작');
+  startPlay();
+}
+function startPlay(){G=new AugGame({n:game.n,komi:AUG_BASE_KOMI,aug:game.aug});const err=G.load(game.entries);if(err)toast('기보를 다 불러오지 못했습니다: '+err);phase='play';save();rebuild();}
+
+// ---------- 판 ----------
+const clone=()=>{const g=new AugGame({n:G.n,komi:G.base,aug:G.aug});g.load(G.entries);return g;};
+let rvCache=null;
+function shown(){
+  if(PG)return PG;
+  if(view!==null&&G&&view<G.turns.length){
+    if(!rvCache||rvCache.k!==view){const g=new AugGame({n:G.n,komi:G.base,aug:G.aug});g.turns=G.turns.slice(0,view);g.replayTurns();rvCache={k:view,g};}
+    return rvCache.g;
+  }
+  return G;
+}
+const myCol=()=>game.online?game.online.col:G?G.turn:0;
+const canAct=()=>!!(G&&live()&&phase==='play'&&!game.over&&view===null&&(!game.online||(game.online.st==='play'&&!game.online.sending&&G.turn===game.online.col)));
+
+const cv=$('#board'),ctx=cv.getContext('2d'),wrap=$('#boardWrap');let GG={s:0,cell:0,m:0,dpr:1};
+function resize(){if(!game)return;const s=wrap.clientWidth,dpr=window.devicePixelRatio||1,k=settings.coords?0.95:0.6;cv.width=Math.round(s*dpr);cv.height=Math.round(s*dpr);const cell=s/(game.n-1+2*k);GG={s,cell,m:cell*k,dpr};draw();}
+const X=i=>GG.m+i*GG.cell;
+function drawStone(x,y,r,col,alpha){
+  ctx.save();ctx.globalAlpha=alpha;
+  if(alpha===1){ctx.beginPath();ctx.arc(x+r*0.07,y+r*0.12,r,0,7);ctx.fillStyle='rgba(0,0,0,.28)';ctx.fill();}
+  const g=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.08,x,y,r);
+  if(col===BLACK){g.addColorStop(0,'#5d5d5d');g.addColorStop(.55,'#202020');g.addColorStop(1,'#060606');}
+  else{g.addColorStop(0,'#ffffff');g.addColorStop(.65,'#eeeeec');g.addColorStop(1,'#c4c4c0');}
+  ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=g;ctx.fill();ctx.restore();
+}
+function draw(){
+  if(!game||!GG.s)return;
+  const n=game.n,{cell,s,dpr}=GG,r=cell*0.48;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,s,s);
+  ctx.strokeStyle='rgba(40,28,10,.82)';ctx.lineWidth=Math.max(1,cell*0.03);ctx.beginPath();
+  for(let i=0;i<n;i++){const v=Math.round(X(i)*dpr)/dpr+0.5/dpr;ctx.moveTo(X(0),v);ctx.lineTo(X(n-1),v);ctx.moveTo(v,X(0));ctx.lineTo(v,X(n-1));}
+  ctx.stroke();ctx.lineWidth=Math.max(1.5,cell*0.055);ctx.strokeRect(X(0),X(0),X(n-1)-X(0),X(n-1)-X(0));
+  ctx.fillStyle='rgba(40,28,10,.9)';for(const [x,y] of STARS[n].slice(0,n===9?5:9)){ctx.beginPath();ctx.arc(X(x),X(y),Math.max(2,cell*0.1),0,7);ctx.fill();}
+  if(settings.coords){ctx.fillStyle='rgba(60,40,12,.75)';ctx.font=`500 ${Math.max(9,cell*0.32)}px system-ui,sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';const o=GG.m*0.5;
+    for(let i=0;i<n;i++){ctx.fillText(COLS[i],X(i),o);ctx.fillText(COLS[i],X(i),s-o);ctx.fillText(String(n-i),o,X(i));ctx.fillText(String(n-i),s-o,X(i));}}
+  const g=shown();if(!g)return;const b=g.b;
+  // 결계 점: 친 사람 색의 마름모 (상대는 둘 수 없음)
+  for(const col of [1,2]){const q=g.bar[col];if(!q)continue;const [x,y]=b.xy(q);const k=cell*0.36;
+    ctx.save();ctx.translate(X(x),X(y));ctx.rotate(Math.PI/4);ctx.fillStyle=col===1?'rgba(20,20,20,.55)':'rgba(255,255,255,.75)';ctx.strokeStyle='#7a5bd6';ctx.lineWidth=Math.max(1.5,cell*0.06);
+    ctx.fillRect(-k/2,-k/2,k,k);ctx.strokeRect(-k/2,-k/2,k,k);ctx.restore();}
+  // 계가 중: 집 표시
+  let own=null;if(phase==='score'&&deadSet&&g===G)own=G.score(deadSet).own;else if(game.over&&game.result&&game.result.how==='score'&&deadSet&&g===G)own=G.score(deadSet).own;
+  if(own)for(const p of b.pts){const v=b.c[p],o=own[p];if(v!==EMPTY&&!(deadSet.has(p)&&!G.invincible(p)))continue;if(!o)continue;const [x,y]=b.xy(p),q=cell*0.3;ctx.fillStyle=o>0?'rgba(15,15,15,.85)':'rgba(255,255,255,.85)';ctx.fillRect(X(x)-q/2,X(y)-q/2,q,q);}
+  // 무적인 무리
+  const invSet=new Set();for(const col of [1,2]){const m=g.inv[col];if(m&&b.c[m]===col)for(const p of g.chain(m))invSet.add(p);}
+  for(const p of b.pts){
+    const v=b.c[p];if(v===EMPTY)continue;const [x,y]=b.xy(p);
+    const dead=own&&deadSet.has(p)&&!invSet.has(p);
+    drawStone(X(x),X(y),r,v,dead?0.45:1);
+    if(invSet.has(p)){ctx.strokeStyle='#ffc61a';ctx.lineWidth=Math.max(2,cell*0.08);ctx.beginPath();ctx.arc(X(x),X(y),r*0.78,0,7);ctx.stroke();}
+    if(dead){const q=cell*0.15;ctx.fillStyle=v===BLACK?'#fff':'#111';ctx.fillRect(X(x)-q/2,X(y)-q/2,q,q);}
+  }
+  // 마지막 수
+  if(g.last>0&&b.c[g.last]!==EMPTY){const [x,y]=b.xy(g.last);ctx.strokeStyle=b.c[g.last]===BLACK?'#fff':'#222';ctx.lineWidth=Math.max(1.5,cell*0.06);ctx.beginPath();ctx.arc(X(x),X(y),r*0.42,0,7);ctx.stroke();}
+  // 증강 쓰는 중: 고른 대상 표시
+  if(act&&act.q&&(act.k==='i'||act.k==='b')){const [x,y]=b.xy(act.q);ctx.strokeStyle='rgba(122,91,214,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(X(x),X(y),r*1.1,0,7);ctx.stroke();}
+  // 놓을 자리 미리보기
+  if(pending&&canAct()){const [x,y]=b.xy(pending);drawStone(X(x),X(y),r,G.turn,0.7);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(X(x),X(y),r*1.08,0,7);ctx.stroke();}
+}
+function pointAt(e){
+  if(!game||!GG.s)return 0;const n=game.n,rc=cv.getBoundingClientRect(),x=Math.round((e.clientX-rc.left-GG.m)/GG.cell),y=Math.round((e.clientY-rc.top-GG.m)/GG.cell);
+  if(x<0||y<0||x>=n||y>=n)return 0;const dx=e.clientX-rc.left-X(x),dy=e.clientY-rc.top-X(y);
+  return dx*dx+dy*dy>(GG.cell*0.6)**2?0:(y+1)*(n+2)+x+1;
+}
+const pname=p=>{if(!p)return '패스';const n=game.n,W=n+2,x=p%W-1,y=(p/W|0)-1;return COLS[x]+(n-y);};
+cv.addEventListener('click',e=>{
+  const p=pointAt(e);if(!p||!G)return;
+  if(phase==='score'){toggleDead(p);return;}
+  if(!canAct())return;
+  const col=G.turn,g=PG||G;
+  if(act&&act.stage==='target'){target(p);return;}
+  if(g.canPlay(p,col)){pending=p;draw();ui();}
+  else{toast(g.whyNot(p,col));sound('bad');}
+});
+new ResizeObserver(resize).observe(wrap);
+$('#placeOk').onclick=()=>{if(pending&&canAct())commit(pending);};
+$('#placeCancel').onclick=()=>{pending=0;draw();ui();};
+
+// ---------- 수 · 증강 ----------
+function commit(p){
+  const col=G.turn;let s;
+  if(!act)s=String(p);
+  else if(act.k==='i'||act.k==='b')s=act.k+act.q+';'+p;
+  else if(act.k==='r')s='r;'+p;
+  else if(act.k==='d'){
+    if(act.stage===1){act.p1=p;act.stage=2;PG.put(p,col);pending=0;sound('stone');draw();ui();return;}
+    s='d'+act.p1+','+p;
+  }
+  play(s);
+}
+function play(s){
+  let cap=0;try{cap=G.apply(s);}catch(e){toast(e.message);sound('bad');return;}
+  act=null;PG=null;pending=0;rvCache=null;
+  sound(cap?'cap':'stone',cap);if(settings.sound&&navigator.vibrate)try{navigator.vibrate(cap?[12,40,12]:12);}catch(e){}
+  if(game.online){save();draw();ui();onSend();return;}
+  if(G.twoPasses(game.rs)){phase='score';deadSet=new Set();toast('두 사람 모두 패스했습니다 · 죽은 돌을 표시해 계가하세요');}
+  save();draw();ui();
+}
+function target(p){
+  const col=G.turn,b=G.b;
+  if(act.k==='i'){if(b.c[p]!==col){toast('무적으로 만들 내 돌을 누르세요');return;}act.q=p;act.stage='move';PG.inv[col]=p;toast('무적수를 걸었습니다 · 이제 이번 차례의 수를 두세요');}
+  else if(act.k==='b'){if(b.c[p]!==EMPTY){toast('결계는 빈 점에 칩니다');return;}act.q=p;act.stage='move';PG.bar[col]=p;toast('결계를 쳤습니다 · 이제 이번 차례의 수를 두세요');}
+  else if(act.k==='s'){
+    if(b.c[p]!==3-col){toast('들어낼 상대 돌을 누르세요');return;}
+    if(G.invincible(p)){toast('무적인 돌은 들어낼 수 없습니다');return;}
+    ask('저격',`${pname(p)} 의 ${NAME[3-col]} 돌을 들어낼까요? 이번 차례는 수를 두지 않습니다.`,'들어내기').then(y=>{if(y)play('s'+p);});
+    return;
+  }
+  draw();ui();
+}
+async function useAug(){
+  if(!canAct())return;
+  if(act){act=null;PG=null;pending=0;draw();ui();return;} // 다시 누르면 취소
+  const col=G.turn,id=game.aug[col],A=AUGS[id];
+  if(A.passive){toast(`${A.name}: ${A.short} (늘 켜져 있음)`);return;}
+  if(!G.canUse(col)){toast('이미 쓴 증강입니다');return;}
+  pending=0;
+  if(id==='invincible'){act={k:'i',stage:'target'};PG=clone();}
+  else if(id==='barrier'){act={k:'b',stage:'target'};PG=clone();}
+  else if(id==='snipe'){act={k:'s',stage:'target'};}
+  else if(id==='double'){act={k:'d',stage:1};PG=clone();}
+  else if(id==='rewind'){
+    if(!G.canRewind(col)){toast('지금은 되감을 수 없습니다 (내 수와 상대 응수가 있어야 함)');return;}
+    if(!(await ask('되감기','내 직전 수와 상대의 응수를 되돌리고 다시 둡니다. 대국 중 한 번만 쓸 수 있습니다.','되감기')))return;
+    act={k:'r',stage:'move'};PG=clone();PG.turns=PG.turns.slice(0,-2);PG.replayTurns();
+  }
+  draw();ui();
+}
+$('#aAug').onclick=useAug;
+$('#aPass').onclick=async()=>{
+  if(!canAct())return;
+  if(act&&(act.k==='d'||act.k==='s')){toast('지금은 패스할 수 없습니다');return;}
+  if(G.entries[G.entries.length-1]!=='0'&&G.turns.length<game.n*game.n*0.3&&!(await ask('패스할까요?','아직 둘 곳이 많이 남아 있습니다.','패스')))return;
+  play(act?(act.k==='r'?'r;0':act.k+act.q+';0'):'0');
+};
+$('#aResign').onclick=async()=>{
+  if(!G||game.over||phase==='pick'||phase==='wait')return;
+  if(game.online){onResign();return;}
+  const loser=G.turn;
+  if(await ask(`${NAME[loser]}이 기권할까요?`,`이번 대국을 ${NAME[3-loser]}의 승리로 끝냅니다.`,'기권'))finish({winner:3-loser,how:'resign'});
+};
+
+// ---------- 계가 ----------
+function toggleDead(p){
+  if(!G.b.c[p]||G.b.c[p]===EDGE)return;
+  if(G.invincible(p)){toast('무적인 돌은 죽은 돌로 표시할 수 없습니다');return;}
+  if(game.online&&!onScoreEdit())return;
+  const on=!deadSet.has(p);for(const q of G.chain(p))on?deadSet.add(q):deadSet.delete(q);
+  sound('stone');save();draw();ui();
+}
+const scoreText=s=>`흑 ${s.bs}집 · 백 ${s.ws}집 + 덤 ${G.komi} → <b>${NAME[s.w]} ${s.d}집 승</b>`;
+function confirmScore(){const s=G.score(deadSet);finish({winner:s.w,how:'score',d:s.d,bs:s.bs,ws:s.ws});}
+function resumeLocal(){phase='play';game.rs=G.entries.length;deadSet=null;save();draw();ui();toast('대국을 이어 갑니다 · 두 사람이 다시 이어서 패스하면 계가합니다');}
+
+// ---------- 끝 ----------
+const resTitle=r=>`${NAME[r.winner]} ${r.how==='score'?r.d+'집 승':r.how==='resign'?'불계승':'시간승'}`;
+function finish(r,post=true){
+  game.over=true;game.result=r;phase='done';act=null;PG=null;pending=0;view=G.turns.length;rvCache=null;
+  save();sound(!game.online||r.winner===game.online.col?'win':'pass');draw();ui();
+  if(post)postStats(r);
+}
+
+// ---------- 화면 ----------
+function ui(){
+  if(!game)return;
+  const g=G,me=game.online?game.online.col:0;
+  for(const col of [1,2]){
+    const el=col===1?$('#pB'):$('#pW'),id=game.aug[col],usedNow=g&&id&&!AUGS[id].passive&&g.used(col);
+    el.querySelector('.who').textContent=game.online?(col===me?'나':(game.online.opp.name||'상대')):'';
+    el.querySelector('.aug').innerHTML=id?`<span class="aug-chip${usedNow?' used':''}">${AUGS[id].name}${AUGS[id].passive?'':usedNow?' · 씀':''}</span>`:'<span class="aug-chip none">고르는 중</span>';
+    el.classList.toggle('active',!!g&&!game.over&&phase==='play'&&g.turn===col);
+  }
+  const st=$('#statusText');
+  if(game.over)st.innerHTML='<b>대국 종료</b>';
+  else if(phase==='pick')st.innerHTML='<b>증강 고르기</b>';
+  else if(phase==='wait')st.innerHTML='<b>상대 기다리는 중</b>';
+  else if(phase==='score')st.innerHTML='<b>계가</b>';
+  else if(g)st.innerHTML=`<b>${NAME[g.turn]}</b> 차례${me?(g.turn===me?' · 내 차례':' · 상대 차례'):''}`;
+  $('#moveText').textContent=g?`${view!==null?view:g.turns.length}수`:'';
+  $('#komiLine').textContent=komiText();
+  // 증강 버튼
+  const col=g?myCol():0,id=col?game.aug[col]:'',A=id&&AUGS[id];
+  $('#aAugText').textContent=act?'증강 취소':A?A.name:'증강';
+  $('#aAug').disabled=!canAct()||!A||(!act&&!A.passive&&!g.canUse(col));
+  $('#aAug').classList.toggle('on',!!act);
+  $('#aPass').disabled=!canAct();$('#aResign').disabled=!g||game.over||phase!=='play'&&phase!=='score'||(game.online&&!me);
+  $('#playCard').classList.toggle('hidden',game.over||phase==='pick'||phase==='wait'||phase==='score');
+  // 안내 카드
+  let t='',btns=[];const B=(i,l,c='ghost')=>btns.push(`<button type="button" class="${c}" id="${i}">${l}</button>`);
+  if(game.online&&!game.over)[t,btns]=onInfo();
+  if(!t&&act){
+    const nm=AUGS[game.aug[G.turn]].name;
+    t=act.k==='i'?(act.stage==='target'?`<b>${nm}</b>: 무적으로 만들 내 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 무리에 걸었습니다 · 이번 차례의 수를 두세요`)
+     :act.k==='b'?(act.stage==='target'?`<b>${nm}</b>: 상대가 못 두게 할 빈 점을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 에 결계 · 이번 차례의 수를 두세요`)
+     :act.k==='s'?`<b>${nm}</b>: 들어낼 상대 돌을 누르세요`
+     :act.k==='d'?`<b>${nm}</b>: ${act.stage===1?'첫 수를 두세요':'두 번째 수를 두세요 (첫 수 '+pname(act.p1)+')'}`
+     :`<b>${nm}</b>: 되돌린 장면입니다 · 다시 두세요`;
+    B('iCancel','증강 취소');
+  }
+  if(!t&&phase==='score'&&!game.online){const s=G.score(deadSet);t=`<b>계가</b> · 죽은 돌을 눌러 표시하세요 (무적인 돌은 늘 삶)<br>${scoreText(s)}`;B('iResume','이어 두기');B('iScore','계가 확정','primary');}
+  $('#infoCard').classList.toggle('hidden',!t);$('#infoText').innerHTML=t;$('#infoBtns').innerHTML=btns.join('');
+  const bind=(i,f)=>{const el=document.getElementById(i);if(el)el.onclick=f;};
+  bind('iCancel',()=>{act=null;PG=null;pending=0;draw();ui();});bind('iResume',resumeLocal);bind('iScore',confirmScore);
+  if(game.online)onBind(bind);
+  // 결과
+  $('#resultCard').classList.toggle('hidden',!game.over);
+  if(game.over&&game.result&&g){
+    const r=game.result;
+    $('#resTitle').textContent=recView?`지난 대국 · ${REC.when(game.id)}`:(me?(r.winner===me?'🎉 승리! ':'아쉬운 패배 · '):'🎉 ')+resTitle(r);
+    $('#resDetail').textContent=r.how==='score'?`흑 ${r.bs}집 · 백 ${r.ws}집 + 덤 ${g.komi}`:r.how==='resign'?`${NAME[3-r.winner]}이 기권했습니다`:`${NAME[3-r.winner]}의 한 수 기한이 지났습니다`;
+    const rg=$('#rvRange');rg.max=g.turns.length;rg.value=view??g.turns.length;$('#rvText').textContent=`${rg.value}/${g.turns.length}`;
+    const k=+rg.value,tt=g.turns[k-1];
+    $('#rvNote').textContent=tt?`${k}수 ${NAME[tt.col]} · ${turnText(tt)}`:'처음 장면';
+    $('#resBack').classList.toggle('hidden',!game.online&&!recView);$('#resBack').textContent=recView?'돌아가기':'온라인 목록';
+  }
+  const showPlace=!!(pending&&canAct());$('#placeBar').classList.toggle('hidden',!showPlace);
+  if(showPlace)$('#placeOk').textContent=(act&&act.k==='d'&&act.stage===1?'첫 수 · ':'착수 · ')+pname(pending);
+  document.body.classList.toggle('placing',showPlace);
+  $('.home-btn').href=game.online&&!recView?'online/':'../home/';
+  $('#metaText').textContent=`${game.online?'온라인 '+game.online.code+' · ':'두 사람 · '}${game.n}×${game.n} · 중국식 계가`;
+}
+function turnText(t){
+  const x=t.t;
+  if(x.kind==='snipe')return `저격: ${pname(x.q)} 돌을 들어냄`;
+  if(x.kind==='double')return `슈퍼선수: ${pname(x.p)} · ${pname(x.p2)}`;
+  const pre=x.pre?(x.pre.k==='i'?`무적수(${pname(x.pre.q)}) 뒤 `:x.pre.k==='b'?`결계(${pname(x.pre.q)}) 뒤 `:'되감기 뒤 '):'';
+  return pre+pname(x.p);
+}
+const setView=v=>{if(!G)return;view=Math.max(0,Math.min(G.turns.length,v));rvCache=null;draw();ui();};
+$('#rvRange').oninput=e=>setView(+e.target.value);
+$('#rvPrev').onclick=()=>setView((view??G.turns.length)-1);$('#rvNext').onclick=()=>setView((view??G.turns.length)+1);
+$('#resBack').onclick=()=>{if(recView){history.replaceState(null,'',location.pathname);route();}else location.href='online/';};
+function rebuild(){rvCache=null;resize();ui();}
+
+// ---------- 온라인 (편지 대국, 문서: Firestore games/방코드, g='goaug') ----------
+const ONQ='goaug-online-q';
+let onPoll=0,onPulling=false,onAgain=false,onLast=0,onLive=null,scoreEdit=false,pickShown='';
+function onQueue(code,moves){let q={};try{q=JSON.parse(localStorage.getItem(ONQ))||{};}catch(e){}if(moves===undefined)return q[code]||null;if(moves)q[code]=moves;else delete q[code];try{localStorage.setItem(ONQ,JSON.stringify(q));}catch(e){}}
+function leaveOnline(){clearInterval(onPoll);onPoll=0;if(onLive){onLive.stop();onLive=null;}}
+async function openOnline(code){
+  leaveOnline();recView=false;act=null;PG=null;pending=0;view=null;scoreEdit=false;pickShown='';closeDlg($('#dlgNew'),'cancel');
+  let d=null,err=null;try{d=await ONL.get(code);}catch(e){err=e;}
+  if(!d&&err)d=GA_ON.cachedOne(code);
+  if(!d||d.g!=='goaug'){toast(err?'대국을 불러오지 못했습니다 (인터넷 연결을 확인하세요)':'없는 대국입니다');history.replaceState(null,'',location.pathname);resumeLocal0();return;}
+  if(d.st==='open'&&d.host!==ONL.uid()){location.replace('online/#join='+code);return;}
+  const col=GA_ON.colorOf(d);
+  game={id:d.created,n:d.n,aug:{1:d.ab||'',2:d.aw||''},entries:[],over:false,result:null,rs:d.rs||0,dead:null,
+    online:{code,col,opp:GA_ON.opp(d),st:d.st,mt:d.mt,ut:d.ut,days:d.days,prop:d.prop||null,res:d.res||null,host:d.host}};
+  G=null;deadSet=null;phase='play';
+  if(!col)toast('이 대국의 참가자가 아니라서 보기만 합니다');
+  onApply(d,true);rebuild();
+  if(err)toast('오프라인 · 마지막으로 받은 상태입니다');
+  if(game.over)return;
+  onLive=ONL.listen(code,()=>{if(isOnline()&&game.online.code===code)onPull();});
+  onPoll=setInterval(()=>{if(!isOnline()||game.over||document.visibilityState!=='visible')return;if(onLive&&onLive.ok()&&Date.now()-onLast<60000)return;onPull();},15000);
+}
+async function onPull(){
+  if(!isOnline())return;if(onPulling){onAgain=true;return;}
+  const code=game.online.code;onPulling=true;onLast=Date.now();
+  try{const d=await ONL.get(code);if(d&&isOnline()&&game.online.code===code)onApply(d,false);}catch(e){}
+  finally{onPulling=false;if(onAgain){onAgain=false;onPull();}}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&isOnline()&&!game.over)onPull();});
+window.addEventListener('online',()=>{if(isOnline()&&!game.over)onPull();});
+function onApply(d,first){
+  const o=game.online,q=onQueue(o.code);
+  Object.assign(o,{st:d.st,mt:d.mt,ut:d.ut,days:d.days,prop:d.prop||null,res:d.res||null,opp:GA_ON.opp(d)});
+  game.rs=d.rs||0;
+  if(o.col)GA_ON.remember(d);
+  if(d.st==='open'){phase='wait';ui();return;}
+  if(d.st==='pick'){
+    game.aug={1:d.ab||'',2:d.aw||''};phase='pick';
+    const mine=o.col===1?d.ab:o.col===2?d.aw:'x';
+    if(!mine&&pickShown!==o.code){pickShown=o.code;showPick(o.col,augOffers(o.code+':'+o.col),'상대가 고른 증강은 두 사람 모두 고른 뒤 공개됩니다.',onPick);}
+    ui();return;
+  }
+  // 대국 중: 증강이 정해졌으면 판을 만든다
+  if(!G||G.aug[1]!==d.ab||G.aug[2]!==d.aw){game.aug={1:d.ab,2:d.aw};G=new AugGame({n:d.n,komi:d.komi,aug:game.aug});const e=G.load(d.moves);if(e)toast('기보를 다 불러오지 못했습니다: '+e);if(!first&&phase==='pick')toast(`대국 시작 · 상대 증강: ${AUGS[o.col===1?d.aw:d.ab].name}`);phase='play';}
+  const sm=d.moves,lm=G.entries.slice(),prefix=(a,b)=>a.length<=b.length&&a.every((m,i)=>m===b[i]);
+  let resend=false;
+  if(sm.length>lm.length&&prefix(lm,sm)){
+    let cap=0;for(let i=lm.length;i<sm.length;i++){try{cap+=G.apply(sm[i]);}catch(e){toast('상대 수를 둘 수 없습니다: '+e.message);break;}}
+    if(!first){sound(cap?'cap':'stone',cap);const t=G.turns[G.turns.length-1];if(t&&d.st==='play')toast(`${o.opp.name}: ${turnText(t)}`);}
+    act=null;PG=null;pending=0;rvCache=null;onQueue(o.code,null);
+  }else if(!(sm.length===lm.length&&prefix(sm,lm))){
+    if(q&&q.length===sm.length+1&&prefix(sm,q)&&d.st==='play'&&(sm.length%2===0?1:2)===o.col){G.load(q);resend=true;}
+    else{G.load(sm);onQueue(o.code,null);}
+    act=null;PG=null;pending=0;rvCache=null;
+  }else if(q&&!o.sending)onQueue(o.code,null);
+  if(d.st==='done'){if(!game.over)onEnd(d);return;}
+  if(d.st==='score'){phase='score';if(!scoreEdit)deadSet=new Set(o.prop?o.prop.dead:(deadSet?[...deadSet]:[]));}
+  else{phase='play';scoreEdit=false;if(deadSet)deadSet=null;}
+  save();draw();ui();
+  if(resend)onSend();
+}
+async function onPick(id){
+  const o=game.online,f=o.col===1?'ab':'aw',other=o.col===1?game.aug[2]:game.aug[1];
+  try{await ONL.write(o.code,{[f]:id,st:other?'play':'pick'},[f,'st'],{ut:o.ut});toast(`${AUGS[id].name}을(를) 골랐습니다`);await onPull();}
+  catch(e){console.warn(e);pickShown='';toast(e.status===0?'인터넷에 연결되어야 합니다':'고르지 못했습니다 · 다시 받습니다');await onPull();}
+}
+async function onSend(){
+  const o=game.online;if(o.sending)return;o.sending=true;ui();
+  const mv=G.entries.slice(),code=o.code,two=G.twoPasses(game.rs);onQueue(code,mv);
+  try{
+    const r=await ONL.write(code,{moves:mv,st:two?'score':'play'},['moves','st'],{ut:o.ut});
+    if(!isOnline()||game.online.code!==code)return;
+    Object.assign(o,{ut:r.ut,mt:r.at,st:two?'score':'play',sending:false});onQueue(code,null);
+    if(two){phase='score';deadSet=new Set();scoreEdit=true;toast('두 사람 모두 패스했습니다 · 죽은 돌을 표시해 계가를 제안하세요');}
+  }catch(e){
+    o.sending=false;
+    if(e.status===0)toast('오프라인 · 연결되면 이 수를 보냅니다');
+    else{console.warn('[온라인]',e);toast('수를 보내지 못했습니다 · 대국 상태를 다시 받습니다');onQueue(code,null);await onPull();}
+  }
+  save();draw();ui();
+}
+async function onWrite(fields,mask,okMsg){
+  const o=game.online;if(o.sending)return false;o.sending=true;ui();
+  try{await ONL.write(o.code,fields,mask,{ut:o.ut});o.sending=false;if(okMsg)toast(okMsg);await onPull();return true;}
+  catch(e){o.sending=false;console.warn('[온라인]',e);toast(e.status===0?'인터넷에 연결되어야 합니다':'처리하지 못했습니다 · 다시 받습니다');if(e.status!==0)await onPull();ui();return false;}
+}
+async function onResign(){
+  const o=game.online;if(!o.col)return;
+  if(await ask('기권할까요?',`${o.opp.name}님의 승리로 대국을 끝냅니다.`,'기권'))onWrite({st:'done',res:{w:3-o.col,how:'resign',d:0,by:ONL.uid()}},['st','res']);
+}
+const onScoreEdit=()=>scoreEdit;
+function onInfo(){
+  const o=game.online,dl=o.mt+o.days*864e5,late=dl<Date.now(),me=ONL.uid(),btns=[];let t='';
+  const B=(i,l,c='ghost')=>btns.push(`<button type="button" class="${c}" id="${i}">${l}</button>`);
+  const dlText=`기한 ${GA_ON.when(dl)} (${GA_ON.left(dl)})`;
+  if(o.sending)t='보내는 중…';
+  else if(phase==='wait'){t=`상대를 기다리는 중 · 방 코드 <b>${o.code}</b>`;B('oInvite','초대 보내기','primary');}
+  else if(phase==='pick'){const mine=o.col===1?game.aug[1]:game.aug[2];t=!o.col?'증강을 고르는 중':mine?`${AUGS[mine].name}을(를) 골랐습니다 · 상대가 고르는 중`:'증강을 고르세요';if(o.col&&!mine)B('oPick','증강 고르기','primary');}
+  else if(!o.col)t='보기만 하는 중';
+  else if(phase==='score'){
+    const s=deadSet?G.score(deadSet):null;
+    if(scoreEdit){t=`<b>계가</b> · 죽은 돌을 눌러 표시하세요<br>${s?scoreText(s):''}`;B('oResume','이어 두기');B('oPropose','이대로 제안','primary');}
+    else if(o.prop&&o.prop.by===me){t=`계가를 제안했습니다 · ${esc(o.opp.name)}님 확인을 기다립니다<br>${scoreText(o.prop)} · ${dlText}`;B('oResume','이어 두기');if(late)B('oAccept','제안대로 끝내기','primary');}
+    else if(o.prop){t=`${esc(o.opp.name)}님의 계가 제안 (판에 죽은 돌 표시)<br>${scoreText(o.prop)}`;B('oResume','이어 두기');B('oEdit','고쳐서 제안');B('oAccept','동의','primary');}
+    else{t='계가: 죽은 돌을 표시해 제안하세요';B('oEdit','죽은 돌 표시','primary');}
+  }
+  else if(G&&G.turn===o.col&&!act)t=`<b>내 차례</b> · ${dlText}`;
+  else if(G&&G.turn!==o.col){t=`${esc(o.opp.name)}님 차례 · ${dlText}`;B('oRefresh','새로고침');if(late)B('oTime','시간승으로 끝내기','primary');}
+  return [t,btns];
+}
+function onBind(bind){
+  const o=game.online;
+  bind('oInvite',async()=>{const d=GA_ON.cachedOne(o.code);if(!d)return;const r=await ONL.share(GA_ON.inviteText(d),GA_ON.link(o.code));if(r==='copied')toast('초대 글과 링크를 복사했습니다');});
+  bind('oPick',()=>{pickShown=o.code;showPick(o.col,augOffers(o.code+':'+o.col),'상대가 고른 증강은 두 사람 모두 고른 뒤 공개됩니다.',onPick);});
+  bind('oRefresh',()=>{onPull();toast('새로 받는 중…');});
+  bind('oTime',async()=>{if(await ask('시간승으로 끝낼까요?',`${o.opp.name}님의 한 수 기한이 지났습니다.`,'시간승'))onWrite({st:'done',res:{w:o.col,how:'time',d:0,by:ONL.uid()}},['st','res']);});
+  bind('oEdit',()=>{scoreEdit=true;if(!deadSet)deadSet=new Set();draw();ui();});
+  bind('oPropose',()=>{const s=G.score(deadSet);onWrite({prop:{by:ONL.uid(),dead:[...deadSet],bs:s.bs,ws:s.ws,w:s.w,d:s.d}},['prop'],'계가를 제안했습니다 · 상대가 동의하면 끝납니다').then(ok=>{if(ok){scoreEdit=false;ui();}});});
+  bind('oAccept',()=>{const p=o.prop;onWrite({st:'done',res:{w:p.w,how:'score',d:p.d,by:ONL.uid()}},['st','res']);});
+  bind('oResume',async()=>{if(!(await ask('이어서 둘까요?','계가를 멈추고 대국을 이어 갑니다. 두 사람이 다시 이어서 패스하면 다시 계가합니다.','이어 두기')))return;scoreEdit=false;deadSet=null;onWrite({st:'play',rs:G.entries.length},['st','prop','rs'],'대국을 이어 갑니다');});
+}
+function onEnd(d){
+  const r=d.res,o=game.online;leaveOnline();onQueue(o.code,null);scoreEdit=false;
+  if(r.how==='score'&&d.prop)deadSet=new Set(d.prop.dead);
+  finish(r.how==='score'&&d.prop?{winner:r.w,how:'score',d:r.d,bs:d.prop.bs,ws:d.prop.ws}:{winner:r.w,how:r.how},r.by===ONL.uid());
+}
+
+// ---------- 지난 대국 · 시작 ----------
+async function openRecord(id){
+  let r=null;try{r=await REC.get('goaug',id);}catch(e){}
+  if(!r){toast('지난 대국 기록을 찾지 못했습니다');history.replaceState(null,'',location.pathname);resumeLocal0();return;}
+  leaveOnline();recView=true;act=null;PG=null;pending=0;
+  game=r.game;G=new AugGame({n:game.n,komi:AUG_BASE_KOMI,aug:game.aug});G.load(game.entries||[]);
+  deadSet=game.dead?new Set(game.dead):null;phase=game.over?'done':'play';
+  if(!game.over){game.over=true;game.result=game.result||{winner:0,how:''};}
+  view=G.turns.length;rebuild();
+}
+function resumeLocal0(){
+  leaveOnline();recView=false;act=null;PG=null;pending=0;view=null;
+  const saved=load('goaug-game',null);
+  if(saved&&saved.n&&saved.aug){
+    game=saved;deadSet=game.dead?new Set(game.dead):null;
+    if(!game.aug[1]||!game.aug[2]){G=null;phase='pick';rebuild();pickFlow();return;}
+    G=new AugGame({n:game.n,komi:AUG_BASE_KOMI,aug:game.aug});G.load(game.entries||[]);
+    phase=game.over?'done':deadSet?'score':'play';if(game.over)view=G.turns.length;rebuild();
+  }else{game={id:Date.now(),n:13,aug:{1:'',2:''},entries:[],over:false,result:null,rs:0,dead:null,local:true};G=null;phase='pick';rebuild();openNew();}
+}
+function route(){
+  const on=/^#online=([A-Z0-9]{6})$/.exec(location.hash),rec=/^#rec=(\d+)$/.exec(location.hash);
+  if(on){openOnline(on[1]);return;}
+  if(rec){openRecord(+rec[1]);return;}
+  if(location.hash==='#rules'){history.replaceState(null,'',location.pathname);if(!game)resumeLocal0();$('#btnRules').click();return;}
+  if(location.hash==='#new'){history.replaceState(null,'',location.pathname);if(!game)resumeLocal0();openNew();return;}
+  if(!game||game.online||recView)resumeLocal0();
+}
+window.addEventListener('hashchange',route);
+route();
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
+</script>
+</body>
+</html>

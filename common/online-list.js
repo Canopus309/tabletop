@@ -63,8 +63,8 @@ function row(d){
     desc=`${ON.when(d.mt)} · ${esc(ON.info(d))} · ${d.moves.length}수${ch?` · 레이팅 ${ch.before} → ${ch.after}`:''}`;
   }else{
     const sc=d.st==='score',offer=d.offer&&d.offer!==ONL.uid();
-    title=`${esc(o.name)}${o.r?` (${Math.round(o.r)})`:''} · ${sc?'계가 중':d.moves.length+'수'}`;
-    const what=sc?(st==='mine'?(d.prop?'상대 계가 제안 확인하기':'죽은 돌 표시해 계가 제안하기'):'상대가 계가 확인 중')
+    title=`${esc(o.name)}${o.r?` (${Math.round(o.r)})`:''} · ${d.st==='pick'?'증강 고르기':sc?'계가 중':d.moves.length+'수'}`;
+    const what=d.st==='pick'?(st==='mine'?'증강 고르기':'상대가 증강 고르는 중'):sc?(st==='mine'?(d.prop?'상대 계가 제안 확인하기':'죽은 돌 표시해 계가 제안하기'):'상대가 계가 확인 중')
       :offer?'상대가 무승부를 제안했습니다':(st==='mine'?'내 차례':'상대 차례')+(d.offer?' · 무승부 제안 중':'');
     desc=`${what} · ${esc(ON.info(d))}<br>기한 ${ON.when(dl)} · <span class="${late?'late':''}">${ON.left(dl)}${late&&st==='theirs'?' (시간승을 받을 수 있음)':''}</span>`;
   }
@@ -156,14 +156,14 @@ $('#joinPaste').onclick=async()=>{
   if(!c){toast('복사한 내용에 방 코드가 없습니다');return;}
   $('#joinCode').value=c;closeDlg($('#dlgJoin'),'ok');
 };
-const GAME_NAME={go:'바둑',omok:'오목',chess:'체스'};
+const GAME_NAME={go:'바둑',omok:'오목',chess:'체스',goaug:'증강 바둑'},GAME_PATH={goaug:'go/aug'};
 async function openJoin(code){
   if(code.length!==6){toast('방 코드는 여섯 글자입니다');return;}
   let d;
   try{d=await ONL.get(code);}catch(e){toast(e.status===0?'인터넷에 연결되어야 참가할 수 있습니다':'대국을 찾지 못했습니다');return;}
   if(!d){toast('없는 방 코드입니다: '+code);return;}
   // 다른 게임의 방 코드면 그 게임의 참가 화면으로
-  if(d.g!==ON.type){if(GAME_NAME[d.g]){toast(GAME_NAME[d.g]+' 대국입니다');location.href=`../../${d.g}/online/#join=${code}`;}else toast('없는 방 코드입니다: '+code);return;}
+  if(d.g!==ON.type){if(GAME_NAME[d.g]){toast(GAME_NAME[d.g]+' 대국입니다');location.href=`${'../'.repeat((ON.C.path||ON.type).split('/').length+1)}${GAME_PATH[d.g]||d.g}/online/#join=${code}`;}else toast('없는 방 코드입니다: '+code);return;}
   const me=ONL.uid();
   if(me&&d.players.includes(me)){location.href='../#online='+code;return;} // 이미 들어 있는 대국
   if(d.st!=='open'){toast('이미 시작한 대국입니다');return;}
@@ -206,4 +206,4 @@ window.addEventListener('online',refresh);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&Date.now()-lastAt>20000)refresh();});
 setInterval(()=>{if(document.visibilityState==='visible'&&Date.now()-lastAt>110000)refresh();},30000); // 목록은 2분마다
 render();route();refresh();
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../../sw.js').catch(()=>{});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('../'.repeat((ON.C.path||ON.type).split('/').length+1)+'sw.js').catch(()=>{});

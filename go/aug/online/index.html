@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16171a" media="(prefers-color-scheme: dark)">
+<title>온라인 대국 · 증강 바둑 · Table Top</title>
+<link rel="manifest" href="../../../manifest.webmanifest">
+<link rel="icon" href="../../../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Table Top">
+<link rel="stylesheet" href="../../../common/base.css">
+<link rel="stylesheet" href="../../../common/hub.css">
+<link rel="stylesheet" href="../../../common/online.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <a class="home-btn" href="../" title="증강 바둑" aria-label="증강 바둑"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+    <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#d9a956"/><circle cx="12" cy="13" r="7" fill="#151515"/><circle cx="20.5" cy="19.5" r="7" fill="#fafafa" stroke="#bbb"/></svg>
+    증강 바둑 온라인 대국
+  </div>
+</header>
+<main class="hub">
+  <div class="card">
+    <div class="on-me">
+      <div><small id="myLabel"></small><div class="v" id="myR">–</div><small id="myRSub"></small></div>
+      <a href="../#rules">증강 보기 ›</a>
+    </div>
+    <div class="on-name hidden" id="nameBox">
+      <p>온라인 대국에서 상대에게 보일 닉네임을 정하세요 (순위표와 같은 이름).</p>
+      <div class="lb-name"><input id="nameIn" maxlength="12" placeholder="닉네임" autocomplete="off"><button type="button" id="nameSave">저장</button></div>
+    </div>
+    <div class="on-btns"><button type="button" class="primary" id="btnCreate">새 대국 만들기</button><button type="button" class="ghost" id="btnJoin">코드로 참가</button></div>
+  </div>
+  <div class="on-status"><span id="status"></span><button type="button" id="btnRefresh">새로고침</button></div>
+
+  <h2 id="hMine">내 차례</h2><div class="hub-list" id="lMine"></div>
+  <h2>상대 차례</h2><div class="hub-list" id="lTheirs"></div>
+  <h2 id="hOpen">초대 중</h2><div class="hub-list" id="lOpen"></div>
+  <h2>끝난 대국</h2><div class="hub-list" id="lDone"></div>
+
+  <p class="note">증강 바둑 편지 대국: 상대가 들어오면 두 사람이 각자 무작위 증강 3개 중 하나를 고르고, 둘 다 고르면 대국이 시작됩니다. 덤은 기본 7.5에 흑 증강 점수를 더하고 백 증강 점수를 뺀 값입니다.
+  둘 다 대국 화면을 보고 있으면 상대 수가 바로 뜹니다. 한 수 기한이 지나면 상대가 시간승을 받을 수 있고, 두 사람이 이어서 패스하면 계가합니다(죽은 돌 표시 → 상대 동의). 레이팅에는 반영되지 않습니다.</p>
+</main>
+
+<dialog id="dlgCreate">
+  <div class="dlg">
+    <h2>새 온라인 대국 · 증강 바둑</h2>
+    <div class="field"><span class="flabel">판 크기</span>
+      <div class="seg">
+        <input type="radio" name="size" id="s9" value="9"><label for="s9">9 × 9</label>
+        <input type="radio" name="size" id="s13" value="13" checked><label for="s13">13 × 13</label>
+        <input type="radio" name="size" id="s19" value="19"><label for="s19">19 × 19</label>
+      </div></div>
+    <div class="field"><span class="flabel">내 돌</span>
+      <div class="seg">
+        <input type="radio" name="color" id="cB" value="1"><label for="cB">흑</label>
+        <input type="radio" name="color" id="cW" value="2"><label for="cW">백</label>
+        <input type="radio" name="color" id="cR" value="0" checked><label for="cR">무작위</label>
+      </div></div>
+    <div class="field"><label for="selDays">한 수 기한</label>
+      <select id="selDays"><option value="1">1일</option><option value="3" selected>3일</option><option value="7">7일</option></select></div>
+    <input type="checkbox" id="optRated" hidden>
+    <p class="small" style="margin:0 2px 6px;font-size:12.5px;color:var(--muted)">증강은 상대가 들어온 뒤 각자 고릅니다. 친선 대국입니다.</p>
+    <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">만들기</button></div>
+  </div>
+</dialog>
+
+<script src="../../../common/ui.js"></script>
+<script src="../../../common/leaderboard.js"></script>
+<script src="../../../common/rating.js"></script>
+<script src="../../../common/online.js"></script>
+<script src="../../../common/online-core.js"></script>
+<script src="../../board.js"></script>
+<script src="../aug.js"></script>
+<script src="core.js"></script>
+<script>window.OLP={core:GA_ON,game:'바둑 → 증강 바둑'};</script>
+<script src="../../../common/online-list.js"></script>
+</body>
+</html>

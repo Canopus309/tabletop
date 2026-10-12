@@ -9,6 +9,8 @@
  *   info(d): '19줄 · 3점 접바둑' 같은 설명, sideNote(d, col): '(접바둑 받음)' 같은 덧말
  *   adv(d): 흑이 받는 이점(레이팅 점수, 접바둑)
  *   rating: {key, col, pend, upl, init(), label, big(R), small(R), sumKey, sum(R)}
+ *   path: 주소의 게임 폴더 (기본 type, 증강 바둑은 'go/aug'), joinState: 참가 뒤 상태 (기본 'play', 증강 바둑은 증강 고르기 'pick')
+ *   unrated: 늘 친선 대국
  *     key: 기기에 저장된 레이팅, col: 순위표 컬렉션, pend/upl: 올릴 것 있음/올렸음 표시 (LB 상태)
  * }
  * 색은 문서와 여기서 늘 숫자다: 1 = 흑, 2 = 백 (체스 화면은 'b'/'w' 로 바꿔 쓴다)
@@ -30,6 +32,7 @@ function onlineCore(C) {
   function stage(d) {
     if (d.st === 'open') return 'open';
     if (d.st === 'done') return 'done';
+    if (d.st === 'pick') return (colorOf(d) === 1 ? d.ab : d.aw) ? 'theirs' : 'mine'; // 증강 고르기
     if (d.st === 'score') return !d.prop || d.prop.by !== me() ? 'mine' : 'theirs';
     if (d.offer && d.offer !== me()) return 'mine'; // 상대의 무승부 제안에 답할 차례
     return turnColor(d) === colorOf(d) ? 'mine' : 'theirs';
@@ -93,7 +96,7 @@ function onlineCore(C) {
   }
   // 게임 홈에 보일 요약과 앱 아이콘 배지 (세 게임의 '내 차례' 수를 합침)
   function summary(l = cached()) {
-    const act = l.filter(d => d.st === 'play' || d.st === 'score'), mine = act.filter(d => stage(d) === 'mine').length;
+    const act = l.filter(d => d.st === 'play' || d.st === 'score' || d.st === 'pick'), mine = act.filter(d => stage(d) === 'mine').length;
     try { localStorage.setItem(SUM, JSON.stringify({ mine, active: act.length, open: l.filter(d => d.st === 'open').length, at: Date.now() })); } catch (e) { }
     let all = 0;
     for (const t of ['go', 'omok', 'chess']) { try { all += (JSON.parse(localStorage.getItem(t + '-online-sum')) || {}).mine || 0; } catch (e) { } }
@@ -110,7 +113,7 @@ function onlineCore(C) {
   async function create(o) { // o = {color: 1|2|0(무작위), days, rated, n?, handi?}
     const s = LB.state(), { uid } = await LB.auth(); fix();
     const R = get(), col = o.color || (Math.random() < 0.5 ? 1 : 2), r = Math.max(0, Math.round(R.rating)), rd = Math.round(R.rd);
-    const f = { g: T, ...C.fields(o), days: o.days, rated: !!o.rated, host: uid, players: [uid],
+    const f = { g: T, ...C.fields(o), days: o.days, rated: !C.unrated && !!o.rated, host: uid, players: [uid],
       bu: col === 1 ? uid : '', wu: col === 2 ? uid : '', bn: col === 1 ? s.name : '', wn: col === 2 ? s.name : '',
       bR: col === 1 ? r : 0, bD: col === 1 ? rd : 0, wR: col === 2 ? r : 0, wD: col === 2 ? rd : 0,
       st: 'open', moves: [], rs: 0, created: Date.now() };
@@ -121,10 +124,10 @@ function onlineCore(C) {
   async function join(d) {
     const s = LB.state(), { uid } = await LB.auth(); fix();
     const R = get(), x = d.bu === '' ? 'b' : 'w';
-    const f = { players: d.players.concat(uid), [x + 'u']: uid, [x + 'n']: s.name, [x + 'R']: Math.max(0, Math.round(R.rating)), [x + 'D']: Math.round(R.rd), st: 'play' };
+    const f = { players: d.players.concat(uid), [x + 'u']: uid, [x + 'n']: s.name, [x + 'R']: Math.max(0, Math.round(R.rating)), [x + 'D']: Math.round(R.rd), st: C.joinState || 'play' };
     await ONL.write(d.code, f, Object.keys(f), { ut: d.ut });
   }
-  const link = code => location.href.replace(new RegExp('/' + T + '/.*$'), '/' + T + '/online/#join=' + code);
+  const PATH = C.path || T, link = code => location.href.replace(new RegExp('/' + PATH + '/.*$'), '/' + PATH + '/online/#join=' + code);
   const inviteText = d => `${d.bn || d.wn}님이 ${C.name} 한 판 청합니다 · ${info(d)} · 방 코드 ${d.code}`;
 
   window.addEventListener('online', sync);
