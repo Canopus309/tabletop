@@ -18,7 +18,7 @@ if (isMainThread) {
     wk.on('exit', () => { if (--alive) return; finish(); });
   }
   function finish() {
-    const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환', '': '없음' };
+    const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환', mirror: '거울수', grow: '증식', save: '패스 저축', teleport: '순간이동', para: '공수부대', fork: '양자택일', shadow: '예약수', '': '없음' };
     const sum = rs => { let w = 0, d = 0; for (const r of rs) { w += r.aWin; d += r.aLead; } return { games: rs.length, aWinRate: +(w / Math.max(1, rs.length)).toFixed(3), aLead: +(d / Math.max(1, rs.length)).toFixed(1) }; };
     const aug = sum(res.filter(r => r.aug[0] || r.aug[1])), plain = sum(res.filter(r => !r.aug[0] && !r.aug[1]));
     // 증강을 쓴 쪽이 어느 신경망이었나: 증강별로 A 쪽이 그 증강을 가졌을 때 A 의 평균 집 차이

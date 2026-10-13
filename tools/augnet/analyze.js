@@ -38,7 +38,7 @@ function fit(games) {
 if (require.main === module) {
   const i = process.argv.indexOf('--last'), last = i > 0 ? +process.argv[i + 1] : 4000;
   const games = fs.readFileSync(path.join(__dirname, 'data' + (process.env.AUGNET_NET && process.env.AUGNET_NET !== 'b10' ? '-' + process.env.AUGNET_NET : ''), 'games.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
-  const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환' };
+  const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환', mirror: '거울수', grow: '증식', save: '패스 저축', teleport: '순간이동', para: '공수부대', fork: '양자택일', shadow: '예약수' };
   for (const [lo, hi] of [[0, last], [Math.max(0, games.length - last), games.length]]) {
     const r = fit(games.slice(lo, hi)); if (!r) continue;
     console.log(`${lo}~${hi}판 (억지 사용 판 뺀 ${r.games}판) · 흑 기본 우세 ${r.base}±${r.baseSe}`);

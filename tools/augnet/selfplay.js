@@ -185,7 +185,7 @@ if (isMainThread) {
     const recs = [], turns = [], used = { 1: null, 2: null };
     // 증강을 가진 쪽의 1/4 은 무작위 시점에 억지로 한 번 쓰게 한다 (그 선택은 학습 기록에서 뺀다)
     const forceAt = {};
-    for (const c of [1, 2]) if (['invincible', 'barrier', 'snipe', 'double', 'swap'].includes(aug[c]) && Math.random() < 0.25) forceAt[c] = Math.floor(Math.random() * 50);
+    for (const c of [1, 2]) if (['invincible', 'barrier', 'snipe', 'double', 'swap', 'mirror', 'grow', 'save', 'teleport', 'para', 'fork', 'shadow'].includes(aug[c]) && Math.random() < 0.25) forceAt[c] = Math.floor(Math.random() * 50);
     let micro = 0;
     while (!st.terminal()) {
       const col = st.col;

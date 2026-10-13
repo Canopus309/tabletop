@@ -11,7 +11,7 @@ const AugAI = (() => {
   const { AUG_LIST, NF2, NG2 } = AugState;
   // 신경망이 본 증강 값 (9줄, 집 · 2026-10-13 AI끼리 4만 판). 경매에서 AI 가 덤을 부를 때 쓴다
   // 저격은 2026-10-13 에 '들어내고 착수'로 바뀌어 아직 재지 못했다: 슈퍼선수와 비슷하게 어림
-  const VALUE = { wall: 35, swap: 15, double: 14, snipe: 13, prisoner: 11, invincible: 9, barrier: 9, kowang: 8, rewind: 4 }; // b15 학습 초반 값, 배포 때 다시 잼
+  const VALUE = { wall: 35, swap: 15, double: 14, snipe: 13, prisoner: 11, invincible: 9, barrier: 9, kowang: 8, rewind: 4, grow: 20, mirror: 12, fork: 8, para: 8, save: 6, teleport: 5, shadow: 2 }; // b15 학습 초반 값 · 새 증강은 어림, 배포 때 다시 잼
   let net = null, head = null, backend = '', loading = null;
   // 이 파일(go/aug/ai.js) 이 있는 곳 기준으로 TF.js · 신경망 파일을 찾는다
   const HERE = typeof document !== 'undefined' && document.currentScript ? new URL('.', document.currentScript.src).href : './';
@@ -22,17 +22,22 @@ const AugAI = (() => {
   // 앱 대국(AugGame) 의 차례들 → St. 되감기로 되돌린 차례는 turns 에 없다
   function fromTurns(n, komi, aug, turns) {
     let s = new St(n, komi, aug);
-    const ix = p => p ? s.idx(p) : s.area;
+    const A1 = 2 * s.area + 1, ix = p => p ? s.idx(p) : s.area, T = p => s.area + 1 + s.idx(p);
+    const seq = ps => { for (const p of ps) { if (s.step === 'decide') break; s = s.apply(ix(p)); } }; // 연속 착수 (둘 곳이 없어 일찍 끝났으면 멈춤)
     for (const x of turns) {
       const t = x.t;
-      if (t.kind === 'swap') s = s.apply(s.area + 1 + s.idx(t.a)).apply(s.area + 1 + s.idx(t.b));
+      if (t.kind === 'swap' || t.kind === 'teleport' || t.kind === 'fork') s = s.apply(T(t.a)).apply(T(t.b));
+      else if (t.kind === 'shadow') s = s.apply(T(t.a));
+      else if (t.kind === 'grow') s = s.apply(T(t.p));
       else if (t.kind === 'snipe') { // 예전 저격 (수 대신 들어냄, 2026-10-13 전 기보)
-        const prev = s.node; s = s.clone(); s.len++; s.used[x.col] = true; s.b.snipe(t.q); s.step = 'decide'; s.node = { board: s.b, move: PASS, parent: prev, lad: null };
+        const prev = s.node; s = s.clone(); s.len++; s.used[x.col] = true; s.b.snipe(t.q); s.b.turnEnd(); s.step = 'decide'; s.node = { board: s.b, move: PASS, parent: prev, lad: null };
       }
-      else if (t.kind === 'double') s = s.apply(2 * s.area + 1).apply(ix(t.p)).apply(ix(t.p2));
+      else if (t.kind === 'double') { s = s.apply(A1); seq([t.p, t.p2]); }
+      else if (t.kind === 'spend') { s = s.apply(A1); seq(t.ps); }
+      else if (t.kind === 'mirror' || t.kind === 'para') { s = s.apply(A1); seq([t.p]); }
       else {
         if (t.pre && t.pre.k === 'r') s.used[x.col] = true;
-        else if (t.pre) s = s.apply(s.area + 1 + s.idx(t.pre.q));
+        else if (t.pre) s = s.apply(T(t.pre.q));
         s = s.apply(ix(t.p));
       }
     }
@@ -237,19 +242,31 @@ const AugAI = (() => {
       const br = await search(new Node(back), V, ab);
       if (rootQ(br, col) > rootQ(root, col) + 0.1) return 'r;' + pt(br.A[best(br)]);
     }
-    const a = root.A[best(root)];
+    let ai = best(root);
+    if (o.force) { let m = -1; for (let k = 0; k < root.A.length; k++) if (root.A[k] > area && (m < 0 || root.N[k] > root.N[m])) m = k; if (m >= 0) ai = m; } // 시험용: 증강을 꼭 쓰기
+    const a = root.A[ai];
     if (a <= area) return String(pt(a));
-    if (a === 2 * area + 1) { // 슈퍼선수: 첫 수 · 둘째 수
-      const i = root.A.indexOf(a), n1 = await search(root.kids[i] || new Node(st.apply(a)), V, ab), p1 = n1.A[best(n1)];
-      const i2 = best(n1), n2 = await search(n1.kids[i2] || new Node(n1.st.apply(p1)), V, ab), p2 = n2.A[best(n2)];
-      return 'd' + pt(p1) + ',' + pt(p2);
+    const au = G.aug[col], child = async (nd, act) => { const i = nd.A.indexOf(act); return search(nd.kids[i] || (nd.kids[i] = new Node(nd.st.apply(act))), V, ab); };
+    const bestMove = () => { let m = -1; for (let k = 0; k < root.A.length; k++) if (root.A[k] <= area && (m < 0 || root.N[k] > root.N[m])) m = k; return String(pt(root.A[m])); };
+    if (a === 2 * area + 1) { // 지금 쓰기: 슈퍼선수 · 패스 저축은 연속 착수, 거울수 · 공수부대는 한 수
+      const need = au === 'double' ? 2 : au === 'save' ? st.saves[col] + 1 : 1, ps = [];
+      let nd = await child(root, a);
+      while (ps.length < need) {
+        const m = nd.A[best(nd)]; ps.push(pt(m));
+        const nx = nd.kids[nd.A.indexOf(m)] || new Node(nd.st.apply(m));
+        if (nx.st.step === 'decide') break;
+        nd = await search(nx, V, ab);
+      }
+      while (ps.length < need) ps.push(0);
+      return au === 'double' ? 'd' + ps.join(',') : au === 'save' ? 'e' + ps.join(',') : (au === 'mirror' ? 'm' : 'p') + ps[0];
     }
-    const q = st.pt(a - area - 1), au = G.aug[col];
-    const i = root.A.indexOf(a), n1 = await search(root.kids[i] || new Node(st.apply(a)), V, ab);
-    if (au === 'swap') { // 바꿀 상대 돌 (없으면 맞바꾸기를 접고 가장 좋은 보통 수)
-      const b2 = n1.A[best(n1)]; if (b2 > area) return 'x' + q + ',' + st.pt(b2 - area - 1);
-      let m = -1; for (let k = 0; k < root.A.length; k++) if (root.A[k] <= area && (m < 0 || root.N[k] > root.N[m])) m = k;
-      return String(pt(root.A[m]));
+    const q = st.pt(a - area - 1);
+    if (au === 'grow') return 'g' + q;
+    if (au === 'shadow') return 'h' + q;
+    const n1 = await child(root, a);
+    if (au === 'swap' || au === 'teleport' || au === 'fork') { // 둘째 고르기 (고를 것이 없으면 가장 좋은 보통 수)
+      const b2 = n1.A[best(n1)]; if (b2 > area) return ({ swap: 'x', teleport: 't', fork: 'f' })[au] + q + ',' + st.pt(b2 - area - 1);
+      return bestMove();
     }
     return (au === 'invincible' ? 'i' : au === 'barrier' ? 'b' : 's') + q + ';' + pt(n1.A[best(n1)]);
   }

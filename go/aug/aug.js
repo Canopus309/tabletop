@@ -10,6 +10,14 @@
  *   벽       늘. 내 쪽 변(흑 아래 · 백 위)의 1선에 내 돌이 다 놓인 채로 시작한다 (2026-10-13 추가: 벽·맞바꾸기·포로교환)
  *   맞바꾸기 한 번. 수 대신 내 돌 하나와 상대 돌 하나의 자리를 바꾼다. 활로가 없어진 상대 무리는 잡히고, 내 무리가 활로 없이 남는 맞바꾸기는 못 한다
  *   포로교환 늘. 대국 중 따내거나 들어낸 상대 돌 수 + 계가 때 죽은 돌로 표시한 상대 돌 수만큼 내 집에 더한다
+ *   거울수   한 번. 이번 수의 판 중심 대칭점(180도)에도 내 돌이 놓인다 (비어 있고 둘 수 있으면)  — 2026-10-13 추가: 거울수·증식·패스 저축·순간이동·공수부대
+ *   증식     한 번. 수 대신 내 돌 하나 둘레의 빈 점을 모두 내 돌로 (상대 결계 점 빼고. 내 무리가 활로 없이 남으면 못 씀)
+ *   패스저축 내가 패스할 때마다 1 저축. 한 번, 저축을 쓰면 그 차례에 (1 + 저축)수를 연달아 둔다
+ *   순간이동 한 번. 수 대신 내 돌 하나를 빈 점으로 옮긴다 (옮긴 돌에 활로가 없으면 못 옮김. 무적수를 건 돌이면 무적도 따라감)
+ *   공수부대 한 번. 이번 수는 자살수 자리에도 둘 수 있고, 그 돌의 무리는 상대의 다음 차례 동안 잡히지 않는다.
+ *            내 다음 차례가 끝났을 때도 활로가 없으면 그때 잡힌다
+ *   양자택일 한 번. 수 대신 빈 점 두 곳을 예약. 상대 차례가 끝나면 아직 비어 있고 둘 수 있는 예약점마다 내 돌이 놓인다
+ *   예약수   한 번. 수 대신 빈 점 한 곳을 예약 (지금 둘 수 없는 자리도 됨). 상대 차례가 끝나면 비어 있고 둘 수 있으면 내 돌
  *
  * 증강 정하기 (경매, 2026-10): 증강 둘을 공개하고 두 사람이 번갈아 덤을 부른다. 마지막에 높게 부른 사람이 먼저 고르고
  *   부른 만큼 상대에게 덤으로 준다 → 덤 = 7.5 + (흑이 낙찰이면 +값, 백이면 -값). 공정한 값은 두 사람이 정하므로 덤표가 필요 없다.
@@ -24,6 +32,13 @@
  *   "s45;123"    저격: 45 의 상대 돌을 들어내고 123 에 착수
  *   "s45"        (예전 저격, 2026-10-13 전 기보) 45 의 상대 돌을 들어냄 (착수 없음)
  *   "x12,34"      맞바꾸기: 12 의 내 돌과 34 의 상대 돌 자리를 바꿈
+ *   "m12"        거울수: 12 에 두고 대칭점에도
+ *   "g12"        증식: 12 의 내 돌 둘레 빈 점을 모두 내 돌로
+ *   "e12,34,56"  패스 저축 쓰기: (1 + 저축)수를 차례로
+ *   "t12,34"      순간이동: 12 의 내 돌을 34 로
+ *   "p12"        공수부대: 12 에 (자살수 자리도 됨)
+ *   "f12,34"      양자택일: 12 와 34 를 예약
+ *   "h12"        예약수: 12 를 예약
  */
 'use strict';
 // 증강 점수 (2026-10 추정값, 집): 수 하나의 값(포석에서 약 14집)을 기준으로 어림했다. 참고 한마디에만 쓴다.
@@ -43,6 +58,13 @@ const AUGS={
   barrier:{name:'결계',short:'상대가 못 두는 점',desc:'한 번, 빈 점 하나를 상대가 끝까지 둘 수 없는 점으로 만듭니다. 그 점에 붙은 내 돌은 그 점이 활로로 남아 잡히지 않고, 확실한 눈이 됩니다. 쓴 차례에 수도 둡니다.',v:{9:20,13:28,19:40}},
   wall:{name:'벽',passive:true,short:'1선을 내 돌로 시작',desc:'늘 켜져 있습니다. 내 쪽 변(흑은 아래, 백은 위)의 1선에 내 돌이 다 놓인 채로 대국을 시작합니다.',v:{9:35,13:38,19:40}},
   swap:{name:'맞바꾸기',short:'내 돌과 상대 돌 자리 바꾸기',desc:'한 번, 내 차례에 수를 두는 대신 내 돌 하나와 상대 돌 하나의 자리를 바꿉니다. 활로가 없어진 상대 무리는 잡히고, 내 무리가 활로 없이 남게 되면 바꿀 수 없습니다. 무적인 돌은 바꿀 수 없습니다.',v:{9:8,13:9,19:10}},
+  mirror:{name:'거울수',short:'대칭점에도 한 점',desc:'한 번, 이번 수를 두면 판 가운데를 중심으로 180도 돌린 자리에도 내 돌이 놓입니다 (그 자리가 비어 있고 둘 수 있을 때. 가운데 점에 두면 한 점만).',v:{9:12,13:13,19:14}},
+  grow:{name:'증식',short:'둘레 빈 점을 모두 내 돌로',desc:'한 번, 내 차례에 수를 두는 대신 내 돌 하나를 고르면 그 둘레(위아래 양옆)의 빈 점이 모두 내 돌이 됩니다. 상대 결계 점은 빠지고, 내 무리가 활로 없이 남게 되면 쓸 수 없습니다.',v:{9:22,13:22,19:22}},
+  save:{name:'패스 저축',short:'패스를 모아 연속 착수',desc:'내가 패스할 때마다 1씩 저축합니다. 한 번, 저축을 쓰면 그 차례에 (1 + 저축)수를 연달아 둡니다 (패스는 안 됨). 두 사람이 이어서 패스하면 대국이 끝나는 규칙은 그대로입니다.',v:{9:6,13:7,19:8}},
+  teleport:{name:'순간이동',short:'내 돌 하나 옮기기',desc:'한 번, 내 차례에 수를 두는 대신 내 돌 하나를 빈 점으로 옮깁니다. 옮긴 돌에 활로가 없으면 옮길 수 없고, 옮긴 돌로 상대 돌을 따낼 수는 있습니다.',v:{9:5,13:6,19:7}},
+  para:{name:'공수부대',short:'자살수 자리에도 착수 · 한 턴 무적',desc:'한 번, 이번 수는 자살수 자리(활로가 없는 곳)에도 둘 수 있고, 그 돌의 무리는 상대의 다음 차례 동안 잡히지 않습니다. 내 다음 차례가 끝났을 때도 활로가 없으면 그때 잡힙니다.',v:{9:8,13:9,19:10}},
+  fork:{name:'양자택일',short:'빈 점 두 곳 예약',desc:'한 번, 내 차례에 수를 두는 대신 빈 점 두 곳을 예약합니다. 상대 차례가 끝나면, 아직 비어 있고 둘 수 있는 예약점마다 내 돌이 놓입니다. 상대는 한 수로 한 곳만 막을 수 있습니다.',v:{9:8,13:9,19:10}},
+  shadow:{name:'예약수',short:'빈 점 한 곳 예약',desc:'한 번, 내 차례에 수를 두는 대신 빈 점 한 곳을 예약합니다 (지금 둘 수 없는 자리도 됩니다). 상대 차례가 끝나면, 그 점이 비어 있고 둘 수 있으면 내 돌이 놓입니다.',v:{9:2,13:2,19:3}},
   prisoner:{name:'포로교환',passive:true,short:'따낸 돌만큼 집',desc:'늘 켜져 있습니다. 대국 중 따내거나 들어낸 상대 돌 수와, 계가 때 죽은 돌로 표시한 상대 돌 수만큼 내 집에 더합니다 (중국식 계가에 일본식 사석 계산을 더하는 셈).',v:{9:5,13:7,19:10}},
 };
 const AUG_IDS=Object.keys(AUGS);
@@ -69,6 +91,13 @@ function augParse(s){
   if((m=/^s(\d+)$/.exec(s)))return{kind:'snipe',q:+m[1]};
   if((m=/^d(\d+),(\d+)$/.exec(s)))return{kind:'double',p:+m[1],p2:+m[2]};
   if((m=/^x(\d+),(\d+)$/.exec(s)))return{kind:'swap',a:+m[1],b:+m[2]};
+  if((m=/^m(\d+)$/.exec(s)))return{kind:'mirror',p:+m[1]};
+  if((m=/^g(\d+)$/.exec(s)))return{kind:'grow',p:+m[1]};
+  if((m=/^e(\d+(?:,\d+)*)$/.exec(s)))return{kind:'spend',ps:m[1].split(',').map(Number)};
+  if((m=/^t(\d+),(\d+)$/.exec(s)))return{kind:'teleport',a:+m[1],b:+m[2]};
+  if((m=/^p(\d+)$/.exec(s)))return{kind:'para',p:+m[1]};
+  if((m=/^f(\d+),(\d+)$/.exec(s)))return{kind:'fork',a:+m[1],b:+m[2]};
+  if((m=/^h(\d+)$/.exec(s)))return{kind:'shadow',a:+m[1]};
   if((m=/^(?:([ibs])(\d+);|(r);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:'r'}:null};
   return null;
 }
@@ -76,6 +105,13 @@ function augFormat(t){
   if(t.kind==='snipe')return's'+t.q;
   if(t.kind==='double')return'd'+t.p+','+t.p2;
   if(t.kind==='swap')return'x'+t.a+','+t.b;
+  if(t.kind==='mirror')return'm'+t.p;
+  if(t.kind==='grow')return'g'+t.p;
+  if(t.kind==='spend')return'e'+t.ps.join(',');
+  if(t.kind==='teleport')return't'+t.a+','+t.b;
+  if(t.kind==='para')return'p'+t.p;
+  if(t.kind==='fork')return'f'+t.a+','+t.b;
+  if(t.kind==='shadow')return'h'+t.a;
   return(t.pre?(t.pre.k==='r'?'r;':t.pre.k+t.pre.q+';'):'')+t.p;
 }
 
@@ -87,6 +123,7 @@ class AugGame{
   }
   reset(){
     this.b=new Board(this.n);this.inv={1:0,2:0};this.bar={1:0,2:0};this.koBan=null;this.last=-1;this.lastCol=0;this.usedNow={1:false,2:false};
+    this.ply=0;this.saves={1:0,2:0};this.para=null;this.resv=null; // resv: 양자택일 · 예약수 {col, pts, at: 이 차례 수가 되면 놓음} // ply: 판에 적용한 차례 수 · saves: 패스 저축 · para: 공수부대 {col, p, prot(이 차례까지 보호), check(이 차례 끝에 확인)}
     for(const col of [1,2])if(this.aug[col]==='wall')for(const p of augWallPts(this.n,col))this.b.place(p,col);
   }
   get komi(){return this.base;}
@@ -103,6 +140,7 @@ class AugGame{
   // p 의 돌이 무적인가 (무적수를 건 돌과 이어져 있으면)
   invincible(p){
     const b=this.b,col=b.c[p];if(col!==BLACK&&col!==WHITE)return false;
+    if(this.para&&this.para.col===col&&this.ply<=this.para.prot&&b.c[this.para.p]===col&&(p===this.para.p||this.chain(p).includes(this.para.p)))return true;
     const m=this.inv[col];if(!m||b.c[m]!==col)return false;
     return m===p||this.chain(p).includes(m);
   }
@@ -143,8 +181,25 @@ class AugGame{
     for(const r of near)if(b.c[r]===col&&b.libs(r,1)===0&&!this.invincible(r))return -1;
     this.koBan=null;return cap;
   }
+  // 둘 곳이 하나도 없는가 (연속 착수 증강이 판이 꽉 차 멈출 때)
+  noMove(col){return !this.b.pts.some(p=>this.canPlay(p,col));}
+  // 판 중심 대칭점 (거울수)
+  mirrorPt(p){const [x,y]=this.b.xy(p);return this.b.pt(this.n-1-x,this.n-1-y);}
   // 한 차례(객체)를 판에 적용. 규칙에 맞지 않으면 Error. 반환: 따낸 돌 수
   step(t,col){
+    const cap=this.stepCore(t,col),k=this.ply++;
+    // 패스 저축: 아직 쓰지 않은 패스 저축을 가진 사람이 그냥 패스하면 1 저축
+    if(t.kind==='move'&&!t.p&&!t.pre&&this.aug[col]==='save'&&!this.used(col))this.saves[col]++;
+    // 공수부대: 내 다음 차례가 끝났을 때 활로가 없으면 잡힘
+    if(this.para&&k===this.para.check){
+      const P=this.para,b=this.b;this.para=null;
+      if(b.c[P.p]===P.col&&b.libs(P.p,1)===0&&!this.invincible(P.p))b.caps[3-P.col]+=b.remove(P.p);
+    }
+    // 양자택일 · 예약수: 상대 차례가 끝나면 예약점에 내 돌 (비어 있고 둘 수 있으면, 하나씩)
+    if(this.resv&&this.ply===this.resv.at){const R=this.resv;this.resv=null;let c2=0;for(const p of R.pts)if(this.canPlay(p,R.col))c2+=this.put(p,R.col);this.koBan=null;this.last=-1;void c2;}
+    return cap;
+  }
+  stepCore(t,col){
     const b=this.b,a=this.aug[col],fail=m=>{throw new Error(m);};
     const need=id=>{if(a!==id)fail(AUGS[id].name+' 증강이 없습니다');if(this.used(col))fail('증강은 한 번만 쓸 수 있습니다');this.usedNow[col]=true;};
     if(t.pre&&t.pre.k==='r')this.usedNow[col]=true; // 되감기는 apply 에서 확인하고 되돌린 뒤 여기 온다
@@ -162,12 +217,50 @@ class AugGame{
       const cap=this.settle(col,[p,q]);if(cap<0)fail('바꾸면 내 돌이 활로 없이 남습니다');
       this.last=q;this.lastCol=col;return cap;
     }
-    if(t.kind==='double'){
-      need('double');if(!t.p||!t.p2)fail('패스는 두 수로 쓸 수 없습니다');
+    if(t.kind==='mirror'){
+      need('mirror');if(!t.p){if(!this.noMove(col))fail('거울수는 패스로 쓸 수 없습니다');return 0;}
       if(!this.canPlay(t.p,col))fail(this.whyNot(t.p,col));
-      let cap=this.put(t.p,col);
-      if(!this.canPlay(t.p2,col))fail(this.whyNot(t.p2,col));
-      return cap+this.put(t.p2,col);
+      let cap=this.put(t.p,col);const q=this.mirrorPt(t.p);
+      if(q!==t.p&&this.canPlay(q,col))cap+=this.put(q,col);
+      this.last=t.p;return cap;
+    }
+    if(t.kind==='grow'){
+      need('grow');const p=t.p;if(b.c[p]!==col)fail('내 돌을 골라야 합니다');
+      const pts=[];for(const dd of b.d){const r=p+dd;if(b.c[r]===EMPTY&&this.bar[3-col]!==r)pts.push(r);}
+      if(!pts.length)fail('둘레에 빈 점이 없습니다');
+      for(const r of pts)b.place(r,col);
+      const cap=this.settle(col,pts);if(cap<0)fail('늘리면 내 돌이 활로 없이 남습니다');
+      this.last=-1;this.lastCol=col;return cap;
+    }
+    if(t.kind==='spend'){
+      need('save');const k=this.saves[col];if(k<1)fail('저축한 패스가 없습니다');
+      if(t.ps.length!==k+1)fail(`저축 ${k}: ${k+1}수를 둬야 합니다`);
+      let cap=0;for(const p of t.ps){if(!p){if(!this.noMove(col))fail('패스는 쓸 수 없습니다');continue;}if(!this.canPlay(p,col))fail(this.whyNot(p,col));cap+=this.put(p,col);}
+      this.saves[col]=0;return cap;
+    }
+    if(t.kind==='teleport'){
+      need('teleport');const a0=t.a,q=t.b;
+      if(b.c[a0]!==col)fail('옮길 내 돌을 골라야 합니다');if(b.c[q]!==EMPTY||this.bar[3-col]===q)fail('빈 점으로만 옮길 수 있습니다');
+      b.c[a0]=EMPTY;b.addE(a0);b.place(q,col);if(this.inv[col]===a0)this.inv[col]=q;
+      const cap=this.settle(col,[q]);if(cap<0)fail('옮긴 돌에 활로가 없습니다');
+      this.last=q;this.lastCol=col;return cap;
+    }
+    if(t.kind==='para'){
+      need('para');const q=t.p;if(!q){if(this.b.pts.some(p=>this.b.c[p]===EMPTY&&this.bar[3-col]!==p))fail('공수부대는 패스로 쓸 수 없습니다');return 0;}
+      if(b.c[q]!==EMPTY||this.bar[3-col]===q)fail(this.whyNot(q,col));
+      this.para={col,p:q,prot:this.ply+1,check:this.ply+2};
+      return this.put(q,col);
+    }
+    if(t.kind==='fork'||t.kind==='shadow'){
+      need(t.kind);const pts=t.kind==='fork'?[t.a,t.b]:[t.a];
+      if(t.kind==='fork'&&t.a===t.b)fail('서로 다른 두 점을 골라야 합니다');
+      for(const p of pts)if(b.c[p]!==EMPTY||this.bar[3-col]===p)fail('빈 점만 예약할 수 있습니다');
+      this.resv={col,pts,at:this.ply+2};this.koBan=null;this.last=-1;this.lastCol=col;return 0;
+    }
+    if(t.kind==='double'){
+      need('double');let cap=0;
+      for(const p of [t.p,t.p2]){if(!p){if(!this.noMove(col))fail('패스는 두 수로 쓸 수 없습니다');continue;}if(!this.canPlay(p,col))fail(this.whyNot(p,col));cap+=this.put(p,col);}
+      return cap;
     }
     if(t.pre&&t.pre.k==='i'){need('invincible');if(b.c[t.pre.q]!==col)fail('무적수는 내 돌에 겁니다');this.inv[col]=t.pre.q;}
     if(t.pre&&t.pre.k==='b'){need('barrier');if(b.c[t.pre.q]!==EMPTY)fail('결계는 빈 점에 칩니다');this.bar[col]=t.pre.q;}
@@ -238,6 +331,12 @@ class AugGame{
     const out=[];
     for(const x of this.turns){
       if(x.t.kind==='swap'){out.push({col:x.col,swap:[x.t.a,x.t.b],note:'맞바꾸기'});continue;}
+      if(x.t.kind==='teleport'){out.push({col:x.col,tele:[x.t.a,x.t.b],note:'순간이동'});continue;}
+      if(x.t.kind==='spend'){x.t.ps.forEach((p,i)=>out.push({col:x.col,p,note:i?'':'패스 저축 ('+x.t.ps.length+'수 연달아)'}));continue;}
+      if(x.t.kind==='mirror'){out.push({col:x.col,p:x.t.p,note:'거울수',extra:'mirror'});continue;}
+      if(x.t.kind==='grow'){out.push({col:x.col,grow:x.t.p,note:'증식'});continue;}
+      if(x.t.kind==='para'){out.push({col:x.col,p:x.t.p,note:'공수부대'});continue;}
+      if(x.t.kind==='fork'||x.t.kind==='shadow'){out.push({col:x.col,p:0,note:(x.t.kind==='fork'?'양자택일':'예약수')});continue;}
       const t=x.t,A=AUGS[this.aug[x.col]];
       if(t.kind==='snipe')out.push({col:x.col,snipe:t.q,note:'저격'});
       else if(t.kind==='double'){out.push({col:x.col,p:t.p,note:'슈퍼선수 (두 수 연달아)'});out.push({col:x.col,p:t.p2});}

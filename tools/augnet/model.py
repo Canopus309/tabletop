@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 NF, NG = 22, 19            # KataGo 입력 (칸마다 · 전역)
-AUG_NF, AUG_NG = 7, 22     # 증강 덧붙임 (2026-10-13 벽·맞바꾸기·포로교환 추가 전에는 6, 14: 그때의 b10 가중치는 지금 코드로 못 읽음)
+AUG_NF, AUG_NG = 13, 52    # 증강 덧붙임 (3판, 2026-10-13: 증강 자리 20 · 빈자리 포함. go/aug/augstate.js 와 같게. 2판은 7, 22 · 1판은 6, 14)
 NF2, NG2 = NF + AUG_NF, NG + AUG_NG
 
 

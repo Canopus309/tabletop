@@ -182,4 +182,26 @@ ok('먼저 부를 색은 1 또는 2, 같은 씨앗이면 같음', [1,2].includes
  void s0;
 }
 
+// 거울수 · 증식 · 패스 저축 · 순간이동 · 공수부대 · 양자택일 · 예약수
+{const g=G('mirror','');g.apply('m'+P(2,2));ok('거울수: 대칭점에도 놓임', g.b.c[P(2,2)]===1&&g.b.c[P(6,6)]===1&&g.turn===2);
+ const h=G('mirror','');h.apply('m'+P(4,4));ok('거울수: 가운데는 한 점', h.b.pts.filter(p=>h.b.c[p]===1).length===1);}
+{const g=G('grow','');g.apply(String(P(4,4)));g.apply(String(P(0,0)));g.apply('g'+P(4,4));
+ ok('증식: 둘레 빈 점 4곳이 내 돌', [P(3,4),P(5,4),P(4,3),P(4,5)].every(p=>g.b.c[p]===1)&&g.turn===2);}
+{const g=G('save','');g.apply('0');g.apply(String(P(0,0)));g.apply('0');g.apply(String(P(8,8)));
+ ok('패스 저축: 패스 두 번이면 2 저축', g.saves[1]===2);
+ throws('패스 저축: 수가 모자라면 거부', ()=>g.apply('e'+P(4,4)+','+P(4,5)));
+ g.apply('e'+P(4,4)+','+P(4,5)+','+P(4,6));ok('패스 저축: 3수 연달아, 백 차례', [P(4,4),P(4,5),P(4,6)].every(p=>g.b.c[p]===1)&&g.turn===2&&g.saves[1]===0);}
+{const g=G('teleport','');g.apply(String(P(0,0)));g.apply(String(P(8,8)));g.apply('t'+P(0,0)+','+P(4,4));
+ ok('순간이동: 돌이 옮겨짐', g.b.c[P(0,0)]===0&&g.b.c[P(4,4)]===1&&g.turn===2);}
+{const g=G('para','');
+ for(const p of [P(6,6),P(1,0),P(6,7),P(0,1)])g.apply(String(p));
+ g.apply('p'+P(0,0));ok('공수부대: 자살수 자리에 둠', g.b.c[P(0,0)]===1);
+ g.apply(String(P(5,5)));ok('공수부대: 상대 차례에는 안 잡힘', g.b.c[P(0,0)]===1);
+ g.apply(String(P(7,7)));ok('공수부대: 내 다음 차례 뒤 활로 없으면 잡힘', g.b.c[P(0,0)]===0&&g.b.caps[2]===1);}
+{const g=G('fork','');g.apply('f'+P(2,2)+','+P(6,6));ok('양자택일: 예약만, 백 차례', g.b.c[P(2,2)]===0&&g.turn===2);
+ g.apply(String(P(6,6)));ok('양자택일: 막지 않은 예약점에 흑 돌', g.b.c[P(2,2)]===1&&g.b.c[P(6,6)]===2&&g.turn===1);
+ throws('양자택일: 같은 점 둘은 안 됨', ()=>{const h=G('fork','');h.apply('f'+P(2,2)+','+P(2,2));});}
+{const g=G('shadow','');g.apply('h'+P(4,4));g.apply(String(P(0,0)));ok('예약수: 상대 차례 뒤 내 돌', g.b.c[P(4,4)]===1&&g.turn===1);
+ const h=G('shadow','');h.apply('h'+P(4,4));h.apply(String(P(4,4)));ok('예약수: 상대가 먼저 두면 사라짐', h.b.c[P(4,4)]===2&&!h.resv);}
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);process.exit(fail?1:0);

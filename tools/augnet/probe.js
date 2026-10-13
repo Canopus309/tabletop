@@ -6,7 +6,7 @@ const net = require('net'), fs = require('fs'), path = require('path');
 const { St, AUG_LIST, NF2, NG2 } = require('./game.js');
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const PORT = +arg('port', 19190), n = 9, area = n * n, IN = area * NF2 + NG2, OUT = 3 * area + 9;
-const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환', '': '없음' };
+const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환', mirror: '거울수', grow: '증식', save: '패스 저축', teleport: '순간이동', para: '공수부대', fork: '양자택일', shadow: '예약수', '': '없음' };
 const AUGS = [''].concat(AUG_LIST), KOMI = []; for (let k = -50.5; k <= 65.5; k += 1) KOMI.push(k);
 
 const sock = net.connect(PORT, '127.0.0.1'); let rbuf = Buffer.alloc(0), want = 0, cb = null;

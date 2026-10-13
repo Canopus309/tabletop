@@ -220,12 +220,25 @@ function sgfText(g){
   for(const col of [1,2])if(g.aug[col]==='wall')s+=(col===1?'AB':'AW')+augWallPts(g.n,col).map(p=>`[${c(p)}]`).join('');
   s+=`PB[${me?(me===1?'나':opp):'흑'}]PW[${me?(me===2?'나':opp):'백'}]GN[증강 바둑]GC[흑 증강: ${augLabel(g.aug[1])}, 백 증강: ${augLabel(g.aug[2])}]`;
   if(g.over&&g.result){const r=g.result;s+=`RE[${r.winner===1?'B':'W'}+${r.how==='resign'?'R':r.how==='time'?'T':r.d}]`;}
-  for(const m of G?G.record():[]){
-    const C=m.col===1?'B':'W';
-    if(m.swap){const [a,q]=m.swap,A=m.col===1?'AB':'AW',B=m.col===1?'AW':'AB';s+=`;AE[${c(a)}][${c(q)}];${A}[${c(q)}]${B}[${c(a)}]C[맞바꾸기: ${c(a)} ↔ ${c(q)}]`;continue;}
-    if(m.snipe!==undefined){s+=`;${C}[]AE[${c(m.snipe)}]C[저격: ${c(m.snipe)} 돌을 들어냄]`;continue;}
-    if(m.rm)s+=`;AE[${c(m.rm)}]C[저격: ${c(m.rm)} 돌을 들어냄]`;
-    s+=`;${C}[${m.p?c(m.p):''}]`;if(m.note)s+=`C[${m.note}${m.q?' '+c(m.q):''}]`;
+  // 처음부터 다시 두며 기록한다: 보통 수는 착수 마디, 판을 직접 바꾸는 증강(맞바꾸기 · 증식 · 순간이동 · 거울수)은 바뀐 칸을 설정 마디로
+  const g2=G?new AugGame({n:G.n,komi:G.base,aug:G.aug}):null,L=ps=>ps.map(p=>`[${c(p)}]`).join('');
+  for(const x of G?G.turns:[]){
+    const t=x.t,C=x.col===1?'B':'W',before=g2.b.c.slice();g2.step(t,x.col);
+    const ch={ae:[],ab:[],aw:[]};for(const p of g2.b.pts)if(before[p]!==g2.b.c[p])(g2.b.c[p]===EMPTY?ch.ae:g2.b.c[p]===BLACK?ch.ab:ch.aw).push(p);
+    const setup=note=>`;${ch.ae.length?'AE'+L(ch.ae):''}${ch.ab.length?'AB'+L(ch.ab):''}${ch.aw.length?'AW'+L(ch.aw):''}C[${note}]`;
+    if(t.kind==='swap'){s+=setup(`맞바꾸기: ${c(t.a)} ↔ ${c(t.b)}`);continue;}
+    if(t.kind==='grow'){s+=setup(`증식: ${c(t.p)} 둘레`);continue;}
+    if(t.kind==='teleport'){s+=setup(`순간이동: ${c(t.a)} → ${c(t.b)}`);continue;}
+    if(t.kind==='mirror'){s+=setup(`거울수: ${c(t.p)}`);continue;}
+    if(t.kind==='snipe'){s+=`;${C}[]AE[${c(t.q)}]C[저격: ${c(t.q)} 돌을 들어냄]`;continue;}
+    if(t.kind==='fork'||t.kind==='shadow'){s+=`;${C}[]C[${t.kind==='fork'?'양자택일: '+c(t.a)+' · '+c(t.b):'예약수: '+c(t.a)} 예약]`;continue;}
+    if(t.kind==='double'||t.kind==='spend'){const ps=t.kind==='double'?[t.p,t.p2]:t.ps;ps.forEach((p,i)=>{s+=`;${C}[${c(p)}]`+(i?'':`C[${t.kind==='double'?'슈퍼선수 (두 수 연달아)':'패스 저축 ('+ps.length+'수 연달아)'}]`);});continue;}
+    if(t.pre&&t.pre.k==='s')s+=`;AE[${c(t.pre.q)}]C[저격: ${c(t.pre.q)} 돌을 들어냄]`;
+    const note=t.kind==='para'?'공수부대':t.pre?(t.pre.k==='i'?'무적수 '+c(t.pre.q):t.pre.k==='b'?'결계 '+c(t.pre.q):t.pre.k==='r'?'되감기':''):'';
+    s+=`;${C}[${t.p?c(t.p):''}]`+(note?`C[${note}]`:'');
+    // 보통 수로는 생기지 않는 변화: 사라진 내 돌 (공수부대 기한 · 예약점 돌에 따임), 생긴 상대 돌 (예약점)
+    const gone=ch.ae.filter(p=>before[p]===x.col),born=(x.col===1?ch.aw:ch.ab).filter(p=>before[p]===EMPTY);
+    if(gone.length||born.length)s+=`;${gone.length?'AE'+L(gone):''}${born.length?(x.col===1?'AW':'AB')+L(born):''}C[증강 효과: ${born.length?'예약점에 돌':''}${born.length&&gone.length?' · ':''}${gone.length?'잡힌 돌':''}]`;
   }
   return s+')';
 }
@@ -413,6 +426,11 @@ function draw(){
   // 마지막 수
   if(g.last>0&&b.c[g.last]!==EMPTY){const [x,y]=b.xy(g.last);ctx.strokeStyle=b.c[g.last]===BLACK?'#fff':'#222';ctx.lineWidth=Math.max(1.5,cell*0.06);ctx.beginPath();ctx.arc(X(x),X(y),r*0.42,0,7);ctx.stroke();}
   // 증강 쓰는 중: 고른 대상 표시
+  if(act&&act.k==='m'&&pending&&canAct()){const q=G.mirrorPt(pending);if(q!==pending&&b.c[q]===EMPTY){const [x,y]=b.xy(q);drawStone(X(x),X(y),r,G.turn,0.4);}}
+  if(G&&g===G&&G.para&&G.ply<=G.para.prot&&b.c[G.para.p]===G.para.col){ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle='rgba(40,150,230,.95)';ctx.lineWidth=Math.max(2,cell*0.07);for(const p of G.chain(G.para.p)){const [x,y]=b.xy(p);ctx.beginPath();ctx.arc(X(x),X(y),r*0.82,0,7);ctx.stroke();}ctx.restore();}
+  if(G&&g===G&&G.resv){for(const p of G.resv.pts)if(b.c[p]===EMPTY){const [x,y]=b.xy(p);drawStone(X(x),X(y),r,G.resv.col,0.3);ctx.save();ctx.setLineDash([2,3]);ctx.strokeStyle='rgba(200,140,20,.95)';ctx.lineWidth=Math.max(2,cell*0.06);ctx.beginPath();ctx.arc(X(x),X(y),r*0.95,0,7);ctx.stroke();ctx.restore();}}
+  if(act&&act.k==='f'&&act.a){const [x,y]=b.xy(act.a);drawStone(X(x),X(y),r,G.turn,0.35);}
+  if(act&&act.k==='t'&&act.a){const [x,y]=b.xy(act.a);ctx.strokeStyle='rgba(122,91,214,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(X(x),X(y),r*1.1,0,7);ctx.stroke();}
   if(act&&act.k==='x'&&act.a){const [x,y]=b.xy(act.a);ctx.strokeStyle='rgba(122,91,214,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(X(x),X(y),r*1.1,0,7);ctx.stroke();}
   if(act&&act.q&&(act.k==='i'||act.k==='b'||act.k==='s')){const [x,y]=b.xy(act.q);ctx.strokeStyle='rgba(122,91,214,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(X(x),X(y),r*1.1,0,7);ctx.stroke();}
   // 놓을 자리 미리보기
@@ -429,7 +447,8 @@ cv.addEventListener('click',e=>{
   if(phase==='score'){toggleDead(p);return;}
   if(!canAct())return;
   const col=G.turn,g=PG||G;
-  if(act&&(act.stage==='target'||act.k==='x')){target(p);return;}
+  if(act&&(act.stage==='target'||act.k==='x'||act.k==='t'||act.k==='f')){target(p);return;}
+  if(act&&act.k==='p'){if(g.b.c[p]===EMPTY&&g.bar[3-col]!==p){pending=p;draw();ui();}else{toast(g.b.c[p]!==EMPTY?'이미 돌이 있습니다':'상대의 결계: 이 점에는 둘 수 없습니다');sound('bad');}return;}
   if(g.canPlay(p,col)){pending=p;draw();ui();}
   else{toast(g.whyNot(p,col));sound('bad');}
 });
@@ -443,6 +462,9 @@ function commit(p){
   if(!act)s=String(p);
   else if(act.k==='i'||act.k==='b'||act.k==='s')s=act.k+act.q+';'+p;
   else if(act.k==='r')s='r;'+p;
+  else if(act.k==='m')s='m'+p;
+  else if(act.k==='p')s='p'+p;
+  else if(act.k==='e'){act.ps.push(p);if(act.ps.length<act.n){PG.put(p,col);pending=0;sound('stone');draw();ui();return;}s='e'+act.ps.join(',');}
   else if(act.k==='d'){
     if(act.stage===1){act.p1=p;act.stage=2;PG.put(p,col);pending=0;sound('stone');draw();ui();return;}
     s='d'+act.p1+','+p;
@@ -476,6 +498,31 @@ function target(p){
   const col=G.turn,b=G.b;
   if(act.k==='i'){if(b.c[p]!==col){toast('무적으로 만들 내 돌을 누르세요');return;}act.q=p;act.stage='move';PG.inv[col]=p;toast('무적수를 걸었습니다 · 이제 이번 차례의 수를 두세요');}
   else if(act.k==='b'){if(b.c[p]!==EMPTY){toast('결계는 빈 점에 칩니다');return;}act.q=p;act.stage='move';PG.bar[col]=p;toast('결계를 쳤습니다 · 이제 이번 차례의 수를 두세요');}
+  else if(act.k==='f'||act.k==='h'){ // 양자택일 · 예약수: 빈 점 예약
+    if(b.c[p]!==EMPTY||G.bar[3-col]===p){toast('예약할 빈 점을 누르세요');return;}
+    if(act.k==='f'&&act.stage==='first'){act.a=p;act.stage='second';draw();ui();return;}
+    if(act.k==='f'&&p===act.a){toast('다른 빈 점을 하나 더 누르세요');return;}
+    const s=act.k==='f'?'f'+act.a+','+p:'h'+p;
+    ask(act.k==='f'?'양자택일':'예약수',act.k==='f'?`${pname(act.a)} 와 ${pname(p)} 를 예약할까요? 상대 차례가 끝나면 비어 있는 예약점마다 내 돌이 놓입니다. 이번 차례는 수를 두지 않습니다.`:`${pname(p)} 를 예약할까요? 상대 차례가 끝나면 그 점이 비어 있고 둘 수 있으면 내 돌이 놓입니다. 이번 차례는 수를 두지 않습니다.`,'예약').then(y=>{if(y)play(s);});
+    return;
+  }
+  else if(act.k==='g'){ // 증식
+    if(b.c[p]!==col){toast('늘릴 내 돌을 누르세요');return;}
+    const s='g'+p,g=clone();try{g.apply(s);}catch(e){toast(e.message);sound('bad');return;}
+    const k=g.b.pts.filter(q=>g.b.c[q]===col).length-G.b.pts.filter(q=>G.b.c[q]===col).length;
+    ask('증식',`${pname(p)} 둘레의 빈 점 ${k}곳이 내 돌이 됩니다. 이번 차례는 수를 두지 않습니다.`,'늘리기').then(y=>{if(y)play(s);});
+    return;
+  }
+  else if(act.k==='t'){ // 순간이동: 내 돌 → 빈 점
+    if(act.stage==='mine'){if(b.c[p]!==col){toast('옮길 내 돌을 누르세요');return;}act.a=p;act.stage='dest';}
+    else{
+      if(b.c[p]===col){act.a=p;draw();ui();return;}
+      if(b.c[p]!==EMPTY){toast('옮길 빈 점을 누르세요');return;}
+      const s='t'+act.a+','+p,g=clone();try{g.apply(s);}catch(e){toast(e.message);sound('bad');return;}
+      ask('순간이동',`${pname(act.a)} 돌을 ${pname(p)} 로 옮길까요? 이번 차례는 수를 두지 않습니다.`,'옮기기').then(y=>{if(y)play(s);});
+      return;
+    }
+  }
   else if(act.k==='x'){ // 맞바꾸기: 내 돌 → 상대 돌
     if(act.stage==='mine'){
       if(b.c[p]!==col){toast('자리를 바꿀 내 돌을 누르세요');return;}if(G.invincible(p)){toast('무적인 돌은 바꿀 수 없습니다');return;}
@@ -507,6 +554,13 @@ async function useAug(){
   else if(id==='snipe'){act={k:'s',stage:'target'};}
   else if(id==='double'){act={k:'d',stage:1};PG=clone();}
   else if(id==='swap'){act={k:'x',stage:'mine'};}
+  else if(id==='mirror'){act={k:'m',stage:'move'};PG=clone();}
+  else if(id==='fork'){act={k:'f',stage:'first'};}
+  else if(id==='shadow'){act={k:'h',stage:'target'};}
+  else if(id==='grow'){act={k:'g',stage:'target'};}
+  else if(id==='teleport'){act={k:'t',stage:'mine'};}
+  else if(id==='para'){act={k:'p',stage:'move'};PG=clone();}
+  else if(id==='save'){const k=G.saves[col];if(k<1){toast('아직 저축한 패스가 없습니다 · 패스할 때마다 1씩 쌓여요');return;}act={k:'e',stage:1,ps:[],n:k+1};PG=clone();}
   else if(id==='rewind'){
     if(!G.canRewind(col)){toast('지금은 되감을 수 없습니다 (내 수와 상대 응수가 있어야 함)');return;}
     if(!(await ask('되감기','내 직전 수와 상대의 응수를 되돌리고 다시 둡니다. 대국 중 한 번만 쓸 수 있습니다.','되감기')))return;
@@ -517,9 +571,11 @@ async function useAug(){
 $('#aAug').onclick=useAug;
 $('#aPass').onclick=async()=>{
   if(!canAct())return;
-  if(act&&(act.k==='d'||act.k==='x'||(act.k==='s'&&act.stage==='target'))){toast('지금은 패스할 수 없습니다');return;}
+  if(act&&(['d','x','m','g','t','e','p','f','h'].includes(act.k)||(act.k==='s'&&act.stage==='target'))){toast('지금은 패스할 수 없습니다');return;}
   if(G.entries[G.entries.length-1]!=='0'&&G.turns.length<game.n*game.n*0.3&&!(await ask('패스할까요?','아직 둘 곳이 많이 남아 있습니다.','패스')))return;
+  const col=G.turn,sv=!act&&game.aug[col]==='save'&&!G.used(col);
   play(act?(act.k==='r'?'r;0':act.k+act.q+';0'):'0');
+  if(sv&&G.saves[col])toast(`패스 저축 +1 · 지금 ${G.saves[col]} (쓰면 ${G.saves[col]+1}수 연달아)`);
 };
 $('#aResign').onclick=async()=>{
   if(!G||game.over||phase==='pick'||phase==='wait')return;
@@ -557,7 +613,7 @@ function ui(){
   for(const col of [1,2]){
     const el=col===1?$('#pB'):$('#pW'),id=game.aug[col],usedNow=g&&id&&!AUGS[id].passive&&g.used(col);
     el.querySelector('.who').textContent=game.online?(col===me?'나':(game.online.opp.name||'상대')):game.ai?(col===me?'나':'AI'):'';
-    el.querySelector('.aug').innerHTML=id?`<span class="aug-chip${usedNow?' used':''}">${AUGS[id].name}${AUGS[id].passive?'':usedNow?' · 씀':''}</span>`:'<span class="aug-chip none">고르는 중</span>';
+    el.querySelector('.aug').innerHTML=id?`<span class="aug-chip${usedNow?' used':''}">${AUGS[id].name}${AUGS[id].passive?'':usedNow?' · 씀':id==='save'&&g?' · '+g.saves[col]:''}</span>`:'<span class="aug-chip none">고르는 중</span>';
     el.classList.toggle('active',!!g&&!game.over&&phase==='play'&&g.turn===col);
   }
   const st=$('#statusText');
@@ -584,6 +640,13 @@ function ui(){
     t=act.k==='i'?(act.stage==='target'?`<b>${nm}</b>: 무적으로 만들 내 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 무리에 걸었습니다 · 이번 차례의 수를 두세요`)
      :act.k==='b'?(act.stage==='target'?`<b>${nm}</b>: 상대가 못 두게 할 빈 점을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 에 결계 · 이번 차례의 수를 두세요`)
      :act.k==='s'?(act.stage==='target'?`<b>${nm}</b>: 들어낼 상대 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 돌을 들어냈습니다 · 이번 차례의 수를 두세요`)
+     :act.k==='m'?`<b>${nm}</b>: 둘 자리를 누르세요${pending?' · 대칭점 '+pname(G.mirrorPt(pending))+'에도 놓입니다':' · 판 가운데 대칭점에도 놓입니다'}`
+     :act.k==='g'?`<b>${nm}</b>: 둘레를 늘릴 내 돌을 누르세요`
+     :act.k==='f'?(act.stage==='first'?`<b>${nm}</b>: 예약할 빈 점 첫째를 누르세요`:`<b>${nm}</b>: ${pname(act.a)} 와 함께 예약할 빈 점을 누르세요`)
+     :act.k==='h'?`<b>${nm}</b>: 예약할 빈 점을 누르세요 (지금 둘 수 없는 자리도 됩니다)`
+     :act.k==='t'?(act.stage==='mine'?`<b>${nm}</b>: 옮길 내 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.a)} 돌을 옮길 빈 점을 누르세요`)
+     :act.k==='p'?`<b>${nm}</b>: 내려앉을 자리를 누르세요 (활로가 없는 곳도 됩니다 · 상대 다음 차례 동안 무적)`
+     :act.k==='e'?`<b>${nm}</b>: ${act.ps.length+1}/${act.n}번째 수를 두세요`
      :act.k==='x'?(act.stage==='mine'?`<b>${nm}</b>: 자리를 바꿀 내 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.a)} 와 바꿀 상대 돌을 누르세요`)
      :act.k==='d'?`<b>${nm}</b>: ${act.stage===1?'첫 수를 두세요':'두 번째 수를 두세요 (첫 수 '+pname(act.p1)+')'}`
      :`<b>${nm}</b>: 되돌린 장면입니다 · 다시 두세요`;
@@ -616,6 +679,13 @@ function turnText(t){
   if(x.kind==='snipe')return `저격: ${pname(x.q)} 돌을 들어냄`;
   if(x.kind==='double')return `슈퍼선수: ${pname(x.p)} · ${pname(x.p2)}`;
   if(x.kind==='swap')return `맞바꾸기: ${pname(x.a)} ↔ ${pname(x.b)}`;
+  if(x.kind==='mirror')return `거울수: ${pname(x.p)} (+ 대칭점)`;
+  if(x.kind==='grow')return `증식: ${pname(x.p)} 둘레`;
+  if(x.kind==='spend')return `패스 저축: ${x.ps.map(pname).join(' · ')}`;
+  if(x.kind==='teleport')return `순간이동: ${pname(x.a)} → ${pname(x.b)}`;
+  if(x.kind==='para')return `공수부대: ${pname(x.p)}`;
+  if(x.kind==='fork')return `양자택일: ${pname(x.a)} · ${pname(x.b)} 예약`;
+  if(x.kind==='shadow')return `예약수: ${pname(x.a)} 예약`;
   const pre=x.pre?(x.pre.k==='i'?`무적수(${pname(x.pre.q)}) 뒤 `:x.pre.k==='b'?`결계(${pname(x.pre.q)}) 뒤 `:x.pre.k==='s'?`저격(${pname(x.pre.q)}) 뒤 `:'되감기 뒤 '):'';
   return pre+pname(x.p);
 }
