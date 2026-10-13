@@ -1,3 +1,16 @@
 .claude/
 .firebase/
 firebase-debug.log
+# 증강 신경망 학습: 기록 · 가중치 · 로그 · 제어 파일은 올리지 않는다 (코드만)
+tools/augnet/data*/
+tools/augnet/models*/
+tools/augnet/logs/
+tools/augnet/tmp/
+tools/augnet/__pycache__/
+tools/augnet/THROTTLE
+tools/augnet/PAUSE
+tools/augnet/STOP
+tools/augnet/RESTART_TRAIN
+tools/augnet/PROGRESS.md
+tools/aug/results/
+chainB.log

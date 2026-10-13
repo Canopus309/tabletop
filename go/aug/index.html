@@ -108,6 +108,13 @@
       <div class="seg">
         <input type="radio" name="mode" id="mLocal" value="local" checked><label for="mLocal">한 폰으로 두 사람</label>
         <input type="radio" name="mode" id="mOnline" value="online"><label for="mOnline">온라인<small>친구 초대</small></label>
+        <input type="radio" name="mode" id="mAI" value="ai"><label for="mAI">AI<small>9줄 · 시험판</small></label>
+      </div></div>
+    <div class="field hidden" id="fMyCol"><span class="flabel">내 돌</span>
+      <div class="seg">
+        <input type="radio" name="mycol" id="cB" value="1" checked><label for="cB">흑</label>
+        <input type="radio" name="mycol" id="cW" value="2"><label for="cW">백</label>
+        <input type="radio" name="mycol" id="cR" value="0"><label for="cR">무작위</label>
       </div></div>
     <p class="sub" style="margin:0 0 6px;font-size:12.5px;color:var(--muted);line-height:1.55">증강 둘을 두고 경매합니다. 번갈아 덤을 부르고, 높게 부른 사람이 먼저 고르며 부른 만큼 상대에게 덤으로 줍니다.</p>
     <div class="dlg-actions"><button type="button" class="ghost" data-close="cancel">취소</button><button type="button" class="primary" data-close="ok">시작</button></div>
@@ -152,6 +159,9 @@
 
 <script src="../board.js"></script>
 <script src="aug.js"></script>
+<script src="augboard.js"></script>
+<script src="../katago.js"></script>
+<script src="ai.js"></script>
 <script src="../../common/ui.js"></script>
 <script src="../../common/leaderboard.js"></script>
 <script src="../../common/records.js"></script>
@@ -196,8 +206,8 @@ function save(){
   if(G&&game.entries.length&&(!game.online||game.online.col))REC.put('goaug',game,recMeta(game),sgfText(game));
 }
 function recMeta(g){
-  const r=g.over&&g.result,me=g.online?g.online.col:0;
-  return{opp:g.online?`${g.online.opp.name} (온라인)`:'두 사람',side:me?NAME[me]:'',info:`${g.n}줄 · ${augLabel(g.aug[1])} 대 ${augLabel(g.aug[2])}`,len:G.turns.length+'수',
+  const r=g.over&&g.result,me=g.online?g.online.col:g.ai?3-g.ai.col:0;
+  return{opp:g.online?`${g.online.opp.name} (온라인)`:g.ai?'AI (시험판)':'두 사람',side:me?NAME[me]:'',info:`${g.n}줄 · ${augLabel(g.aug[1])} 대 ${augLabel(g.aug[2])}`,len:G.turns.length+'수',
     out:!r?'open':me?(r.winner===me?'win':'loss'):'done',res:r?resTitle(r):'끝나지 않은 대국'};
 }
 function sgfText(g){
@@ -205,8 +215,8 @@ function sgfText(g){
   const d=new Date(g.id||Date.now()),p2=n=>String(n).padStart(2,'0'),nm=t=>String(t||'').replace(/[\]\\]/g,'');
   const komi=gameKomi(g);
   let s=`(;GM[1]FF[4]CA[UTF-8]AP[TableTop]SZ[${g.n}]KM[${komi}]RU[Chinese]DT[${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}]`;
-  const me=g.online&&g.online.col,opp=g.online?nm(g.online.opp.name):'';
-  s+=`PB[${g.online?(me===1?'나':opp):'흑'}]PW[${g.online?(me===2?'나':opp):'백'}]GN[증강 바둑]GC[흑 증강: ${augLabel(g.aug[1])}, 백 증강: ${augLabel(g.aug[2])}]`;
+  const me=g.online?g.online.col:g.ai?3-g.ai.col:0,opp=g.online?nm(g.online.opp.name):g.ai?'AI':'';
+  s+=`PB[${me?(me===1?'나':opp):'흑'}]PW[${me?(me===2?'나':opp):'백'}]GN[증강 바둑]GC[흑 증강: ${augLabel(g.aug[1])}, 백 증강: ${augLabel(g.aug[2])}]`;
   if(g.over&&g.result){const r=g.result;s+=`RE[${r.winner===1?'B':'W'}+${r.how==='resign'?'R':r.how==='time'?'T':r.d}]`;}
   for(const m of G?G.record():[]){
     const C=m.col===1?'B':'W';
@@ -219,7 +229,7 @@ $('#resDl').onclick=()=>REC.download(REC.fileName('goaug',game.id),sgfText(game)
 // 결과 모음 (덤 조정용): 대국 결과·증강·판 크기만 보낸다 (이름 없음). 이 기기가 온라인 기능을 한 번이라도 썼을 때만
 function postStats(r){
   try{
-    if(!navigator.onLine||!LB.state().uid||!G)return;
+    if(!navigator.onLine||!LB.state().uid||!G||game.ai)return; // AI 대국은 덤 조정 자료에 넣지 않는다
     const id=game.online?game.online.code:'L'+game.id;
     const a=game.auc||{};
     ONL.createDoc('augstats',id,{n:game.n,ab:game.aug[1],aw:game.aug[2],komi:G.komi,w:r.winner,how:r.how,len:G.turns.length,local:!game.online,of:a.of||[],bid:a.bv??-1,bwin:a.bw||0},['at']).catch(e=>console.warn('[증강 결과]',e));
@@ -227,15 +237,30 @@ function postStats(r){
 }
 
 // ---------- 새 대국 (한 폰으로 두 사람) ----------
+// AI 를 고르면 9줄만 (AI 는 9줄에서 배웠다) · 내 돌 고르기를 보인다
+function newDlgMode(){
+  const ai=document.querySelector('input[name=mode]:checked').value==='ai';
+  $('#fMyCol').classList.toggle('hidden',!ai);
+  for(const s of ['13','19'])document.querySelector(`input[name=size][value="${s}"]`).disabled=ai;
+  if(ai)document.querySelector('input[name=size][value="9"]').checked=true;
+}
+document.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',newDlgMode));
 function openNew(){
-  const last=load('goaug-newopts',{size:13});document.querySelector(`input[name=size][value="${last.size}"]`).checked=true;
+  const last=load('goaug-newopts',{size:13,mode:'local',mycol:1});document.querySelector(`input[name=size][value="${last.size}"]`).checked=true;
+  const mr=document.querySelector(`input[name=mode][value="${last.mode==='ai'?'ai':'local'}"]`);if(mr)mr.checked=true;
+  const cr=document.querySelector(`input[name=mycol][value="${last.mycol??1}"]`);if(cr)cr.checked=true;
+  newDlgMode();
   openDlg($('#dlgNew'),v=>{
     if(v!=='ok')return;
-    const n=+document.querySelector('input[name=size]:checked').value;store('goaug-newopts',{size:n});
-    if(document.querySelector('input[name=mode]:checked').value==='online'){location.href='online/';return;}
+    const mode=document.querySelector('input[name=mode]:checked').value,n=+document.querySelector('input[name=size]:checked').value;
+    const mc=+document.querySelector('input[name=mycol]:checked').value;
+    store('goaug-newopts',{size:mode==='ai'?last.size:n,mode,mycol:mc});
+    if(mode==='online'){location.href='online/';return;}
     leaveOnline();recView=false;history.replaceState(null,'',location.pathname);
-    const id=Date.now(),first=augCoin(id);
+    const id=Date.now(),first=augCoin(id),me=mc||(Math.random()<0.5?1:2);
     game={id,n,aug:{1:'',2:''},entries:[],over:false,result:null,rs:0,dead:null,local:true,auc:{of:augOffers(id,2),bv:-1,bw:0,bt:first,log:[]}};
+    if(mode==='ai'){game.n=9;game.ai={col:3-me};AugAI.load().catch(()=>{});} // 경매하는 동안 AI 를 미리 불러 둔다
+    aiStop();
     G=null;view=null;act=null;PG=null;pending=0;deadSet=null;phase='pick';
     save();rebuild();pickFlow();
   });
@@ -244,22 +269,25 @@ $('#btnNew').onclick=openNew;$('#resNew').onclick=openNew;
 // 증강 고르기: 흑 → (폰 넘기기) → 백 → 공개
 const augCard=(id,btn)=>{const A=AUGS[id];return `<${btn?'button type="button"':'div'} class="aug-card${btn?'':' static'}" data-id="${id}"><span class="tier">${augTier(id,game.n)}</span><b>${A.name}</b><small>${A.desc}</small></${btn?'button':'div'}>`;};
 function showPick(col,offers,sub,onPick){
-  $('#pkTitle').textContent=`${NAME[col]} 증강 고르기`;$('#pkSub').textContent=sub;
+  $('#pkTitle').textContent=game.ai?`내 증강 고르기 (${NAME[col]})`:`${NAME[col]} 증강 고르기`;$('#pkSub').textContent=sub;
   $('#pkCards').innerHTML=offers.map(id=>augCard(id,true)).join('');
   $('#pkCards').onclick=e=>{const b=e.target.closest('.aug-card');if(!b)return;closeDlg($('#dlgPick'),'x');onPick(b.dataset.id);};
   openDlg($('#dlgPick'));
 }
 // 경매 대화상자: a = {of: 증강 둘, bv: 지금 최고 값(-1 = 아직 없음), bw: 최고 부른 색}, col = 부를 색
+// AI 대국에서는 색 대신 '나' · 'AI' 로 부른다 (조사까지: 이/가)
+const who=col=>game&&game.ai?(col===game.ai.col?'AI':'나'):NAME[col];
+const whoI=col=>game&&game.ai?(col===game.ai.col?'AI가':'내가'):NAME[col]+'이';
 function showAuction(a,col,onBid,onPass){
   const max=AUG_BID_MAX[game.n]||50,min=a.bv<0?0:a.bv+1;let v=Math.min(min,max);
-  $('#auTitle').textContent=`증강 경매 · ${NAME[col]} 차례`;
+  $('#auTitle').textContent=`증강 경매 · ${game.ai?'내 차례 ('+NAME[col]+')':NAME[col]+' 차례'}`;
   $('#auSub').innerHTML=a.bv<0?'먼저 부르세요 (0집도 됩니다). 마지막에 높게 부른 사람이 먼저 고르고, 부른 만큼 상대에게 덤으로 줍니다.'
-    :`지금 최고: <b>${NAME[a.bw]} ${a.bv}집</b>. 더 높게 부르거나, 그만두면 ${NAME[a.bw]}이 먼저 고릅니다.`;
+    :`지금 최고: <b>${who(a.bw)} ${a.bv}집</b>. 더 높게 부르거나, 그만두면 ${whoI(a.bw)} 먼저 고릅니다.`;
   $('#auCards').innerHTML=a.of.map(id=>augCard(id,false)).join('');
   const show=()=>{$('#auVal').textContent=v;$('#auM1').disabled=$('#auM5').disabled=v<=min;$('#auP1').disabled=$('#auP5').disabled=v>=max;$('#auBid').disabled=min>max;$('#auBid').textContent=min>max?'더 못 부름':v+'집 부르기';};
   const step=d=>{v=Math.max(min,Math.min(max,v+d));show();};
   $('#auM5').onclick=()=>step(-5);$('#auM1').onclick=()=>step(-1);$('#auP1').onclick=()=>step(1);$('#auP5').onclick=()=>step(5);
-  $('#auPass').classList.toggle('hidden',a.bv<0);$('#auPass').textContent=a.bv<0?'그만':`그만 (${NAME[a.bw]}이 고름)`;
+  $('#auPass').classList.toggle('hidden',a.bv<0);$('#auPass').textContent=a.bv<0?'그만':`그만 (${whoI(a.bw)} 고름)`;
   $('#auBid').onclick=()=>{closeDlg($('#dlgAuc'),'x');onBid(v);};
   $('#auPass').onclick=()=>{closeDlg($('#dlgAuc'),'x');onPass();};
   show();openDlg($('#dlgAuc'));
@@ -269,17 +297,60 @@ async function pickFlow(){
   if(game.aug[1]&&game.aug[2]){startPlay();return;}
   if(!a){game.auc={of:augOffers(game.id,2),bv:-1,bw:0,bt:augCoin(game.id),log:[]};save();pickFlow();return;}
   if(a.bt){ // 부르는 중
+    if(game.ai&&a.bt===game.ai.col){aiBid(a);return;}
     showAuction(a,a.bt,v=>{a.log.push([a.bt,v]);a.bv=v;a.bw=a.bt;a.bt=3-a.bt;save();ui();pickFlow();},()=>{a.log.push([a.bt,null]);a.bt=0;save();ui();pickFlow();});
     return;
   }
   const w=a.bw; // 낙찰: 먼저 고르기
-  showPick(w,a.of,`${NAME[w]}이 ${a.bv}집에 낙찰받았습니다. 먼저 고르세요. 남은 증강은 ${NAME[3-w]}이 가집니다.`,async id=>{
+  if(game.ai&&w===game.ai.col){
+    const id=AugAI.prefer(a.of);game.aug[w]=id;game.aug[3-w]=a.of.find(x=>x!==id);game.komi=augKomi(w,a.bv);save();ui();
+    await ask('증강 공개',`AI가 ${a.bv}집에 낙찰받아 ${AUGS[id].name} 증강을 골랐습니다. 흑: ${AUGS[game.aug[1]].name} · 백: ${AUGS[game.aug[2]].name} — ${komiText()}`,'대국 시작');
+    startPlay();return;
+  }
+  showPick(w,a.of,`${whoI(w)} ${a.bv}집에 낙찰받았습니다. 먼저 고르세요. 남은 증강은 ${whoI(3-w)} 가집니다.`,async id=>{
     game.aug[w]=id;game.aug[3-w]=a.of.find(x=>x!==id);game.komi=augKomi(w,a.bv);save();
     await ask('증강 공개',`흑: ${AUGS[game.aug[1]].name} · 백: ${AUGS[game.aug[2]].name} — ${komiText()}`,'대국 시작');
     startPlay();
   });
 }
-function startPlay(){G=new AugGame({n:game.n,komi:gameKomi(game),aug:game.aug});const err=G.load(game.entries);if(err)toast('기보를 다 불러오지 못했습니다: '+err);phase='play';save();rebuild();}
+function startPlay(){G=new AugGame({n:game.n,komi:gameKomi(game),aug:game.aug});const err=G.load(game.entries);if(err)toast('기보를 다 불러오지 못했습니다: '+err);phase='play';save();rebuild();aiTurn();}
+
+// ---------- AI (시험판) ----------
+// game.ai = {col: AI 의 색}. AI 는 go/aug/ai.js (증강을 배운 신경망 + 수 읽기)
+let aiBusy=false,aiEpoch=0,aiStatus='';
+const aiStop=()=>{aiEpoch++;aiBusy=false;aiStatus='';};
+// 경매: AI 는 자기 증강 값 차이까지 1집씩 올려 부른다
+function aiBid(a){
+  const ep=aiEpoch;
+  setTimeout(()=>{
+    if(ep!==aiEpoch||!game||!game.ai||game.auc!==a)return;
+    const mx=AugAI.maxBid(a.of),v=a.bv<0?0:a.bv+1;
+    if(v<=mx&&v<=(AUG_BID_MAX[game.n]||30)){a.log.push([a.bt,v]);a.bv=v;a.bw=a.bt;a.bt=3-a.bt;toast(`AI가 ${v}집을 불렀습니다`);}
+    else{a.log.push([a.bt,null]);a.bt=0;toast('AI가 그만뒀습니다');}
+    save();ui();pickFlow();
+  },700);
+}
+async function aiTurn(){
+  if(!game||!game.ai||recView||game.over||phase!=='play'||!G||G.turn!==game.ai.col||aiBusy)return;
+  aiBusy=true;const ep=++aiEpoch;aiStatus='';ui();
+  try{
+    const s=await AugAI.move(G,game.ai.col,{onStatus:t=>{if(ep===aiEpoch){aiStatus=t;ui();}},abort:()=>ep!==aiEpoch});
+    if(ep!==aiEpoch)return;
+    aiBusy=false;aiStatus='';
+    const t=augParse(s);if(t.kind!=='move'||t.pre)toast('AI: '+turnText({t}));
+    play(s);
+  }catch(e){
+    if(e.message!=='abort'){console.error(e);toast('AI 오류: '+e.message);}
+  }finally{if(ep===aiEpoch){aiBusy=false;aiStatus='';ui();}}
+}
+// 두 번 패스로 계가: AI 신경망의 소유 판단으로 죽은 돌을 먼저 표시한다 (사람이 고칠 수 있음)
+async function aiDead(){
+  try{
+    const j=await AugAI.judge(G);if(phase!=='score'||!deadSet)return;
+    for(const p of G.b.pts){const c=G.b.c[p];if(((c===BLACK&&j.own[p]<-0.3)||(c===WHITE&&j.own[p]>0.3))&&!G.invincible(p))deadSet.add(p);}
+    save();draw();ui();toast('AI가 죽은 돌을 표시했습니다 · 확인하고 계가 확정을 누르세요');
+  }catch(e){console.warn(e);}
+}
 
 // ---------- 판 ----------
 const clone=()=>{const g=new AugGame({n:G.n,komi:G.base,aug:G.aug});g.load(G.entries);return g;};
@@ -292,8 +363,8 @@ function shown(){
   }
   return G;
 }
-const myCol=()=>game.online?game.online.col:G?G.turn:0;
-const canAct=()=>!!(G&&live()&&phase==='play'&&!game.over&&view===null&&(!game.online||(game.online.st==='play'&&!game.online.sending&&G.turn===game.online.col)));
+const myCol=()=>game.online?game.online.col:game.ai?3-game.ai.col:G?G.turn:0;
+const canAct=()=>!!(G&&live()&&phase==='play'&&!game.over&&view===null&&(!game.online||(game.online.st==='play'&&!game.online.sending&&G.turn===game.online.col))&&(!game.ai||(!aiBusy&&G.turn!==game.ai.col)));
 
 const cv=$('#board'),ctx=cv.getContext('2d'),wrap=$('#boardWrap');let GG={s:0,cell:0,m:0,dpr:1};
 function resize(){if(!game)return;const s=wrap.clientWidth,dpr=window.devicePixelRatio||1,k=settings.coords?0.95:0.6;cv.width=Math.round(s*dpr);cv.height=Math.round(s*dpr);const cell=s/(game.n-1+2*k);GG={s,cell,m:cell*k,dpr};draw();}
@@ -376,8 +447,9 @@ function play(s){
   act=null;PG=null;pending=0;rvCache=null;
   sound(cap?'cap':'stone',cap);if(settings.sound&&navigator.vibrate)try{navigator.vibrate(cap?[12,40,12]:12);}catch(e){}
   if(game.online){save();draw();ui();onSend();return;}
-  if(G.twoPasses(game.rs)){phase='score';deadSet=new Set();toast('두 사람 모두 패스했습니다 · 죽은 돌을 표시해 계가하세요');}
+  if(G.twoPasses(game.rs)){phase='score';deadSet=new Set();if(game.ai)aiDead();else toast('두 사람 모두 패스했습니다 · 죽은 돌을 표시해 계가하세요');}
   save();draw();ui();
+  aiTurn();
 }
 function target(p){
   const col=G.turn,b=G.b;
@@ -419,6 +491,7 @@ $('#aPass').onclick=async()=>{
 $('#aResign').onclick=async()=>{
   if(!G||game.over||phase==='pick'||phase==='wait')return;
   if(game.online){onResign();return;}
+  if(game.ai){if(await ask('기권할까요?','이번 대국을 AI의 승리로 끝냅니다.','기권')){aiStop();finish({winner:game.ai.col,how:'resign'});}return;}
   const loser=G.turn;
   if(await ask(`${NAME[loser]}이 기권할까요?`,`이번 대국을 ${NAME[3-loser]}의 승리로 끝냅니다.`,'기권'))finish({winner:3-loser,how:'resign'});
 };
@@ -433,7 +506,7 @@ function toggleDead(p){
 }
 const scoreText=s=>`흑 ${s.bs}집 · 백 ${s.ws}집 + 덤 ${G.komi} → <b>${NAME[s.w]} ${s.d}집 승</b>`;
 function confirmScore(){const s=G.score(deadSet);finish({winner:s.w,how:'score',d:s.d,bs:s.bs,ws:s.ws});}
-function resumeLocal(){phase='play';game.rs=G.entries.length;deadSet=null;save();draw();ui();toast('대국을 이어 갑니다 · 두 사람이 다시 이어서 패스하면 계가합니다');}
+function resumeLocal(){phase='play';game.rs=G.entries.length;deadSet=null;save();draw();ui();toast('대국을 이어 갑니다 · 두 사람이 다시 이어서 패스하면 계가합니다');aiTurn();}
 
 // ---------- 끝 ----------
 const resTitle=r=>`${NAME[r.winner]} ${r.how==='score'?r.d+'집 승':r.how==='resign'?'불계승':'시간승'}`;
@@ -446,10 +519,10 @@ function finish(r,post=true){
 // ---------- 화면 ----------
 function ui(){
   if(!game)return;
-  const g=G,me=game.online?game.online.col:0;
+  const g=G,me=game.online?game.online.col:game.ai?3-game.ai.col:0;
   for(const col of [1,2]){
     const el=col===1?$('#pB'):$('#pW'),id=game.aug[col],usedNow=g&&id&&!AUGS[id].passive&&g.used(col);
-    el.querySelector('.who').textContent=game.online?(col===me?'나':(game.online.opp.name||'상대')):'';
+    el.querySelector('.who').textContent=game.online?(col===me?'나':(game.online.opp.name||'상대')):game.ai?(col===me?'나':'AI'):'';
     el.querySelector('.aug').innerHTML=id?`<span class="aug-chip${usedNow?' used':''}">${AUGS[id].name}${AUGS[id].passive?'':usedNow?' · 씀':''}</span>`:'<span class="aug-chip none">고르는 중</span>';
     el.classList.toggle('active',!!g&&!game.over&&phase==='play'&&g.turn===col);
   }
@@ -458,6 +531,7 @@ function ui(){
   else if(phase==='pick')st.innerHTML='<b>증강 경매</b>';
   else if(phase==='wait')st.innerHTML='<b>상대 기다리는 중</b>';
   else if(phase==='score')st.innerHTML='<b>계가</b>';
+  else if(g&&game.ai&&g.turn===game.ai.col)st.innerHTML=`<b>AI</b> ${aiStatus?esc(aiStatus):aiBusy?'생각 중…':'차례'}`;
   else if(g)st.innerHTML=`<b>${NAME[g.turn]}</b> 차례${me?(g.turn===me?' · 내 차례':' · 상대 차례'):''}`;
   $('#moveText').textContent=g?`${view!==null?view:g.turns.length}수`:'';
   $('#komiLine').textContent=komiText();
@@ -500,7 +574,7 @@ function ui(){
   if(showPlace)$('#placeOk').textContent=(act&&act.k==='d'&&act.stage===1?'첫 수 · ':'착수 · ')+pname(pending);
   document.body.classList.toggle('placing',showPlace);
   $('.home-btn').href=game.online&&!recView?'online/':'../home/';
-  $('#metaText').textContent=`${game.online?'온라인 '+game.online.code+' · ':'두 사람 · '}${game.n}×${game.n} · 중국식 계가`;
+  $('#metaText').textContent=`${game.online?'온라인 '+game.online.code+' · ':game.ai?'AI 대국 (시험판'+(AugAI.name?' · '+AugAI.name:'')+') · ':'두 사람 · '}${game.n}×${game.n} · 중국식 계가`;
 }
 function turnText(t){
   const x=t.t;
@@ -683,10 +757,11 @@ function resumeLocal0(){
     game=saved;deadSet=game.dead?new Set(game.dead):null;
     if(!game.aug[1]||!game.aug[2]){G=null;phase='pick';rebuild();pickFlow();return;}
     G=new AugGame({n:game.n,komi:gameKomi(game),aug:game.aug});G.load(game.entries||[]);
-    phase=game.over?'done':deadSet?'score':'play';if(game.over)view=G.turns.length;rebuild();
+    phase=game.over?'done':deadSet?'score':'play';if(game.over)view=G.turns.length;rebuild();aiTurn();
   }else{game={id:Date.now(),n:13,aug:{1:'',2:''},entries:[],over:false,result:null,rs:0,dead:null,local:true};G=null;phase='pick';rebuild();openNew();}
 }
 function route(){
+  aiStop();
   const on=/^#online=([A-Z0-9]{6})$/.exec(location.hash),rec=/^#rec=(\d+)$/.exec(location.hash);
   if(on){openOnline(on[1]);return;}
   if(rec){openRecord(+rec[1]);return;}

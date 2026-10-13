@@ -3,7 +3,7 @@
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '../..');
-const src = ['go/board.js', 'tools/aug/augboard.js', 'go/aug/aug.js'].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n') + '\n;({AugBoard, AugGame, AUG_IDS, PASS, EMPTY})';
+const src = ['go/board.js', 'go/aug/augboard.js', 'go/aug/aug.js'].map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n') + '\n;({AugBoard, AugGame, AUG_IDS, PASS, EMPTY})';
 const { AugBoard, AugGame, AUG_IDS, PASS, EMPTY } = vm.runInThisContext(src);
 let seed = 12345; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x80000000; };
 const pick = a => a[Math.floor(rnd() * a.length)];

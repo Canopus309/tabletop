@@ -1,5 +1,5 @@
 // 증강 바둑 측정용 AI 대국 (Node). 앱의 기본 AI(무작위로 끝까지 두어 보는 탐색, go/index.html 의 engine 스크립트)를
-// 증강 규칙 판(tools/aug/augboard.js)에서 돌리고, 증강마다 '지금 쓰면 이득인가'를 평가해 쓴다.
+// 증강 규칙 판(go/aug/augboard.js)에서 돌리고, 증강마다 '지금 쓰면 이득인가'를 평가해 쓴다.
 // 신경망이 아니라 규칙대로 끝까지 두어 보고 판단하므로 무적수·결계도 계산에 그대로 들어간다 (대신 약하다: 9줄 10~15급쯤)
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -7,7 +7,7 @@ const ROOT = path.join(__dirname, '../..');
 const html = fs.readFileSync(path.join(ROOT, 'go/index.html'), 'utf8');
 const engine = html.slice(html.indexOf('<script id="engine">') + 20, html.indexOf('</script>', html.indexOf('<script id="engine">')))
   .replace(/new Board\(/g, 'new AugBoard(');
-const src = fs.readFileSync(path.join(ROOT, 'go/board.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'augboard.js'), 'utf8') + '\n' + engine
+const src = fs.readFileSync(path.join(ROOT, 'go/board.js'), 'utf8') + '\n' + fs.readFileSync(path.join(ROOT, 'go/aug/augboard.js'), 'utf8') + '\n' + engine
   + '\n;({Board, AugBoard, genmove, estimate, PASS, EMPTY, BLACK, WHITE})';
 const E = vm.runInThisContext(src);
 const { AugBoard, genmove, estimate, PASS, EMPTY } = E;
