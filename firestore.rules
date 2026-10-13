@@ -41,7 +41,7 @@ service cloud.firestore {
         && d.n in [9, 13, 19] && d.ab in augList() && d.aw in augList() && d.komi is number
         && d.w in [1, 2] && d.how in ['score', 'resign', 'time'] && d.len is int && d.len >= 0 && d.len < 2000
         && d.local is bool && d.at == request.time
-        && (!('of' in d) || (d.of is list && d.of.size() <= 2)) && (!('bid' in d) || (d.bid is int && d.bid >= -1 && d.bid <= 80)) && (!('bwin' in d) || d.bwin in [0, 1, 2]);
+        && (!('of' in d) || (d.of is list && d.of.size() <= 2)) && (!('bid' in d) || (d.bid is int && d.bid >= -1 && d.bid <= 361)) && (!('bwin' in d) || d.bwin in [0, 1, 2]);
     }
 
     // 온라인 대국 (편지 대국, 바둑 g='go' · 증강 바둑 'goaug' · 오목 'omok' · 체스 'chess'). 문서 하나 = 방 하나, 문서 id = 6자리 방 코드
@@ -121,7 +121,7 @@ service cloud.firestore {
     // 증강 경매 (증강 바둑, st 'pick'): of = 증강 둘, bv = 지금 최고 값(-1 없음), bw = 최고 부른 색, bt = 부를 색 (0 = 경매 끝)
     // 부를 차례인 사람이 더 높게 부르거나(값은 판 크기별 상한까지), 이미 누가 불렀으면 그만둘 수 있다.
     // 끝나면 최고 부른 사람이 둘 중 하나를 고르고 남은 것은 상대 것, 덤 = 7.5 ± 낙찰 값 (흑 낙찰이면 +)
-    function bidMax(n) { return (n == 9) ? 50 : (n == 13) ? 50 : 80; }
+    function bidMax(n) { return n * n; }
     function bidOk() {
       let o = resource.data; let d = request.resource.data;
       return o.g == 'goaug' && o.st == 'pick' && o.bt != 0 && myColor(o) == o.bt

@@ -282,7 +282,7 @@ function showPick(col,offers,sub,onPick){
 const who=col=>game&&game.ai?(col===game.ai.col?'AI':'나'):NAME[col];
 const whoI=col=>game&&game.ai?(col===game.ai.col?'AI가':'내가'):NAME[col]+'이';
 function showAuction(a,col,onBid,onPass){
-  const max=AUG_BID_MAX[game.n]||50,min=a.bv<0?0:a.bv+1;let v=Math.min(min,max);
+  const max=AUG_BID_MAX[game.n]||game.n*game.n,min=a.bv<0?0:a.bv+1;let v=Math.min(min,max);
   $('#auTitle').textContent=`증강 경매 · ${game.ai?'내 차례 ('+NAME[col]+')':NAME[col]+' 차례'}`;
   $('#auSub').innerHTML=a.bv<0?'먼저 부르세요 (0집도 됩니다). 마지막에 높게 부른 사람이 먼저 고르고, 부른 만큼 상대에게 덤으로 줍니다.'
     :`지금 최고: <b>${who(a.bw)} ${a.bv}집</b>. 더 높게 부르거나, 그만두면 ${whoI(a.bw)} 먼저 고릅니다.`;
@@ -328,7 +328,7 @@ function aiBid(a){
   setTimeout(()=>{
     if(ep!==aiEpoch||!game||!game.ai||game.auc!==a)return;
     const mx=AugAI.maxBid(a.of),v=a.bv<0?0:a.bv+1;
-    if(v<=mx&&v<=(AUG_BID_MAX[game.n]||30)){a.log.push([a.bt,v]);a.bv=v;a.bw=a.bt;a.bt=3-a.bt;toast(`AI가 ${v}집을 불렀습니다`);}
+    if(v<=mx&&v<=(AUG_BID_MAX[game.n]||game.n*game.n)){a.log.push([a.bt,v]);a.bv=v;a.bw=a.bt;a.bt=3-a.bt;toast(`AI가 ${v}집을 불렀습니다`);}
     else{a.log.push([a.bt,null]);a.bt=0;toast('AI가 그만뒀습니다');}
     save();ui();pickFlow();
   },700);
