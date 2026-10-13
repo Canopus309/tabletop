@@ -17,12 +17,11 @@
  *   공수부대 한 번. 이번 수는 자살수 자리에도 둘 수 있고, 그 돌의 무리는 상대의 다음 차례 동안 잡히지 않는다.
  *            내 다음 차례가 끝났을 때도 활로가 없으면 그때 잡힌다
  *   양자택일 한 번. 수 대신 빈 점 두 곳을 예약. 상대 차례가 끝나면 아직 비어 있고 둘 수 있는 예약점마다 내 돌이 놓인다
- *   예약수   한 번. 수 대신 빈 점 한 곳을 예약 (지금 둘 수 없는 자리도 됨). 상대 차례가 끝나면 비어 있고 둘 수 있으면 내 돌
+ *   예약수   한 번. 빈 점 한 곳을 예약하고 그 차례 수도 둔다 (지금 둘 수 없는 자리도 예약 가능). 상대 차례가 끝나면 비어 있고 둘 수 있으면 내 돌
  *   (2026-10-13 밤 추가. 따로 말이 없으면 능력을 쓰고 그 차례 수도 둔다)
  *   네크로맨서 내 수 대신, 내가 따낸 돌 하나를 써서 상대 돌을 놓는다 (상대가 둔 것과 똑같이). 따낸 돌이 남아 있으면 계속
  *   추크추방 한 번. 이번 수를 두면 상대는 다음 차례에 둘 수 있는 1-1점 중 하나에만 둔다 (없으면 효과 없음)
  *   중립지대 한 번. 빈 점 하나를 누구도 못 두는 점으로 (판 가장자리처럼: 활로도 집도 아님). 그 차례 수도 둔다
- *   라고할뻔 한 번. 내 돌 하나를 들어내고 그 차례 수도 둔다
  *   큰돌     한 번. 2×2 칸의 빈 점을 모두 내 돌로 채우고 그 차례 수도 둔다
  *   명당     늘. 계가 때 내 돌이나 내 집인 화점 한 곳마다 +2 (1점이 3점)
  *
@@ -45,9 +44,9 @@
  *   "t12,34"      순간이동: 12 의 내 돌을 34 로
  *   "p12"        공수부대: 12 에 (자살수 자리도 됨)
  *   "f12,34"      양자택일: 12 와 34 를 예약
- *   "h12"        예약수: 12 를 예약
+ *   "h12;123"    예약수: 12 를 예약하고 123 에 착수
  *   "n12"        네크로맨서: 12 에 상대 돌
- *   "z;123"      추크추방 + 착수 · "u12;123" 중립지대 · "k12;123" 라고할뻔 · "o12;123" 큰돌 (12 = 2×2 의 왼쪽 위)
+ *   "z;123"      추크추방 + 착수 · "u12;123" 중립지대 · "o12;123" 큰돌 (12 = 2×2 의 왼쪽 위)
  */
 'use strict';
 // 증강 점수 (2026-10 추정값, 집): 수 하나의 값(포석에서 약 14집)을 기준으로 어림했다. 참고 한마디에만 쓴다.
@@ -73,11 +72,10 @@ const AUGS={
   teleport:{name:'순간이동',short:'내 돌 하나 옮기기',desc:'한 번, 내 차례에 수를 두는 대신 내 돌 하나를 빈 점으로 옮깁니다. 옮긴 돌에 활로가 없으면 옮길 수 없고, 옮긴 돌로 상대 돌을 따낼 수는 있습니다.',v:{9:5,13:6,19:7}},
   para:{name:'공수부대',short:'자살수 자리에도 착수 · 한 턴 무적',desc:'한 번, 이번 수는 자살수 자리(활로가 없는 곳)에도 둘 수 있고, 그 돌의 무리는 상대의 다음 차례 동안 잡히지 않습니다. 내 다음 차례가 끝났을 때도 활로가 없으면 그때 잡힙니다.',v:{9:8,13:9,19:10}},
   fork:{name:'양자택일',short:'빈 점 두 곳 예약',desc:'한 번, 내 차례에 수를 두는 대신 빈 점 두 곳을 예약합니다. 상대 차례가 끝나면, 아직 비어 있고 둘 수 있는 예약점마다 내 돌이 놓입니다. 상대는 한 수로 한 곳만 막을 수 있습니다.',v:{9:8,13:9,19:10}},
-  shadow:{name:'예약수',short:'빈 점 한 곳 예약',desc:'한 번, 내 차례에 수를 두는 대신 빈 점 한 곳을 예약합니다 (지금 둘 수 없는 자리도 됩니다). 상대 차례가 끝나면, 그 점이 비어 있고 둘 수 있으면 내 돌이 놓입니다.',v:{9:2,13:2,19:3}},
+  shadow:{name:'예약수',short:'빈 점 한 곳 예약 + 착수',desc:'한 번, 빈 점 한 곳을 예약하고 그 차례 수도 둡니다 (지금 둘 수 없는 자리도 예약할 수 있습니다). 상대 차례가 끝나면, 그 점이 비어 있고 둘 수 있으면 내 돌이 놓입니다.',v:{9:10,13:11,19:12}},
   necro:{name:'네크로맨서',short:'따낸 돌로 상대 돌 놓기',desc:'내 차례에 내 수를 두는 대신, 내가 따낸 상대 돌 하나를 써서 상대 돌을 놓습니다 (상대가 그 자리에 둔 것과 똑같이 처리: 상대 눈 메우기 등). 따낸 돌이 남아 있으면 몇 번이든 쓸 수 있습니다.',v:{9:3,13:4,19:5}},
   zugzwang:{name:'추크추방',short:'상대 다음 수를 1-1로',desc:'한 번, 이번 수를 두면 상대는 다음 차례에 둘 수 있는 1-1점(네 귀의 맨 끝) 중 하나에만 둘 수 있습니다. 둘 수 있는 1-1점이 없으면 효과가 없습니다.',v:{9:10,13:11,19:12}},
   neutral:{name:'중립지대',short:'누구도 못 두는 점',desc:'한 번, 빈 점 하나를 누구도 둘 수 없는 점으로 만듭니다 (판 가장자리처럼: 활로도 집도 아님). 그 때문에 활로가 없어진 상대 무리는 잡히고, 내 무리가 활로 없이 남게 되는 점은 고를 수 없습니다. 쓴 차례에 수도 둡니다.',v:{9:6,13:6,19:7}},
-  retract:{name:'라고할뻔',short:'내 돌 하나 들어내기',desc:'한 번, 내 돌 하나를 들어내고 그 차례 수도 둡니다.',v:{9:3,13:3,19:4}},
   bigstone:{name:'큰돌',short:'2×2를 내 돌로',desc:'한 번, 2×2 칸의 빈 점을 모두 내 돌로 채우고 그 차례 수도 둡니다 (상대 결계 점은 빠짐). 내 무리가 활로 없이 남게 되면 쓸 수 없습니다.',v:{9:30,13:30,19:30}},
   myeongdang:{name:'명당',passive:true,short:'화점이 3배',desc:'늘 켜져 있습니다. 계가 때 내 돌이나 내 집인 화점(천원 포함) 한 곳마다 2집을 더합니다 (1점이 3점).',v:{9:5,13:8,19:8}},
   prisoner:{name:'포로교환',passive:true,short:'따낸 돌만큼 집',desc:'늘 켜져 있습니다. 대국 중 따내거나 들어낸 상대 돌 수와, 계가 때 죽은 돌로 표시한 상대 돌 수만큼 내 집에 더합니다 (중국식 계가에 일본식 사석 계산을 더하는 셈).',v:{9:5,13:7,19:10}},
@@ -114,9 +112,8 @@ function augParse(s){
   if((m=/^t(\d+),(\d+)$/.exec(s)))return{kind:'teleport',a:+m[1],b:+m[2]};
   if((m=/^p(\d+)$/.exec(s)))return{kind:'para',p:+m[1]};
   if((m=/^f(\d+),(\d+)$/.exec(s)))return{kind:'fork',a:+m[1],b:+m[2]};
-  if((m=/^h(\d+)$/.exec(s)))return{kind:'shadow',a:+m[1]};
   if((m=/^n(\d+)$/.exec(s)))return{kind:'necro',p:+m[1]};
-  if((m=/^(?:([ibsuko])(\d+);|([rz]);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:m[3]}:null};
+  if((m=/^(?:([ibsuoh])(\d+);|([rz]);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:m[3]}:null};
   return null;
 }
 function augFormat(t){
@@ -129,7 +126,6 @@ function augFormat(t){
   if(t.kind==='teleport')return't'+t.a+','+t.b;
   if(t.kind==='para')return'p'+t.p;
   if(t.kind==='fork')return'f'+t.a+','+t.b;
-  if(t.kind==='shadow')return'h'+t.a;
   if(t.kind==='necro')return'n'+t.p;
   return(t.pre?(t.pre.k==='r'||t.pre.k==='z'?t.pre.k+';':t.pre.k+t.pre.q+';'):'')+t.p;
 }
@@ -283,9 +279,9 @@ class AugGame{
       const q=t.p,opp=3-col;if(!this.canPlay(q,opp))fail('상대가 둘 수 없는 자리입니다 ('+this.whyNot(q,opp)+')');
       this.necroUsed[col]++;const cap=this.put(q,opp);this.lastCol=opp;return cap;
     }
-    if(t.kind==='fork'||t.kind==='shadow'){
-      need(t.kind);const pts=t.kind==='fork'?[t.a,t.b]:[t.a];
-      if(t.kind==='fork'&&t.a===t.b)fail('서로 다른 두 점을 골라야 합니다');
+    if(t.kind==='fork'){
+      need('fork');const pts=[t.a,t.b];
+      if(t.a===t.b)fail('서로 다른 두 점을 골라야 합니다');
       for(const p of pts)if(b.c[p]!==EMPTY||this.bar[3-col]===p)fail('빈 점만 예약할 수 있습니다');
       this.resv={col,pts,at:this.ply+2};this.koBan=null;this.last=-1;this.lastCol=col;return 0;
     }
@@ -302,9 +298,9 @@ class AugGame{
       b.c[q]=EDGE;b.delE(q);if(this.bar[1]===q)this.bar[1]=0;if(this.bar[2]===q)this.bar[2]=0;
       if(this.settle(col,[q])<0)fail('내 돌이 활로 없이 남는 점입니다');this.neutral=(this.neutral||[]).concat(q);
     }
-    if(t.pre&&t.pre.k==='k'){
-      need('retract');const q=t.pre.q;if(b.c[q]!==col)fail('들어낼 내 돌을 골라야 합니다');
-      b.c[q]=EMPTY;b.addE(q);if(this.inv[col]===q)this.inv[col]=0;this.koBan=null;
+    if(t.pre&&t.pre.k==='h'){ // 예약수: 예약하고 이어서 착수
+      need('shadow');const q=t.pre.q;if(b.c[q]!==EMPTY||this.bar[3-col]===q)fail('빈 점만 예약할 수 있습니다');
+      this.resv={col,pts:[q],at:this.ply+2};
     }
     if(t.pre&&t.pre.k==='o'){
       need('bigstone');const q=t.pre.q,[x,y]=b.xy(q);if(x>this.n-2||y>this.n-2)fail('2×2 칸이 판 안에 있어야 합니다');
@@ -387,7 +383,7 @@ class AugGame{
       if(x.t.kind==='mirror'){out.push({col:x.col,p:x.t.p,note:'거울수',extra:'mirror'});continue;}
       if(x.t.kind==='grow'){out.push({col:x.col,grow:x.t.p,note:'증식'});continue;}
       if(x.t.kind==='para'){out.push({col:x.col,p:x.t.p,note:'공수부대'});continue;}
-      if(x.t.kind==='fork'||x.t.kind==='shadow'){out.push({col:x.col,p:0,note:(x.t.kind==='fork'?'양자택일':'예약수')});continue;}
+      if(x.t.kind==='fork'){out.push({col:x.col,p:0,note:'양자택일'});continue;}
       const t=x.t,A=AUGS[this.aug[x.col]];
       if(t.kind==='snipe')out.push({col:x.col,snipe:t.q,note:'저격'});
       else if(t.kind==='double'){out.push({col:x.col,p:t.p,note:'슈퍼선수 (두 수 연달아)'});out.push({col:x.col,p:t.p2});}

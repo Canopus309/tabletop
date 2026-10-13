@@ -36,7 +36,7 @@ for (let gi = 0; gi < N; gi++) {
       if (mine.length && opp.length) { const x = pick(mine), y = pick(opp), okB = b.canSwap(x, y), g2 = new AugGame({ n, aug: G.aug }); g2.load(G.entries); let okG = true; try { g2.apply('x' + x + ',' + y); } catch (e) { okG = false; } if (okB !== okG) { console.log('맞바꾸기 판단 다름', gi, t, x, y, okB, okG); bad++; break; } s = okB ? 'x' + x + ',' + y : String(pick(legal)); swaps++; }
       else s = String(pick(legal));
     }
-    else if (use && (a === 'fork' || a === 'shadow')) { const emp = Array.from(b.pts).filter(p => b.c[p] === EMPTY && b.bar[3 - col] !== p); if (emp.length >= 2) { const x = pick(emp), y = pick(emp.filter(p => p !== x)); s = a === 'fork' ? 'f' + x + ',' + y : 'h' + x; } else s = String(pick(legal)); }
+    else if (use && (a === 'fork' || a === 'shadow')) { const emp = Array.from(b.pts).filter(p => b.c[p] === EMPTY && b.bar[3 - col] !== p); if (emp.length >= 2) { const x = pick(emp), y = pick(emp.filter(p => p !== x)); if (a === 'fork') s = 'f' + x + ',' + y; else { const b2 = new AugBoard(n); b2.copyFrom(b); b2.reserveOnly(x); s = 'h' + x + ';' + pick(Array.from(b2.pts).filter(p => b2.isLegal(p, col))); } } else s = String(pick(legal)); }
     else if (use && a === 'mirror') s = 'm' + pick(legal);
     else if (use && a === 'grow') {
       const mine = Array.from(b.pts).filter(p => b.c[p] === col); if (mine.length) { const x = pick(mine), okB = b.canGrow(x), g2 = new AugGame({ n, aug: G.aug }); g2.load(G.entries); let okG = true; try { g2.apply('g' + x); } catch (e) { okG = false; } if (okB !== okG) { console.log('증식 판단 다름', gi, t, x, okB, okG); bad++; break; } s = okB ? 'g' + x : String(pick(legal)); } else s = String(pick(legal));
@@ -59,7 +59,7 @@ for (let gi = 0; gi < N; gi++) {
     if (s[0] === 'd') { const [p1, p2] = s.slice(1).split(',').map(Number); b.play(p1); b.again(); b.play(p2); augUses++; }
     else if (s[0] === 's') { const [q, p] = s.slice(1).split(';').map(Number); b.pluck(q); b.play(p); augUses++; }
     else if (s[0] === 'f') { b.reserve(s.slice(1).split(',').map(Number)); augUses++; }
-    else if (s[0] === 'h') { b.reserve([+s.slice(1)]); augUses++; }
+    else if (s[0] === 'h') { const [x, y] = s.slice(1).split(';').map(Number); b.reserveOnly(x); b.play(y); augUses++; }
     else if (s[0] === 'm') { b.mirror(+s.slice(1)); augUses++; }
     else if (s[0] === 'g') { b.grow(+s.slice(1)); augUses++; }
     else if (s[0] === 't') { const [x, y] = s.slice(1).split(',').map(Number); b.teleport(x, y); augUses++; }

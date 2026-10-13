@@ -27,7 +27,6 @@ const AugAI = (() => {
     for (const x of turns) {
       const t = x.t;
       if (t.kind === 'swap' || t.kind === 'teleport' || t.kind === 'fork') s = s.apply(T(t.a)).apply(T(t.b));
-      else if (t.kind === 'shadow') s = s.apply(T(t.a));
       else if (t.kind === 'grow') s = s.apply(T(t.p));
       else if (t.kind === 'snipe') { // 예전 저격 (수 대신 들어냄, 2026-10-13 전 기보)
         const prev = s.node; s = s.clone(); s.len++; s.used[x.col] = true; s.b.snipe(t.q); s.b.turnEnd(); s.step = 'decide'; s.node = { board: s.b, move: PASS, parent: prev, lad: null };
@@ -262,13 +261,12 @@ const AugAI = (() => {
     }
     const q = st.pt(a - area - 1);
     if (au === 'grow') return 'g' + q;
-    if (au === 'shadow') return 'h' + q;
     const n1 = await child(root, a);
     if (au === 'swap' || au === 'teleport' || au === 'fork') { // 둘째 고르기 (고를 것이 없으면 가장 좋은 보통 수)
       const b2 = n1.A[best(n1)]; if (b2 > area) return ({ swap: 'x', teleport: 't', fork: 'f' })[au] + q + ',' + st.pt(b2 - area - 1);
       return bestMove();
     }
-    return (au === 'invincible' ? 'i' : au === 'barrier' ? 'b' : 's') + q + ';' + pt(n1.A[best(n1)]);
+    return ({ invincible: 'i', barrier: 'b', snipe: 's', shadow: 'h' })[au] + q + ';' + pt(n1.A[best(n1)]);
   }
   // 흑 기준 소유 (계가 때 죽은 돌 표시용): Board 자리 번호 → -1..1, 그리고 흑 기준 승률 · 집
   async function judge(G) {

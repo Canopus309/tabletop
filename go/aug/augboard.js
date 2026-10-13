@@ -44,6 +44,8 @@ class AugBoard extends Board{
   }
   // 양자택일 · 예약수: 예약하고 차례를 넘긴다
   reserve(pts){this.resv={col:this.turn,pts,at:this.turnNo+2};this.endTurn();}
+  // 예약수: 예약만 (이어서 그 차례 수를 둔다)
+  reserveOnly(q){this.resv={col:this.turn,pts:[q],at:this.turnNo+2};}
   isLegal(p,col){
     if(p===PASS)return true;
     const c=this.c;if(c[p]!==EMPTY)return false;

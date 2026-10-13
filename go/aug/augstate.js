@@ -1,7 +1,7 @@
 /* 증강 바둑 AI 의 장면 (St): 탐색 나무의 한 마디 = 한 '단계'. 앱 AI (go/aug/ai.js) 와 학습 도구 (tools/augnet) 가 같이 쓴다.
  * 한 차례를 단계로 나눈다
  *   decide  착수·패스, 또는 증강 쓰기 (대상 칸: 무적수·결계·저격·맞바꾸기·증식·순간이동·양자택일·예약수 / '지금 쓰기': 슈퍼선수·거울수·공수부대·패스 저축)
- *   move    무적수·결계·저격을 쓴 뒤 그 차례의 착수 (패스 가능)
+ *   move    무적수·결계·저격·예약수를 쓴 뒤 그 차례의 착수 (패스 가능)
  *   first / second  슈퍼선수의 첫 수 · 둘째 수 (패스 없음)
  *   swap2   맞바꾸기: 내 돌을 고른 뒤 바꿀 상대 돌 (대상 칸)
  *   tele2   순간이동: 내 돌을 고른 뒤 옮길 빈 점 (대상 칸)
@@ -143,7 +143,7 @@ const AugState = (() => {
         else if (au === 'teleport') { s.pickA = q; s.step = 'tele2'; sameNode(); }
         else if (au === 'grow') { b.grow(q); done(); moveNode(q); }
         else if (au === 'fork') { s.pickA = q; s.step = 'fork2'; sameNode(); }
-        else if (au === 'shadow') { b.reserve([q]); done(); moveNode(PASS); }
+        else if (au === 'shadow') { b.reserveOnly(q); s.step = 'move'; sameNode(); } // 예약수: 예약하고 이어서 착수
         else { b.pluck(q); s.step = 'move'; sameNode(); } // 저격: 들어내고 이어서 착수
       }
       return s;

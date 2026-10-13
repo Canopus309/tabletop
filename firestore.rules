@@ -35,7 +35,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.auth != null && id.size() <= 20 && validAugStat(request.resource.data);
     }
-    function augList() { return ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier', 'wall', 'swap', 'prisoner', 'mirror', 'grow', 'save', 'teleport', 'para', 'fork', 'shadow', 'necro', 'zugzwang', 'neutral', 'retract', 'bigstone', 'myeongdang']; }
+    function augList() { return ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier', 'wall', 'swap', 'prisoner', 'mirror', 'grow', 'save', 'teleport', 'para', 'fork', 'shadow', 'necro', 'zugzwang', 'neutral', 'bigstone', 'myeongdang']; }
     function validAugStat(d) {
       return d.keys().hasOnly(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at', 'of', 'bid', 'bwin']) && d.keys().hasAll(['n', 'ab', 'aw', 'komi', 'w', 'how', 'len', 'local', 'at'])
         && d.n in [9, 13, 19] && d.ab in augList() && d.aw in augList() && d.komi is number

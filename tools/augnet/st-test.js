@@ -27,12 +27,12 @@ for (let gi = 0; gi < N && !bad; gi++) {
     const P = x => x === area ? 0 : pt(x), T = x => pt(x - area - 1);
     const f = cur[0], last = cur[cur.length - 1];
     let str;
-    if (cur.length === 1) str = f.a > area ? (au === 'shadow' ? 'h' : 'g') + T(f.a) : String(P(f.a));
+    if (cur.length === 1) str = f.a > area ? 'g' + T(f.a) : String(P(f.a));
     else if (f.a === 2 * area + 1) {
       const ms = cur.slice(1).map(c => P(c.a)); while (ms.length < f.need) ms.push(0); // 둘 곳이 없어 일찍 끝난 차례
       str = au === 'double' ? 'd' + ms.join(',') : au === 'mirror' ? 'm' + ms[0] : au === 'para' ? 'p' + ms[0] : 'e' + ms.join(',');
     } else if (au === 'swap' || au === 'teleport' || au === 'fork') str = ({ swap: 'x', teleport: 't', fork: 'f' })[au] + T(f.a) + ',' + (last.a === area ? 0 : T(last.a));
-    else str = ({ invincible: 'i', barrier: 'b', snipe: 's' })[au] + T(f.a) + ';' + P(last.a);
+    else str = ({ invincible: 'i', barrier: 'b', snipe: 's', shadow: 'h' })[au] + T(f.a) + ';' + P(last.a);
     kinds[str[0]] = (kinds[str[0]] || 0) + 1;
     try { G.apply(str); } catch (e) { console.log('앱이 거부', gi, k, str, aug, e.message); bad++; break; }
     turns++; cur = [];
