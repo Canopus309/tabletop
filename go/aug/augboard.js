@@ -7,9 +7,13 @@
  */
 'use strict';
 const AUG_MARK=new Int32Array(23*23),AUG_STACK=new Int32Array(23*23);let AUG_STAMP=0;
+const AUG_TMPS={};const AUG_TMP=n=>AUG_TMPS[n]||(AUG_TMPS[n]=new AugBoard(n)); // 규칙 확인용 빈 판 (판 크기마다 하나)
 class AugBoard extends Board{
   constructor(n){super(n);this.inv=[0,0,0];this.bar=[0,0,0];this.kw=0;}
   copyFrom(b){super.copyFrom(b);this.inv[1]=b.inv[1];this.inv[2]=b.inv[2];this.bar[1]=b.bar[1];this.bar[2]=b.bar[2];this.kw=b.kw;}
+  // 벽: col 쪽 변의 1선을 내 돌로 (대국 시작 때)
+  wall(col){for(const p of augWallPts(this.n,col)){this.c[p]=col;this.delE(p);}}
+
   // p 의 무리가 무적인가 (무적수를 건 돌이 같은 무리에 있으면)
   isInv(p){
     const c=this.c,col=c[p],m=this.inv[col];if(!m||c[m]!==col)return false;if(m===p)return true;
@@ -53,6 +57,23 @@ class AugBoard extends Board{
   pluck(q){this.c[q]=EMPTY;this.addE(q);this.caps[this.turn]++;this.ko=0;}
   // 예전 저격: q 의 돌 한 점을 들어내고 차례를 넘긴다 (예전 기보 · 측정 도구용)
   snipe(q){const col=this.turn;this.c[q]=EMPTY;this.addE(q);this.caps[col]++;this.ko=0;this.passes=0;this.moveNum++;this.turn=3-col;this.last=-1;}
+  // 맞바꾸기 뒤 정리 (AugGame.settle 과 같음): 둘레의 활로 없는 상대 무리를 따내고, 내 무리가 활로 없이 남으면 -1
+  settle(col,pts){
+    const c=this.c,d=this.d,opp=3-col,near=new Set();
+    for(const p of pts){near.add(p);for(let i=0;i<4;i++)near.add(p+d[i]);}
+    let cap=0;
+    for(const r of near)if(c[r]===opp&&this.libs(r,1)===0&&!this.isInv(r))cap+=this.remove(r);
+    this.caps[col]+=cap;
+    for(const r of near)if(c[r]===col&&this.libs(r,1)===0&&!this.isInv(r))return -1;
+    return cap;
+  }
+  endTurn(){this.moveNum++;this.turn=3-this.turn;this.ko=0;this.passes=0;this.last=-1;}
+  // 맞바꾸기: 내 돌 a 와 상대 돌 q 의 자리를 바꾸고 차례를 넘긴다. 규칙에 어긋나면 false (판은 그대로)
+  canSwap(a,q){
+    const col=this.turn;if(this.c[a]!==col||this.c[q]!==3-col||this.isInv(a)||this.isInv(q))return false;
+    const t=AUG_TMP(this.n);t.copyFrom(this);t.c[a]=3-col;t.c[q]=col;return t.settle(col,[a,q])>=0;
+  }
+  swap(a,q){const col=this.turn;this.c[a]=3-col;this.c[q]=col;this.settle(col,[a,q]);this.endTurn();}
   // 슈퍼선수: 같은 색이 한 수 더 (첫 수 뒤에 부름)
   again(){this.turn=3-this.turn;this.ko=0;}
 }

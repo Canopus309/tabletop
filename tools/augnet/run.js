@@ -79,7 +79,7 @@ setInterval(() => { if (stop() && procs.thermo) procs.thermo.kill(); }, 5000);
 function report() {
   const rd = f => { try { return fs.readFileSync(path.join(HERE, f), 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch (e) { return []; } };
   const games = rd(DD + '/games.jsonl'), tl = rd(MD + '/train-log.jsonl'), pl = rd(MD + '/probe-log.jsonl');
-  const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계' };
+  const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환' };
   const recent = games.slice(-2000);
   const useRate = Object.keys(NAME).filter(a => a !== 'kowang').map(a => {
     let have = 0, used = 0, at = 0;

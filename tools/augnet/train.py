@@ -10,7 +10,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 sys.path.insert(0, os.path.dirname(__file__))
-from model import from_katago, save, NF2, NG2
+from model import from_katago, save, NF, NF2, NG2
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 어느 KataGo 를 바탕으로 하나: 환경 변수 AUGNET_NET = b10 (기본, data/ · models/) 또는 b15 (data-b15/ · models-b15/)
@@ -100,7 +100,7 @@ def train_round(steps):
         l_own = F.mse_loss(own.float(), own_t)
         loss = l_pol + 1.5 * l_val + 0.5 * l_sc + 0.5 * l_own
         if teacher is not None:
-            plain = (bin_[..., NF2 - 6:].abs().sum((1, 2, 3)) == 0)   # 무적 · 결계 · 단계 표시가 없는 장면
+            plain = (bin_[..., NF:].abs().sum((1, 2, 3)) == 0)   # 무적 · 결계 · 단계 · 맞바꾸기 표시가 없는 장면
             if plain.any():
                 with torch.no_grad(), torch.autocast('cuda', dtype=torch.float16):
                     tp = teacher(bin_[plain], glob_[plain])[0].float()

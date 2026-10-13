@@ -138,4 +138,48 @@ ok('참고 한마디: 9줄 결계 아주 강함, 패왕 조금 약함', augTier(
 ok('경매 후보 둘은 서로 다름', new Set(augOffers('X1',2)).size===2);
 ok('먼저 부를 색은 1 또는 2, 같은 씨앗이면 같음', [1,2].includes(ctx.augCoin('ABC'))&&ctx.augCoin('ABC')===ctx.augCoin('ABC'));
 
+// 벽 (흑 아래 · 백 위 1선)
+{const g=G('wall','wall');
+ ok('벽: 흑 아래 1선 9점 · 백 위 1선 9점으로 시작', [0,1,2,3,4,5,6,7,8].every(x=>g.b.c[P(x,8)]===1&&g.b.c[P(x,0)]===2));
+ ok('벽: 흑부터 둠', g.turn===1);
+ g.apply(String(P(4,4)));g.load(g.entries);
+ ok('벽: 기보를 다시 읽어도 벽이 있음', g.b.c[P(0,8)]===1&&g.b.c[P(4,4)]===1);
+ const s=g.score(new Set());ok('벽: 계가에 벽 돌도 셈', s.bs>=10&&s.ws>=9);
+}
+// 맞바꾸기
+{const g=G('swap','');
+ g.apply(String(P(0,0)));g.apply(String(P(4,4)));
+ g.apply('x'+P(0,0)+','+P(4,4));
+ ok('맞바꾸기: 흑 돌과 백 돌 자리가 바뀜, 백 차례', g.b.c[P(0,0)]===2&&g.b.c[P(4,4)]===1&&g.turn===2&&g.used(1));
+}
+{const g=G('swap','');
+ // 백 A9(0,0) 은 백 B9 · A8 과 이어져 있음 → 흑 돌을 A9 로 보내면 흑은 활로가 없음
+ for(const p of [P(4,4),P(1,0),P(8,8),P(0,1),P(7,7),P(0,0)])g.apply(String(p));
+ throws('맞바꾸기: 내 돌이 활로 없이 남으면 못 함', ()=>g.apply('x'+P(4,4)+','+P(0,0)));
+ ok('맞바꾸기: 못 한 뒤에도 판·증강 그대로', g.b.c[P(4,4)]===1&&g.b.c[P(0,0)]===2&&!g.used(1));
+}
+{const g=G('swap','');
+ // 백 (5,5) 를 흑 (0,0) 과 바꾸면 백이 A9 로 감: A9 백은 흑 B9·A8 에 둘러싸여 활로 0 → 잡힘
+ g.apply(String(P(1,0)));g.apply(String(P(5,5)));g.apply(String(P(0,1)));g.apply(String(P(6,6)));g.apply(String(P(0,0)));g.apply(String(P(7,7)));
+ g.apply('x'+P(0,0)+','+P(5,5));
+ ok('맞바꾸기: 보낸 상대 돌이 활로 없으면 잡힘', g.b.c[P(0,0)]===0&&g.b.c[P(5,5)]===1&&g.b.caps[1]===1);
+ throws('맞바꾸기: 한 번만', ()=>{g.apply(String(P(8,8)));g.apply('x'+P(1,0)+','+P(6,6));});
+}
+{const g=G('swap','invincible');
+ for(const p of [P(0,0),P(4,4),P(8,8)])g.apply(String(p));
+ g.apply('i'+P(4,4)+';'+P(3,3));
+ throws('맞바꾸기: 무적인 돌은 못 바꿈', ()=>g.apply('x'+P(0,0)+','+P(4,4)));
+}
+// 포로교환
+{const g=G('prisoner','');
+ // 흑이 백 한 점을 따냄: 백 (0,0), 흑 (1,0) · (0,1)
+ g.apply(String(P(1,0)));g.apply(String(P(0,0)));g.apply(String(P(0,1)));
+ const s0=G('',''),gg=G('','');for(const e of g.entries)gg.apply(e);
+ const a=g.score(new Set()),b=gg.score(new Set());
+ ok('포로교환: 따낸 1점만큼 흑 집이 1 많음', a.bs===b.bs+1&&a.pb===1);
+ g.apply(String(P(4,4)));g.apply(String(P(8,8)));
+ const d=g.score(new Set([P(4,4)]));ok('포로교환: 죽은 돌로 표시한 백 돌도 셈', d.pb===2);
+ void s0;
+}
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);process.exit(fail?1:0);

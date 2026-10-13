@@ -3,7 +3,7 @@
 // 사용: node analyze.js [--last 4000]   (run.js 보고서에서도 fit() 을 부른다)
 'use strict';
 const fs = require('fs'), path = require('path');
-const AUGS = ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier'];
+const { AUG_LIST: AUGS } = require('./game.js');
 
 function solve(A, b) {   // 작은 대칭 행렬: 가우스 소거, 역행렬도 함께
   const k = b.length, M = A.map((r, i) => r.concat(Array.from({ length: k }, (_, j) => +(i === j)), [b[i]]));
@@ -38,7 +38,7 @@ function fit(games) {
 if (require.main === module) {
   const i = process.argv.indexOf('--last'), last = i > 0 ? +process.argv[i + 1] : 4000;
   const games = fs.readFileSync(path.join(__dirname, 'data' + (process.env.AUGNET_NET && process.env.AUGNET_NET !== 'b10' ? '-' + process.env.AUGNET_NET : ''), 'games.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
-  const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계' };
+  const NAME = { kowang: '패왕', rewind: '되감기', snipe: '저격', double: '슈퍼선수', invincible: '무적수', barrier: '결계', wall: '벽', swap: '맞바꾸기', prisoner: '포로교환' };
   for (const [lo, hi] of [[0, last], [Math.max(0, games.length - last), games.length]]) {
     const r = fit(games.slice(lo, hi)); if (!r) continue;
     console.log(`${lo}~${hi}판 (억지 사용 판 뺀 ${r.games}판) · 흑 기본 우세 ${r.base}±${r.baseSe}`);

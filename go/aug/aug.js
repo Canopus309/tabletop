@@ -7,6 +7,9 @@
  *   슈퍼선수 한 번. 내 차례에 두 수를 연달아 둔다 (패스는 안 됨)
  *   무적수   한 번. 내 돌 하나를 무적으로: 그 돌과 이어진 돌(나중에 이은 돌 포함)은 활로가 없어도 잡히지 않는다. 쓴 차례에 수도 둔다
  *   결계     한 번. 빈 점 하나를 상대가 끝까지 둘 수 없는 점으로. 그 점에 붙은 내 돌은 그 점이 활로로 남아 잡히지 않는다. 쓴 차례에 수도 둔다
+ *   벽       늘. 내 쪽 변(흑 아래 · 백 위)의 1선에 내 돌이 다 놓인 채로 시작한다 (2026-10-13 추가: 벽·맞바꾸기·포로교환)
+ *   맞바꾸기 한 번. 수 대신 내 돌 하나와 상대 돌 하나의 자리를 바꾼다. 활로가 없어진 상대 무리는 잡히고, 내 무리가 활로 없이 남는 맞바꾸기는 못 한다
+ *   포로교환 늘. 대국 중 따내거나 들어낸 상대 돌 수 + 계가 때 죽은 돌로 표시한 상대 돌 수만큼 내 집에 더한다
  *
  * 증강 정하기 (경매, 2026-10): 증강 둘을 공개하고 두 사람이 번갈아 덤을 부른다. 마지막에 높게 부른 사람이 먼저 고르고
  *   부른 만큼 상대에게 덤으로 준다 → 덤 = 7.5 + (흑이 낙찰이면 +값, 백이면 -값). 공정한 값은 두 사람이 정하므로 덤표가 필요 없다.
@@ -20,6 +23,7 @@
  *   "d12,34"     슈퍼선수: 12 와 34 에 연달아 착수
  *   "s45;123"    저격: 45 의 상대 돌을 들어내고 123 에 착수
  *   "s45"        (예전 저격, 2026-10-13 전 기보) 45 의 상대 돌을 들어냄 (착수 없음)
+ *   "x12,34"      맞바꾸기: 12 의 내 돌과 34 의 상대 돌 자리를 바꿈
  */
 'use strict';
 // 증강 점수 (2026-10 추정값, 집): 수 하나의 값(포석에서 약 14집)을 기준으로 어림했다. 참고 한마디에만 쓴다.
@@ -37,12 +41,17 @@ const AUGS={
   double:{name:'슈퍼선수',short:'두 수 연달아',desc:'한 번, 내 차례에 두 수를 연달아 둡니다 (패스는 안 됨).',v:{9:13,13:16,19:20}},
   invincible:{name:'무적수',short:'잡히지 않는 돌',desc:'한 번, 내 돌 하나를 무적으로 만듭니다. 그 돌과 이어진 돌(나중에 이어 붙인 돌 포함)은 활로가 없어도 잡히지 않고, 계가 때도 늘 산 돌입니다. 쓴 차례에 수도 둡니다.',v:{9:18,13:25,19:35}},
   barrier:{name:'결계',short:'상대가 못 두는 점',desc:'한 번, 빈 점 하나를 상대가 끝까지 둘 수 없는 점으로 만듭니다. 그 점에 붙은 내 돌은 그 점이 활로로 남아 잡히지 않고, 확실한 눈이 됩니다. 쓴 차례에 수도 둡니다.',v:{9:20,13:28,19:40}},
+  wall:{name:'벽',passive:true,short:'1선을 내 돌로 시작',desc:'늘 켜져 있습니다. 내 쪽 변(흑은 아래, 백은 위)의 1선에 내 돌이 다 놓인 채로 대국을 시작합니다.',v:{9:14,13:18,19:22}},
+  swap:{name:'맞바꾸기',short:'내 돌과 상대 돌 자리 바꾸기',desc:'한 번, 내 차례에 수를 두는 대신 내 돌 하나와 상대 돌 하나의 자리를 바꿉니다. 활로가 없어진 상대 무리는 잡히고, 내 무리가 활로 없이 남게 되면 바꿀 수 없습니다. 무적인 돌은 바꿀 수 없습니다.',v:{9:8,13:9,19:10}},
+  prisoner:{name:'포로교환',passive:true,short:'따낸 돌만큼 집',desc:'늘 켜져 있습니다. 대국 중 따내거나 들어낸 상대 돌 수와, 계가 때 죽은 돌로 표시한 상대 돌 수만큼 내 집에 더합니다 (중국식 계가에 일본식 사석 계산을 더하는 셈).',v:{9:5,13:7,19:10}},
 };
 const AUG_IDS=Object.keys(AUGS);
 const AUG_BASE_KOMI=7.5;
 const augValue=(id,n)=>id&&AUGS[id]?AUGS[id].v[n]??AUGS[id].v[19]:0;
 // 경매 전(덤표 시절) 기보의 덤을 되살릴 때만: 그때의 점수 (저격 규칙을 바꾸기 전 값)
 const augValue0=(id,n)=>id&&AUGS[id]?(AUGS[id].v0||AUGS[id].v)[n]??(AUGS[id].v0||AUGS[id].v)[19]:0;
+// 벽: 흑은 아래 변, 백은 위 변의 1선 (Board 자리 번호)
+function augWallPts(n,col){const y=col===1?n-1:0,out=[];for(let x=0;x<n;x++)out.push((y+1)*(n+2)+x+1);return out;}
 // 참고 한마디 (정확한 숫자 대신): 같은 판 크기에서 가장 센 증강에 견준 비율로
 function augTier(id,n){
   const top=Math.max(...AUG_IDS.map(a=>augValue(a,n))),r=augValue(id,n)/top;
@@ -58,12 +67,14 @@ function augParse(s){
   s=String(s);let m;
   if((m=/^s(\d+)$/.exec(s)))return{kind:'snipe',q:+m[1]};
   if((m=/^d(\d+),(\d+)$/.exec(s)))return{kind:'double',p:+m[1],p2:+m[2]};
+  if((m=/^x(\d+),(\d+)$/.exec(s)))return{kind:'swap',a:+m[1],b:+m[2]};
   if((m=/^(?:([ibs])(\d+);|(r);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:'r'}:null};
   return null;
 }
 function augFormat(t){
   if(t.kind==='snipe')return's'+t.q;
   if(t.kind==='double')return'd'+t.p+','+t.p2;
+  if(t.kind==='swap')return'x'+t.a+','+t.b;
   return(t.pre?(t.pre.k==='r'?'r;':t.pre.k+t.pre.q+';'):'')+t.p;
 }
 
@@ -73,7 +84,10 @@ class AugGame{
     this.n=o.n;this.base=o.komi??AUG_BASE_KOMI;this.aug={1:o.aug&&o.aug[1]||'',2:o.aug&&o.aug[2]||''};
     this.entries=[];this.turns=[];this.reset();
   }
-  reset(){this.b=new Board(this.n);this.inv={1:0,2:0};this.bar={1:0,2:0};this.koBan=null;this.last=-1;this.lastCol=0;this.usedNow={1:false,2:false};}
+  reset(){
+    this.b=new Board(this.n);this.inv={1:0,2:0};this.bar={1:0,2:0};this.koBan=null;this.last=-1;this.lastCol=0;this.usedNow={1:false,2:false};
+    for(const col of [1,2])if(this.aug[col]==='wall')for(const p of augWallPts(this.n,col))this.b.place(p,col);
+  }
   get komi(){return this.base;}
   get turn(){return this.entries.length%2===0?BLACK:WHITE;}
   // 이 증강을 이미 썼는가 (판에 적용한 차례까지 기준. 되감기로 되돌린 차례의 증강은 다시 쓸 수 있다)
@@ -118,6 +132,16 @@ class AugGame{
     if(cap===1){let single=true;for(const dd of b.d)if(b.c[p+dd]===col)single=false;if(single&&b.libs(p,2)===1)this.koBan={p:capPos,col:3-col};}
     return cap;
   }
+  // 맞바꾸기 뒤 정리: pts 둘레에서 활로가 없는 상대 무리를 따내고, 내 무리가 활로 없이 남으면 -1 (그 차례는 무효)
+  settle(col,pts){
+    const b=this.b,opp=3-col,near=new Set();
+    for(const p of pts){near.add(p);for(const dd of b.d)near.add(p+dd);}
+    let cap=0;
+    for(const r of near)if(b.c[r]===opp&&b.libs(r,1)===0&&!this.invincible(r))cap+=b.remove(r);
+    b.caps[col]+=cap;
+    for(const r of near)if(b.c[r]===col&&b.libs(r,1)===0&&!this.invincible(r))return -1;
+    this.koBan=null;return cap;
+  }
   // 한 차례(객체)를 판에 적용. 규칙에 맞지 않으면 Error. 반환: 따낸 돌 수
   step(t,col){
     const b=this.b,a=this.aug[col],fail=m=>{throw new Error(m);};
@@ -128,6 +152,14 @@ class AugGame{
       if(b.c[q]!==3-col)fail('상대 돌을 골라야 합니다');if(this.invincible(q))fail('무적인 돌은 들어낼 수 없습니다');
       b.c[q]=EMPTY;b.addE(q);b.caps[col]++;this.koBan=null;this.last=-1;this.lastCol=col;
       return 1;
+    }
+    if(t.kind==='swap'){
+      need('swap');const p=t.a,q=t.b;
+      if(b.c[p]!==col)fail('먼저 내 돌을 골라야 합니다');if(b.c[q]!==3-col)fail('바꿀 상대 돌을 골라야 합니다');
+      if(this.invincible(p)||this.invincible(q))fail('무적인 돌은 바꿀 수 없습니다');
+      b.c[p]=3-col;b.c[q]=col;
+      const cap=this.settle(col,[p,q]);if(cap<0)fail('바꾸면 내 돌이 활로 없이 남습니다');
+      this.last=q;this.lastCol=col;return cap;
     }
     if(t.kind==='double'){
       need('double');if(!t.p||!t.p2)fail('패스는 두 수로 쓸 수 없습니다');
@@ -192,13 +224,19 @@ class AugGame{
       while(st.length){const q=st.pop();reg.push(q);for(const dd of b.d){const r=q+dd;if(b.c[r]===EDGE)continue;const cv=col(r);if(cv===EMPTY){if(!seen[r]){seen[r]=1;st.push(r);}}else if(cv===BLACK)tb=true;else tw=true;}}
       const o=tb&&!tw?1:tw&&!tb?-1:0;for(const q of reg)own[q]=o;if(o>0)bs+=reg.length;else if(o<0)ws+=reg.length;
     }
+    // 포로교환: 따내거나 들어낸 상대 돌 + 죽은 돌로 표시한 상대 돌만큼 더함
+    let pb=0,pw=0;
+    if(this.aug[1]==='prisoner'){pb=b.caps[1];for(const p of dead)if(b.c[p]===WHITE&&!this.invincible(p))pb++;}
+    if(this.aug[2]==='prisoner'){pw=b.caps[2];for(const p of dead)if(b.c[p]===BLACK&&!this.invincible(p))pw++;}
+    bs+=pb;ws+=pw;
     const diff=bs-ws-this.komi;
-    return{bs,ws,w:diff>0?BLACK:WHITE,d:Math.abs(diff),own};
+    return{bs,ws,pb,pw,w:diff>0?BLACK:WHITE,d:Math.abs(diff),own};
   }
   // 기보에 남길 실제 수순 (되감은 차례는 빠짐): [{col, p}] 와 증강 설명
   record(){
     const out=[];
     for(const x of this.turns){
+      if(x.t.kind==='swap'){out.push({col:x.col,swap:[x.t.a,x.t.b],note:'맞바꾸기'});continue;}
       const t=x.t,A=AUGS[this.aug[x.col]];
       if(t.kind==='snipe')out.push({col:x.col,snipe:t.q,note:'저격'});
       else if(t.kind==='double'){out.push({col:x.col,p:t.p,note:'슈퍼선수 (두 수 연달아)'});out.push({col:x.col,p:t.p2});}
@@ -209,12 +247,13 @@ class AugGame{
   }
 }
 // 증강 후보: 방 코드 등으로 정해지는 무작위 순서 (같은 씨앗이면 늘 같음 → 다시 뽑기 없음). 경매는 앞의 둘
-function augOffers(seed,k=3){
+// pool: 고를 증강 목록 (AI 대국은 AI 가 배운 증강만)
+function augOffers(seed,k=3,pool=AUG_IDS){
   let h=2166136261>>>0;for(const ch of String(seed)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0;}
   const rnd=()=>{h^=h<<13;h>>>=0;h^=h>>>17;h^=h<<5;h>>>=0;return h/4294967296;};
-  const a=AUG_IDS.slice();for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}
+  const a=pool.slice();for(let i=a.length-1;i>0;i--){const j=rnd()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}
   return a.slice(0,k);
 }
 // 씨앗으로 정하는 1 또는 2 (경매를 먼저 부를 색)
 function augCoin(seed){let h=7;for(const ch of String(seed))h=(h*31+ch.charCodeAt(0))>>>0;return h%2?1:2;}
-if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,AUG_BID_MAX,augValue,augValue0,augTier,augKomi,augParse,augFormat,AugGame,augOffers,augCoin};
+if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,AUG_BID_MAX,augWallPts,augValue,augValue0,augTier,augKomi,augParse,augFormat,AugGame,augOffers,augCoin};

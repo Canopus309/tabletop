@@ -346,5 +346,7 @@ const AugAI = (() => {
   // 경매: 증강 둘(of) 을 두고 AI 가 낙찰받고 싶은 최고 값 (먼저 고르면 좋은 것을 갖고, 진 쪽은 남은 것)
   const maxBid = of => Math.max(0, Math.round(Math.abs((VALUE[of[0]] || 0) - (VALUE[of[1]] || 0))));
   const prefer = of => (VALUE[of[0]] || 0) >= (VALUE[of[1]] || 0) ? of[0] : of[1];
-  return { load, move, judge, maxBid, prefer, VALUE, get ready() { return !!net; }, get backend() { return backend; }, get name() { return head ? head.name : ''; }, _internal: { St, fromTurns, run, parseFile, buildNet, search, Node } };
+  // 이 AI 가 배운 증강 (AI 대국의 경매 후보). 벽·맞바꾸기·포로교환은 다음 학습부터
+  const KNOWN = AUG_LIST.slice();
+  return { load, move, judge, maxBid, prefer, VALUE, KNOWN, get ready() { return !!net; }, get backend() { return backend; }, get name() { return head ? head.name : ''; }, _internal: { St, fromTurns, run, parseFile, buildNet, search, Node } };
 })();
