@@ -120,6 +120,8 @@ const code = () => 'TS' + Math.random().toString(36).slice(2, 6).toUpperCase().r
   const aug = o => newGame({ g: 'goaug', n: 13, komi: 7.5, handi: 0, rated: false, ab: '', aw: '', of: ['barrier', 'snipe'], bv: -1, bw: 0, bt: 1, ...o });
   expect('증강: 레이팅 대국으로 만들기', await write(A, code(), aug({ rated: true }), null, true), false);
   expect('증강: 같은 후보 둘', await write(A, code(), aug({ of: ['snipe', 'snipe'] }), null, true), false);
+  expect('증강: 새 증강 후보 (거울수 · 명당)', await write(A, code(), aug({ of: ['mirror', 'myeongdang'] }), null, true), true);
+  expect('증강: 없는 증강 이름', await write(A, code(), aug({ of: ['mirror', 'retract'] }), null, true), false);
   const a1 = code();
   expect('증강 만들기', await write(A, a1, aug(), null, true), true);
   expect('증강: 바로 play 로 참가', await write(B, a1, { ...join, players: [A.uid, B.uid] }, JM), false);
@@ -129,7 +131,7 @@ const code = () => 'TS' + Math.random().toString(36).slice(2, 6).toUpperCase().r
   expect('경매: 처음에 그만', await write(A, a1, { bt: 0 }, ['bt']), false);
   expect('경매: 흑 0집', await write(A, a1, { bv: 0, bw: 1, bt: 2 }, ['bv', 'bw', 'bt']), true);
   expect('경매: 백이 같은 값', await write(B, a1, { bv: 0, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), false);
-  expect('경매: 백 상한 넘게', await write(B, a1, { bv: 51, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), false);
+  expect('경매: 백 상한 넘게 (13줄 상한 = 칸 수 169)', await write(B, a1, { bv: 170, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), false);
   expect('경매: 백 6집', await write(B, a1, { bv: 6, bw: 2, bt: 1 }, ['bv', 'bw', 'bt']), true);
   expect('경매: 낙찰 전에 고르기', await write(B, a1, { ab: 'snipe', aw: 'barrier', komi: 1.5, st: 'play' }, ['ab', 'aw', 'komi', 'st']), false);
   expect('경매: 흑 그만 (백 낙찰)', await write(A, a1, { bt: 0 }, ['bt']), true);
