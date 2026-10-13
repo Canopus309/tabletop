@@ -183,7 +183,7 @@ let game=null,G=null,phase='play',view=null,act=null,PG=null,pending=0,deadSet=n
 // ---------- 증강 설명 ----------
 function augLabel(id){return id?AUGS[id].name:'고르는 중';}
 // 이 대국의 덤 (경매로 정함). 예전 방식(덤표)으로 둔 기록은 그때 값으로
-const gameKomi=g=>typeof g.komi==='number'?g.komi:AUG_BASE_KOMI+augValue(g.aug[1],g.n)-augValue(g.aug[2],g.n);
+const gameKomi=g=>typeof g.komi==='number'?g.komi:AUG_BASE_KOMI+augValue0(g.aug[1],g.n)-augValue0(g.aug[2],g.n);
 function komiText(){
   const a=game.auc;
   if(!game.aug[1]||!game.aug[2])return a&&a.bv>=0?`덤: 경매 중 · 지금 최고 ${NAME[a.bw]} ${a.bv}집`:'덤: 경매로 정해집니다 (기본 7.5)';
@@ -221,6 +221,7 @@ function sgfText(g){
   for(const m of G?G.record():[]){
     const C=m.col===1?'B':'W';
     if(m.snipe!==undefined){s+=`;${C}[]AE[${c(m.snipe)}]C[저격: ${c(m.snipe)} 돌을 들어냄]`;continue;}
+    if(m.rm)s+=`;AE[${c(m.rm)}]C[저격: ${c(m.rm)} 돌을 들어냄]`;
     s+=`;${C}[${m.p?c(m.p):''}]`;if(m.note)s+=`C[${m.note}${m.q?' '+c(m.q):''}]`;
   }
   return s+')';
@@ -409,7 +410,7 @@ function draw(){
   // 마지막 수
   if(g.last>0&&b.c[g.last]!==EMPTY){const [x,y]=b.xy(g.last);ctx.strokeStyle=b.c[g.last]===BLACK?'#fff':'#222';ctx.lineWidth=Math.max(1.5,cell*0.06);ctx.beginPath();ctx.arc(X(x),X(y),r*0.42,0,7);ctx.stroke();}
   // 증강 쓰는 중: 고른 대상 표시
-  if(act&&act.q&&(act.k==='i'||act.k==='b')){const [x,y]=b.xy(act.q);ctx.strokeStyle='rgba(122,91,214,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(X(x),X(y),r*1.1,0,7);ctx.stroke();}
+  if(act&&act.q&&(act.k==='i'||act.k==='b'||act.k==='s')){const [x,y]=b.xy(act.q);ctx.strokeStyle='rgba(122,91,214,.95)';ctx.lineWidth=Math.max(2,cell*0.07);ctx.beginPath();ctx.arc(X(x),X(y),r*1.1,0,7);ctx.stroke();}
   // 놓을 자리 미리보기
   if(pending&&canAct()){const [x,y]=b.xy(pending);drawStone(X(x),X(y),r,G.turn,0.7);ctx.strokeStyle='rgba(47,140,110,.95)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(X(x),X(y),r*1.08,0,7);ctx.stroke();}
 }
@@ -436,7 +437,7 @@ $('#placeCancel').onclick=()=>{pending=0;draw();ui();};
 function commit(p){
   const col=G.turn;let s;
   if(!act)s=String(p);
-  else if(act.k==='i'||act.k==='b')s=act.k+act.q+';'+p;
+  else if(act.k==='i'||act.k==='b'||act.k==='s')s=act.k+act.q+';'+p;
   else if(act.k==='r')s='r;'+p;
   else if(act.k==='d'){
     if(act.stage===1){act.p1=p;act.stage=2;PG.put(p,col);pending=0;sound('stone');draw();ui();return;}
@@ -474,8 +475,7 @@ function target(p){
   else if(act.k==='s'){
     if(b.c[p]!==3-col){toast('들어낼 상대 돌을 누르세요');return;}
     if(G.invincible(p)){toast('무적인 돌은 들어낼 수 없습니다');return;}
-    ask('저격',`${pname(p)} 의 ${NAME[3-col]} 돌을 들어낼까요? 이번 차례는 수를 두지 않습니다.`,'들어내기').then(y=>{if(y)play('s'+p);});
-    return;
+    act.q=p;act.stage='move';PG=clone();PG.b.c[p]=EMPTY;PG.b.addE(p);PG.koBan=null;toast('저격: 들어냈습니다 · 이제 이번 차례의 수를 두세요');
   }
   draw();ui();
 }
@@ -500,7 +500,7 @@ async function useAug(){
 $('#aAug').onclick=useAug;
 $('#aPass').onclick=async()=>{
   if(!canAct())return;
-  if(act&&(act.k==='d'||act.k==='s')){toast('지금은 패스할 수 없습니다');return;}
+  if(act&&(act.k==='d'||(act.k==='s'&&act.stage==='target'))){toast('지금은 패스할 수 없습니다');return;}
   if(G.entries[G.entries.length-1]!=='0'&&G.turns.length<game.n*game.n*0.3&&!(await ask('패스할까요?','아직 둘 곳이 많이 남아 있습니다.','패스')))return;
   play(act?(act.k==='r'?'r;0':act.k+act.q+';0'):'0');
 };
@@ -565,7 +565,7 @@ function ui(){
     const nm=AUGS[game.aug[G.turn]].name;
     t=act.k==='i'?(act.stage==='target'?`<b>${nm}</b>: 무적으로 만들 내 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 무리에 걸었습니다 · 이번 차례의 수를 두세요`)
      :act.k==='b'?(act.stage==='target'?`<b>${nm}</b>: 상대가 못 두게 할 빈 점을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 에 결계 · 이번 차례의 수를 두세요`)
-     :act.k==='s'?`<b>${nm}</b>: 들어낼 상대 돌을 누르세요`
+     :act.k==='s'?(act.stage==='target'?`<b>${nm}</b>: 들어낼 상대 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.q)} 돌을 들어냈습니다 · 이번 차례의 수를 두세요`)
      :act.k==='d'?`<b>${nm}</b>: ${act.stage===1?'첫 수를 두세요':'두 번째 수를 두세요 (첫 수 '+pname(act.p1)+')'}`
      :`<b>${nm}</b>: 되돌린 장면입니다 · 다시 두세요`;
     B('iCancel','증강 취소');
@@ -596,7 +596,7 @@ function turnText(t){
   const x=t.t;
   if(x.kind==='snipe')return `저격: ${pname(x.q)} 돌을 들어냄`;
   if(x.kind==='double')return `슈퍼선수: ${pname(x.p)} · ${pname(x.p2)}`;
-  const pre=x.pre?(x.pre.k==='i'?`무적수(${pname(x.pre.q)}) 뒤 `:x.pre.k==='b'?`결계(${pname(x.pre.q)}) 뒤 `:'되감기 뒤 '):'';
+  const pre=x.pre?(x.pre.k==='i'?`무적수(${pname(x.pre.q)}) 뒤 `:x.pre.k==='b'?`결계(${pname(x.pre.q)}) 뒤 `:x.pre.k==='s'?`저격(${pname(x.pre.q)}) 뒤 `:'되감기 뒤 '):'';
   return pre+pname(x.p);
 }
 const setView=v=>{if(!G)return;view=Math.max(0,Math.min(G.turns.length,v));rvCache=null;draw();ui();};

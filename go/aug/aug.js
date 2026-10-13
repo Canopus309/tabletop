@@ -3,7 +3,7 @@
  * 증강 (한 사람에 하나, '한 번' 표시는 대국 중 한 번만)
  *   패왕     늘 켜짐. 패에서 상대 돌을 바로 되따낼 수 있다 (두 사람 모두 패왕이면 서로 지워져 보통 패 규칙)
  *   되감기   한 번. 내 직전 수와 상대의 응수를 함께 되돌리고 다시 둔다 (바로 앞 상대 차례가 되감기였으면 못 씀)
- *   저격     한 번. 내 차례에 수 대신 판 위 상대 돌 한 점을 들어낸다 (무적인 돌은 안 됨)
+ *   저격     한 번. 판 위 상대 돌 한 점을 들어내고, 그 차례에 수도 둔다 (무적인 돌은 안 됨). 2026-10-13 전에는 수 대신이었다
  *   슈퍼선수 한 번. 내 차례에 두 수를 연달아 둔다 (패스는 안 됨)
  *   무적수   한 번. 내 돌 하나를 무적으로: 그 돌과 이어진 돌(나중에 이은 돌 포함)은 활로가 없어도 잡히지 않는다. 쓴 차례에 수도 둔다
  *   결계     한 번. 빈 점 하나를 상대가 끝까지 둘 수 없는 점으로. 그 점에 붙은 내 돌은 그 점이 활로로 남아 잡히지 않는다. 쓴 차례에 수도 둔다
@@ -18,20 +18,22 @@
  *   "b45;123"    빈 점 45 에 결계를 치고 123 에 착수
  *   "r;123"      되감기 (내 직전 수와 상대 응수를 되돌림) 후 123 에 착수
  *   "d12,34"     슈퍼선수: 12 와 34 에 연달아 착수
- *   "s45"        저격: 45 의 상대 돌을 들어냄 (착수 없음)
+ *   "s45;123"    저격: 45 의 상대 돌을 들어내고 123 에 착수
+ *   "s45"        (예전 저격, 2026-10-13 전 기보) 45 의 상대 돌을 들어냄 (착수 없음)
  */
 'use strict';
 // 증강 점수 (2026-10 추정값, 집): 수 하나의 값(포석에서 약 14집)을 기준으로 어림했다. 참고 한마디에만 쓴다.
 //  - 패왕: 패가 나면 늘 이긴다. 상대는 패를 피하면 되므로 효과가 제한적
 //  - 되감기: 큰 실수 하나를 무를 수 있고, 상대 응수를 본 뒤 다른 수를 고를 수 있다
-//  - 저격: 내 수 하나를 써서 상대 수 하나를 없애므로 수 차이는 그대로지만, 눈·연결의 급소 돌을 골라 없앨 수 있다
+//  - 저격: 상대 돌 하나를 없애고 내 수도 둔다. 상대가 그 자리에 다시 둬도 내가 한 수를 번 셈이라 슈퍼선수와 비슷하다
+//    (예전처럼 수 대신 들어내면 상대가 다시 두는 것으로 그만이라 쓸모가 없었다: AI끼리 4만 판에서 0집 안팎)
 //  - 슈퍼선수: 공짜 수 하나(약 14집)를 싸움의 가장 좋은 때에 쓴다. 상대는 늘 두 수 연속을 대비해야 한다
 //  - 무적수: 한 무리가 영원히 죽지 않아 침입·싸움에서 크게 유리하다
 //  - 결계: 무적수가 하는 일을 다 할 수 있고(붙은 내 돌은 잡히지 않음) 확실한 눈·상대 급소 막기까지 되므로 무적수보다 위
 const AUGS={
   kowang:{name:'패왕',passive:true,short:'패를 바로 되따냄',desc:'늘 켜져 있습니다. 패에서 상대 돌을 바로 되따낼 수 있어 패를 늘 이깁니다. 두 사람 모두 패왕이면 서로 지워져 보통 패 규칙입니다.',v:{9:4,13:5,19:6}},
   rewind:{name:'되감기',short:'한 번 무르기',desc:'한 번, 내 직전 수와 상대의 응수를 함께 되돌리고 다시 둡니다. 바로 앞 상대 차례가 되감기였으면 쓸 수 없습니다.',v:{9:6,13:7,19:8}},
-  snipe:{name:'저격',short:'상대 돌 한 점 제거',desc:'한 번, 내 차례에 수를 두는 대신 판 위의 상대 돌 한 점을 들어냅니다. 무적인 돌은 들어낼 수 없습니다.',v:{9:10,13:12,19:15}},
+  snipe:{name:'저격',short:'상대 돌 하나 빼고 착수',desc:'한 번, 판 위의 상대 돌 한 점을 들어내고, 그 차례에 수도 둡니다 (들어낸 자리에 둬도 됩니다). 무적인 돌은 들어낼 수 없습니다.',v:{9:15,13:18,19:22},v0:{9:10,13:12,19:15}},
   double:{name:'슈퍼선수',short:'두 수 연달아',desc:'한 번, 내 차례에 두 수를 연달아 둡니다 (패스는 안 됨).',v:{9:13,13:16,19:20}},
   invincible:{name:'무적수',short:'잡히지 않는 돌',desc:'한 번, 내 돌 하나를 무적으로 만듭니다. 그 돌과 이어진 돌(나중에 이어 붙인 돌 포함)은 활로가 없어도 잡히지 않고, 계가 때도 늘 산 돌입니다. 쓴 차례에 수도 둡니다.',v:{9:18,13:25,19:35}},
   barrier:{name:'결계',short:'상대가 못 두는 점',desc:'한 번, 빈 점 하나를 상대가 끝까지 둘 수 없는 점으로 만듭니다. 그 점에 붙은 내 돌은 그 점이 활로로 남아 잡히지 않고, 확실한 눈이 됩니다. 쓴 차례에 수도 둡니다.',v:{9:20,13:28,19:40}},
@@ -39,6 +41,8 @@ const AUGS={
 const AUG_IDS=Object.keys(AUGS);
 const AUG_BASE_KOMI=7.5;
 const augValue=(id,n)=>id&&AUGS[id]?AUGS[id].v[n]??AUGS[id].v[19]:0;
+// 경매 전(덤표 시절) 기보의 덤을 되살릴 때만: 그때의 점수 (저격 규칙을 바꾸기 전 값)
+const augValue0=(id,n)=>id&&AUGS[id]?(AUGS[id].v0||AUGS[id].v)[n]??(AUGS[id].v0||AUGS[id].v)[19]:0;
 // 참고 한마디 (정확한 숫자 대신): 같은 판 크기에서 가장 센 증강에 견준 비율로
 function augTier(id,n){
   const top=Math.max(...AUG_IDS.map(a=>augValue(a,n))),r=augValue(id,n)/top;
@@ -49,12 +53,12 @@ const AUG_BID_MAX={9:30,13:50,19:80};
 // 낙찰 결과로 덤: 흑이 낙찰받으면 백에게 값만큼 더 주고, 백이 낙찰받으면 흑에게 준다
 const augKomi=(win,bid)=>AUG_BASE_KOMI+(win===1?bid:win===2?-bid:0);
 
-// 한 차례 글자 ↔ 객체 {pre: {k:'i'|'b'|'r', q}, kind: 'move'|'double'|'snipe', p, p2, q}
+// 한 차례 글자 ↔ 객체 {pre: {k:'i'|'b'|'s'|'r', q}, kind: 'move'|'double'|'snipe'(예전 저격), p, p2, q}
 function augParse(s){
   s=String(s);let m;
   if((m=/^s(\d+)$/.exec(s)))return{kind:'snipe',q:+m[1]};
   if((m=/^d(\d+),(\d+)$/.exec(s)))return{kind:'double',p:+m[1],p2:+m[2]};
-  if((m=/^(?:([ib])(\d+);|(r);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:'r'}:null};
+  if((m=/^(?:([ibs])(\d+);|(r);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:'r'}:null};
   return null;
 }
 function augFormat(t){
@@ -119,7 +123,7 @@ class AugGame{
     const b=this.b,a=this.aug[col],fail=m=>{throw new Error(m);};
     const need=id=>{if(a!==id)fail(AUGS[id].name+' 증강이 없습니다');if(this.used(col))fail('증강은 한 번만 쓸 수 있습니다');this.usedNow[col]=true;};
     if(t.pre&&t.pre.k==='r')this.usedNow[col]=true; // 되감기는 apply 에서 확인하고 되돌린 뒤 여기 온다
-    if(t.kind==='snipe'){
+    if(t.kind==='snipe'){ // 예전 저격 (수 대신)
       need('snipe');const q=t.q;
       if(b.c[q]!==3-col)fail('상대 돌을 골라야 합니다');if(this.invincible(q))fail('무적인 돌은 들어낼 수 없습니다');
       b.c[q]=EMPTY;b.addE(q);b.caps[col]++;this.koBan=null;this.last=-1;this.lastCol=col;
@@ -134,6 +138,11 @@ class AugGame{
     }
     if(t.pre&&t.pre.k==='i'){need('invincible');if(b.c[t.pre.q]!==col)fail('무적수는 내 돌에 겁니다');this.inv[col]=t.pre.q;}
     if(t.pre&&t.pre.k==='b'){need('barrier');if(b.c[t.pre.q]!==EMPTY)fail('결계는 빈 점에 칩니다');this.bar[col]=t.pre.q;}
+    if(t.pre&&t.pre.k==='s'){
+      need('snipe');const q=t.pre.q;
+      if(b.c[q]!==3-col)fail('상대 돌을 골라야 합니다');if(this.invincible(q))fail('무적인 돌은 들어낼 수 없습니다');
+      b.c[q]=EMPTY;b.addE(q);b.caps[col]++;this.koBan=null;
+    }
     if(!this.canPlay(t.p,col))fail(this.whyNot(t.p,col));
     return this.put(t.p,col);
   }
@@ -193,7 +202,7 @@ class AugGame{
       const t=x.t,A=AUGS[this.aug[x.col]];
       if(t.kind==='snipe')out.push({col:x.col,snipe:t.q,note:'저격'});
       else if(t.kind==='double'){out.push({col:x.col,p:t.p,note:'슈퍼선수 (두 수 연달아)'});out.push({col:x.col,p:t.p2});}
-      else out.push({col:x.col,p:t.p,note:t.pre?(t.pre.k==='i'?'무적수':t.pre.k==='b'?'결계':'되감기'):'',q:t.pre&&t.pre.q});
+      else out.push({col:x.col,p:t.p,note:t.pre?(t.pre.k==='i'?'무적수':t.pre.k==='b'?'결계':t.pre.k==='s'?'저격':'되감기'):'',q:t.pre&&t.pre.q,rm:t.pre&&t.pre.k==='s'?t.pre.q:0});
       void A;
     }
     return out;
@@ -208,4 +217,4 @@ function augOffers(seed,k=3){
 }
 // 씨앗으로 정하는 1 또는 2 (경매를 먼저 부를 색)
 function augCoin(seed){let h=7;for(const ch of String(seed))h=(h*31+ch.charCodeAt(0))>>>0;return h%2?1:2;}
-if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,AUG_BID_MAX,augValue,augTier,augKomi,augParse,augFormat,AugGame,augOffers,augCoin};
+if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,AUG_BID_MAX,augValue,augValue0,augTier,augKomi,augParse,augFormat,AugGame,augOffers,augCoin};

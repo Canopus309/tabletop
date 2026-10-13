@@ -3,7 +3,7 @@
  *   파일 models/augnet9.bin 은 tools/augnet/export.py 가 만든다 (float16 가중치)
  * - 입력 특징은 앱 KataGo 와 같고 (katago.js 의 encode), 증강 칸 6면 · 전역 14개를 덧붙인다 (tools/augnet/game.js 와 같음)
  * - 규칙 판은 augboard.js 의 AugBoard. 한 차례를 단계로 나눠 읽는다:
- *     decide (착수 · 패스 · 증강 쓰기) → move (무적수·결계 뒤 착수) / first · second (슈퍼선수 두 수)
+ *     decide (착수 · 패스 · 증강 쓰기) → move (무적수·결계·저격 뒤 착수) / first · second (슈퍼선수 두 수)
  * board.js, augboard.js, ../katago.js 다음에 불러온다. 전역 AugAI 를 만든다.
  */
 'use strict';
@@ -11,7 +11,8 @@ const AugAI = (() => {
   const AUG_LIST = ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier'];
   const NF = 22, NG = 19, NF2 = 28, NG2 = 33;
   // 신경망이 본 증강 값 (9줄, 집 · 2026-10-13 AI끼리 4만 판). 경매에서 AI 가 덤을 부를 때 쓴다
-  const VALUE = { double: 16, invincible: 15, kowang: 8, barrier: 6, rewind: 1, snipe: 1 };
+  // 저격은 2026-10-13 에 '들어내고 착수'로 바뀌어 아직 재지 못했다: 슈퍼선수와 비슷하게 어림
+  const VALUE = { double: 16, invincible: 15, snipe: 15, kowang: 8, barrier: 6, rewind: 1 };
   let net = null, head = null, backend = '', loading = null;
   // 이 파일(go/aug/ai.js) 이 있는 곳 기준으로 TF.js · 신경망 파일을 찾는다
   const HERE = typeof document !== 'undefined' && document.currentScript ? new URL('.', document.currentScript.src).href : './';
@@ -84,7 +85,7 @@ const AugAI = (() => {
         s.used[col] = true;
         if (au === 'invincible') { b.inv[col] = q; s.step = 'move'; sameNode(); }
         else if (au === 'barrier') { b.bar[col] = q; s.step = 'move'; sameNode(); }
-        else { b.snipe(q); s.step = 'decide'; moveNode(-1); s.node.move = PASS; }
+        else { b.pluck(q); s.step = 'move'; sameNode(); } // 저격: 들어내고 이어서 착수
       }
       return s;
     }
@@ -113,7 +114,9 @@ const AugAI = (() => {
     const ix = p => p ? s.idx(p) : s.area;
     for (const x of turns) {
       const t = x.t;
-      if (t.kind === 'snipe') s = s.apply(s.area + 1 + s.idx(t.q));
+      if (t.kind === 'snipe') { // 예전 저격 (수 대신 들어냄, 2026-10-13 전 기보)
+        const prev = s.node; s = s.clone(); s.len++; s.used[x.col] = true; s.b.snipe(t.q); s.step = 'decide'; s.node = { board: s.b, move: PASS, parent: prev, lad: null };
+      }
       else if (t.kind === 'double') s = s.apply(2 * s.area + 1).apply(ix(t.p)).apply(ix(t.p2));
       else {
         if (t.pre && t.pre.k === 'r') s.used[x.col] = true;
@@ -327,9 +330,8 @@ const AugAI = (() => {
       return 'd' + pt(p1) + ',' + pt(p2);
     }
     const q = st.pt(a - area - 1), au = G.aug[col];
-    if (au === 'snipe') return 's' + q;
     const i = root.A.indexOf(a), n1 = await search(root.kids[i] || new Node(st.apply(a)), V, ab);
-    return (au === 'invincible' ? 'i' : 'b') + q + ';' + pt(n1.A[best(n1)]);
+    return (au === 'invincible' ? 'i' : au === 'barrier' ? 'b' : 's') + q + ';' + pt(n1.A[best(n1)]);
   }
   // 흑 기준 소유 (계가 때 죽은 돌 표시용): Board 자리 번호 → -1..1, 그리고 흑 기준 승률 · 집
   async function judge(G) {

@@ -1,7 +1,7 @@
 // 증강 바둑 자기 대국: 탐색 나무의 한 마디 = 한 '단계' (St). 규칙은 go/aug/augboard.js (앱 규칙과 맞대기 검사 통과)
 // 한 차례를 단계로 나눈다
 //   decide  착수·패스, 또는 증강 쓰기 (무적수·결계·저격은 대상 칸, 슈퍼선수는 '지금 쓰기')
-//   move    무적수·결계를 쓴 뒤 그 차례의 착수 (패스 가능)
+//   move    무적수·결계·저격을 쓴 뒤 그 차례의 착수 (패스 가능). 저격은 2026-10-13 부터 '들어내고 착수'
 //   first / second  슈퍼선수의 첫 수 · 둘째 수 (패스 없음)
 // 행동 번호: 0..area-1 = 착수(칸 y*n+x), area = 패스, area+1+t = 대상 칸 t, 2*area+1 = 지금 쓰기
 // 되감기는 실제 대국의 뿌리에서만 고려한다 (탐색 나무 안에서는 다루지 않음, selfplay.js)
@@ -82,7 +82,7 @@ class St {
       s.used[col] = true;
       if (au === 'invincible') { b.inv[col] = q; s.step = 'move'; sameNode(); }
       else if (au === 'barrier') { b.bar[col] = q; s.step = 'move'; sameNode(); }
-      else { b.snipe(q); s.step = 'decide'; moveNode(-1); s.node.move = PASS; } // 저격: 차례가 넘어감 (수순 정보에는 패스처럼)
+      else { b.pluck(q); s.step = 'move'; sameNode(); } // 저격: 들어내고 이어서 착수
     }
     return s;
   }

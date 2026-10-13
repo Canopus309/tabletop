@@ -49,7 +49,9 @@ class AugBoard extends Board{
     }
     return cap;
   }
-  // 저격: q 의 돌 한 점을 들어내고 차례를 넘긴다
+  // 저격 (2026-10-13 부터): q 의 돌 한 점을 들어낸다. 차례는 그대로 (이어서 그 차례의 수를 둔다)
+  pluck(q){this.c[q]=EMPTY;this.addE(q);this.caps[this.turn]++;this.ko=0;}
+  // 예전 저격: q 의 돌 한 점을 들어내고 차례를 넘긴다 (예전 기보 · 측정 도구용)
   snipe(q){const col=this.turn;this.c[q]=EMPTY;this.addE(q);this.caps[col]++;this.ko=0;this.passes=0;this.moveNum++;this.turn=3-col;this.last=-1;}
   // 슈퍼선수: 같은 색이 한 수 더 (첫 수 뒤에 부름)
   again(){this.turn=3-this.turn;this.ko=0;}

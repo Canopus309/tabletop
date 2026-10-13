@@ -25,7 +25,7 @@ for (let gi = 0; gi < N; gi++) {
     let s;
     snaps.push(b.c.slice());
     if (use && a === 'double') { const p1 = pick(legal); const g2 = new AugGame({ n, aug: G.aug }); g2.load(G.entries); g2.put(p1, col); const l2 = Array.from(b.pts).filter(p => g2.canPlay(p, col)); if (!l2.length) { s = String(p1); } else { const p2 = pick(l2); s = 'd' + p1 + ',' + p2; } }
-    else if (use && a === 'snipe') { const opp = Array.from(b.pts).filter(p => b.c[p] === 3 - col && !b.isInv(p)); s = opp.length ? 's' + pick(opp) : String(pick(legal)); }
+    else if (use && a === 'snipe') { const opp = Array.from(b.pts).filter(p => b.c[p] === 3 - col && !b.isInv(p)); if (opp.length) { const q = pick(opp), b2 = new AugBoard(n); b2.copyFrom(b); b2.pluck(q); s = 's' + q + ';' + pick(Array.from(b2.pts).filter(p => b2.isLegal(p, col))); } else s = String(pick(legal)); }
     else if (use && a === 'invincible') { const mine = Array.from(b.pts).filter(p => b.c[p] === col); s = mine.length ? 'i' + pick(mine) + ';' + pick(legal) : String(pick(legal)); }
     else if (use && a === 'barrier') { const q = pick(Array.from(b.pts).filter(p => b.c[p] === EMPTY)); const lg = legal.filter(p => p !== q || true); s = 'b' + q + ';' + pick(lg); }
     else s = rnd() < 0.03 ? '0' : String(pick(legal));
@@ -33,7 +33,7 @@ for (let gi = 0; gi < N; gi++) {
     try { G.apply(s); } catch (e) { continue; } // 앱 규칙이 거부하면 (예: 결계 점이 이번 수 자리) 건너뜀
     // 같은 행동을 AugBoard 에
     if (s[0] === 'd') { const [p1, p2] = s.slice(1).split(',').map(Number); b.play(p1); b.again(); b.play(p2); augUses++; }
-    else if (s[0] === 's') { b.snipe(+s.slice(1)); augUses++; }
+    else if (s[0] === 's') { const [q, p] = s.slice(1).split(';').map(Number); b.pluck(q); b.play(p); augUses++; }
     else if (s[0] === 'i' || s[0] === 'b') { const [q, p] = s.slice(1).split(';').map(Number); if (s[0] === 'i') b.inv[col] = q; else b.bar[col] = q; b.play(p); augUses++; }
     else b.play(+s);
     moves++;

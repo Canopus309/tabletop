@@ -83,9 +83,19 @@ function koSetup(g){
 // 저격
 {const g=G('snipe','');
  g.apply(String(P(0,0)));g.apply(String(P(4,4)));
- throws('저격: 내 돌은 못 들어냄', ()=>g.apply('s'+P(0,0)));
- g.apply('s'+P(4,4));
- ok('저격: 백 돌이 없어짐, 백 차례', g.b.c[P(4,4)]===0&&g.turn===2);
+ throws('저격: 내 돌은 못 들어냄', ()=>g.apply('s'+P(0,0)+';'+P(1,1)));
+ g.apply('s'+P(4,4)+';'+P(4,4)); // 들어내고 그 자리에 둠
+ ok('저격: 백 돌이 없어지고 그 자리에 흑, 백 차례', g.b.c[P(4,4)]===1&&g.turn===2&&g.used(1));
+ throws('저격: 한 번만', ()=>{g.apply(String(P(8,8)));g.apply('s'+P(8,8)+';'+P(7,7));});
+}
+{const g=G('snipe','');
+ g.apply(String(P(0,0)));g.apply(String(P(4,4)));
+ g.apply('s'+P(4,4)+';0'); // 들어내고 패스도 됨
+ ok('저격 뒤 패스', g.b.c[P(4,4)]===0&&g.turn===2&&g.entries[2]==='s'+P(4,4)+';0');
+}
+{const g=G('snipe','');
+ g.load([String(P(0,0)),String(P(4,4)),'s'+P(4,4)]); // 예전 기보 (수 대신 들어냄)
+ ok('예전 저격 기보도 읽힘', g.b.c[P(4,4)]===0&&g.turn===2&&g.turns.length===3);
 }
 
 // 되감기
