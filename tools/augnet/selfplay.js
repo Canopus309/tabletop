@@ -178,7 +178,7 @@ if (isMainThread) {
 
   // ---------- 한 판 ----------
   async function playGame() {
-    const komi = Math.max(-30.5, Math.min(40.5, 7.5 + Math.round(gauss() * 10)));
+    const komi = Math.max(-42.5, Math.min(57.5, 7.5 + Math.round(gauss() * 15))); // 경매 덤 범위 (9줄 상한 50집, 벽 때문에 넓힘)
     const pick = () => Math.random() < 0.25 ? '' : AUG_LIST[(Math.random() * AUG_LIST.length) | 0];
     const aug = { 1: pick(), 2: pick() };
     let st = new St(n, komi, aug), root = new Node(st);

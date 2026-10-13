@@ -134,7 +134,7 @@ function koSetup(g){
 
 // 경매
 ok('경매 덤: 흑 낙찰 5집 → 12.5, 백 낙찰 5집 → 2.5', augKomi(1,5)===12.5&&augKomi(2,5)===2.5);
-ok('참고 한마디: 9줄 결계 아주 강함, 패왕 조금 약함', augTier('barrier',9)==='아주 강해요!'&&augTier('kowang',9)==='조금 약해요');
+ok('참고 한마디: 9줄 결계 아주 강함, 패왕 조금 약함, 벽 압도적', augTier('barrier',9)==='아주 강해요!'&&augTier('kowang',9)==='조금 약해요'&&augTier('wall',9)==='압도적이에요!!');
 ok('경매 후보 둘은 서로 다름', new Set(augOffers('X1',2)).size===2);
 ok('먼저 부를 색은 1 또는 2, 같은 씨앗이면 같음', [1,2].includes(ctx.augCoin('ABC'))&&ctx.augCoin('ABC')===ctx.augCoin('ABC'));
 
