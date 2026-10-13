@@ -1,120 +1,32 @@
 /* 증강 바둑 AI (시험판, 9줄): 증강을 배운 신경망 + 수 읽기(PUCT)
  * - 신경망: KataGo g170e-b10c128 (CC0) 에 증강 입력·출력을 붙여 AI끼리 대국으로 학습한 것 (tools/augnet).
  *   파일 models/augnet9.bin 은 tools/augnet/export.py 가 만든다 (float16 가중치)
- * - 입력 특징은 앱 KataGo 와 같고 (katago.js 의 encode), 증강 칸 6면 · 전역 14개를 덧붙인다 (tools/augnet/game.js 와 같음)
+ * - 장면 · 행동 · 입력 특징은 augstate.js (학습 도구와 같은 파일)
  * - 규칙 판은 augboard.js 의 AugBoard. 한 차례를 단계로 나눠 읽는다:
  *     decide (착수 · 패스 · 증강 쓰기) → move (무적수·결계·저격 뒤 착수) / first · second (슈퍼선수 두 수)
- * board.js, augboard.js, ../katago.js 다음에 불러온다. 전역 AugAI 를 만든다.
+ * board.js, augboard.js, ../katago.js, augstate.js 다음에 불러온다. 전역 AugAI 를 만든다.
  */
 'use strict';
 const AugAI = (() => {
-  const AUG_LIST = ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier'];
-  const NF = 22, NG = 19, NF2 = 28, NG2 = 33;
+  const { AUG_LIST, NF2, NG2 } = AugState;
   // 신경망이 본 증강 값 (9줄, 집 · 2026-10-13 AI끼리 4만 판). 경매에서 AI 가 덤을 부를 때 쓴다
   // 저격은 2026-10-13 에 '들어내고 착수'로 바뀌어 아직 재지 못했다: 슈퍼선수와 비슷하게 어림
-  const VALUE = { double: 16, invincible: 15, snipe: 15, kowang: 8, barrier: 6, rewind: 1 };
+  const VALUE = { wall: 35, swap: 15, double: 14, snipe: 13, prisoner: 11, invincible: 9, barrier: 9, kowang: 8, rewind: 4 }; // b15 학습 초반 값, 배포 때 다시 잼
   let net = null, head = null, backend = '', loading = null;
   // 이 파일(go/aug/ai.js) 이 있는 곳 기준으로 TF.js · 신경망 파일을 찾는다
   const HERE = typeof document !== 'undefined' && document.currentScript ? new URL('.', document.currentScript.src).href : './';
-  const enc = () => Kata._internal.encode;
 
-  // ---------------- 증강 바둑 장면 (tools/augnet/game.js 의 St 와 같음) ----------------
-  const SYMS = {};
-  function syms(n) {
-    if (SYMS[n]) return SYMS[n];
-    const out = [];
-    for (let s = 0; s < 8; s++) {
-      const m = new Int16Array(n * n);
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { let a = x, b = y; if (s & 1) a = n - 1 - a; if (s & 2) b = n - 1 - b; if (s & 4) { const t = a; a = b; b = t; } m[y * n + x] = b * n + a; }
-      out.push(m);
-    }
-    return (SYMS[n] = out);
-  }
-  class St {
-    constructor(n, komi, aug) {
-      this.n = n; this.area = n * n; this.komi = komi; this.aug = { 1: aug[1] || '', 2: aug[2] || '' };
-      this.b = new AugBoard(n);
-      if (this.aug[1] === 'kowang' && this.aug[2] !== 'kowang') this.b.kw = 1; else if (this.aug[2] === 'kowang' && this.aug[1] !== 'kowang') this.b.kw = 2;
-      this.used = { 1: false, 2: false }; this.step = 'decide';
-      this.node = { board: this.b, move: -1, parent: null, lad: null };
-      this.len = 0;
-    }
-    clone() {
-      const s = Object.create(St.prototype);
-      s.n = this.n; s.area = this.area; s.komi = this.komi; s.aug = this.aug;
-      s.b = new AugBoard(this.n); s.b.copyFrom(this.b);
-      s.used = { 1: this.used[1], 2: this.used[2] }; s.step = this.step; s.node = this.node; s.len = this.len;
-      return s;
-    }
-    get col() { return this.b.turn; }
-    pt(i) { const n = this.n; return (Math.floor(i / n) + 1) * (n + 2) + (i % n) + 1; }
-    idx(p) { const W = this.n + 2; return ((p / W | 0) - 1) * this.n + (p % W - 1); }
-    terminal() { return this.b.passes >= 2 || this.len >= this.area * 3; }
-    score() { return Kata.ttScore(this.b, this.komi); }
-    canAug(col) { const a = this.aug[col]; return !!a && a !== 'kowang' && a !== 'rewind' && !this.used[col]; }
-    actions() {
-      const b = this.b, col = b.turn, A = [], area = this.area;
-      const noPass = this.step === 'first' || this.step === 'second';
-      for (let i = 0; i < area; i++) { const p = this.pt(i); if (b.isLegal(p, col)) A.push(i); }
-      if (!noPass) A.push(area);
-      if (this.step === 'decide' && this.canAug(col)) {
-        const a = this.aug[col];
-        if (a === 'double') A.push(2 * area + 1);
-        else for (let i = 0; i < area; i++) {
-          const p = this.pt(i), v = b.c[p];
-          if ((a === 'invincible' && v === col) || (a === 'barrier' && v === EMPTY) || (a === 'snipe' && v === 3 - col && !b.isInv(p))) A.push(area + 1 + i);
-        }
-      }
-      if (noPass && A.length === 0) A.push(area);
-      return A;
-    }
-    apply(a) {
-      const s = this.clone(), b = s.b, col = b.turn, area = this.area;
-      s.len++;
-      const prevNode = this.node;
-      const moveNode = m => { s.node = { board: b, move: m, parent: prevNode, lad: null }; };
-      const sameNode = () => { s.node = { board: b, move: prevNode.move, parent: prevNode.parent, lad: null }; };
-      if (a < area || a === area) {
-        const p = a === area ? PASS : this.pt(a);
-        b.play(p);
-        if (this.step === 'first') { b.again(); s.step = 'second'; } else s.step = 'decide';
-        moveNode(p);
-      } else if (a === 2 * area + 1) { s.used[col] = true; s.step = 'first'; sameNode(); }
-      else {
-        const q = this.pt(a - area - 1), au = this.aug[col];
-        s.used[col] = true;
-        if (au === 'invincible') { b.inv[col] = q; s.step = 'move'; sameNode(); }
-        else if (au === 'barrier') { b.bar[col] = q; s.step = 'move'; sameNode(); }
-        else { b.pluck(q); s.step = 'move'; sameNode(); } // 저격: 들어내고 이어서 착수
-      }
-      return s;
-    }
-    features(sym, bin, bo, glob, go) {
-      const b = this.b, n = this.n, area = this.area, map = syms(n)[sym], col = b.turn;
-      const tmp = new Float32Array(area * NF), tg = new Float32Array(NG);
-      enc()(this.node, this.komi, sym, tmp, 0, tg, 0);
-      if (b.kw === col && b.ko) tmp[map[this.idx(b.ko)] * NF + 6] = 0;
-      for (let i = 0; i < area; i++) bin.set(tmp.subarray(i * NF, i * NF + NF), bo + i * NF2);
-      glob.set(tg, go);
-      const set = (i, f) => { bin[bo + map[i] * NF2 + NF + f] = 1; };
-      for (const c of [col, 3 - col]) {
-        const k = c === col ? 0 : 1, m = b.inv[c];
-        if (m && b.c[m] === c) for (let i = 0; i < area; i++) { const p = this.pt(i); if (b.c[p] === c && b.isInv(p)) set(i, k); }
-        if (b.bar[c]) set(this.idx(b.bar[c]), 2 + k);
-      }
-      const f4 = this.step === 'move' || this.step === 'first', f5 = this.step === 'first' || this.step === 'second';
-      if (f4 || f5) for (let i = 0; i < area; i++) { if (f4) bin[bo + i * NF2 + NF + 4] = 1; if (f5) bin[bo + i * NF2 + NF + 5] = 1; }
-      const ga = (c, off) => { const a = this.aug[c]; if (a) { glob[go + NG + off + AUG_LIST.indexOf(a)] = 1; if (a === 'kowang' || !this.used[c]) glob[go + NG + off + 6] = 1; } };
-      ga(col, 0); ga(3 - col, 7);
-    }
-  }
+  // ---------------- 증강 바둑 장면: 학습 도구와 같은 augstate.js ----------------
+  const { St, syms } = AugState;
+
   // 앱 대국(AugGame) 의 차례들 → St. 되감기로 되돌린 차례는 turns 에 없다
   function fromTurns(n, komi, aug, turns) {
     let s = new St(n, komi, aug);
     const ix = p => p ? s.idx(p) : s.area;
     for (const x of turns) {
       const t = x.t;
-      if (t.kind === 'snipe') { // 예전 저격 (수 대신 들어냄, 2026-10-13 전 기보)
+      if (t.kind === 'swap') s = s.apply(s.area + 1 + s.idx(t.a)).apply(s.area + 1 + s.idx(t.b));
+      else if (t.kind === 'snipe') { // 예전 저격 (수 대신 들어냄, 2026-10-13 전 기보)
         const prev = s.node; s = s.clone(); s.len++; s.used[x.col] = true; s.b.snipe(t.q); s.step = 'decide'; s.node = { board: s.b, move: PASS, parent: prev, lad: null };
       }
       else if (t.kind === 'double') s = s.apply(2 * s.area + 1).apply(ix(t.p)).apply(ix(t.p2));
@@ -140,6 +52,7 @@ const AugAI = (() => {
     const u8 = new Uint8Array(buf), magic = new TextDecoder().decode(u8.subarray(0, 8));
     if (magic !== 'AUGNET1\n') throw new Error('증강 신경망 파일이 아닙니다');
     const hl = new DataView(buf).getUint32(8, true), h = JSON.parse(new TextDecoder().decode(u8.subarray(12, 12 + hl)));
+    if (h.nf !== NF2 || h.ng !== NG2) throw new Error('앱과 맞지 않는 AI 신경망 파일입니다 (입력 ' + h.nf + '·' + h.ng + ')');
     const half = new Uint16Array(buf, 12 + hl), W = {};
     for (const [k, [off, shape]] of Object.entries(h.tensors)) {
       const len = shape.reduce((a, b) => a * b, 1), f = new Float32Array(len);
@@ -241,6 +154,7 @@ const AugAI = (() => {
         } catch (e) { console.warn('[증강 AI] ' + be + ' 사용 불가', e); }
       }
       await tf.setBackend(best.be); net = best.net; backend = best.be;
+      BATCH = best.ms > 60 ? 32 : best.ms > 25 ? 16 : 8;
       if (best.net !== cpuNet) cpuNet.dispose();
       return { backend, name: head.name };
     })();
@@ -249,7 +163,8 @@ const AugAI = (() => {
   }
 
   // ---------------- 수 읽기 (PUCT, 가상 손실로 여러 장면을 한 번에) ----------------
-  const CPUCT = 1.3, BATCH = 8;
+  const CPUCT = 1.3;
+  let BATCH = 8; // 한 번에 계산할 장면 수: 계산 한 번의 고정 시간이 크면 (b15 · 느린 그래픽) 더 많이 묶는다
   function parse(st, r) {
     const n = st.n, area = n * n, o = r.o, map = syms(n)[r.sym], A = st.actions(), lg = new Float64Array(A.length);
     for (let i = 0; i < A.length; i++) { const a = A[i]; lg[i] = a < area ? o[map[a]] : a === area ? o[area] : a === 2 * area + 1 ? o[2 * area + 1] : o[area + 1 + map[a - area - 1]]; }
@@ -306,7 +221,7 @@ const AugAI = (() => {
   }
   const best = nd => { let b = 0; for (let i = 1; i < nd.A.length; i++) if (nd.N[i] > nd.N[b]) b = i; return b; };
   const rootQ = (nd, col) => (col === 1 ? 1 : -1) * nd.wb / Math.max(1, nd.n);
-  const visitsFor = () => backend === 'cpu' ? 64 : 320;
+  const visitsFor = () => backend === 'cpu' ? 64 : 256;
 
   // 앱 대국 G 에서 AI(col) 의 한 차례를 정한다 → 한 차례 글자 ("123", "i45;123", "d12,34", "s45", "r;123", "0")
   async function move(G, col, o = {}) {
@@ -331,6 +246,11 @@ const AugAI = (() => {
     }
     const q = st.pt(a - area - 1), au = G.aug[col];
     const i = root.A.indexOf(a), n1 = await search(root.kids[i] || new Node(st.apply(a)), V, ab);
+    if (au === 'swap') { // 바꿀 상대 돌 (없으면 맞바꾸기를 접고 가장 좋은 보통 수)
+      const b2 = n1.A[best(n1)]; if (b2 > area) return 'x' + q + ',' + st.pt(b2 - area - 1);
+      let m = -1; for (let k = 0; k < root.A.length; k++) if (root.A[k] <= area && (m < 0 || root.N[k] > root.N[m])) m = k;
+      return String(pt(root.A[m]));
+    }
     return (au === 'invincible' ? 'i' : au === 'barrier' ? 'b' : 's') + q + ';' + pt(n1.A[best(n1)]);
   }
   // 흑 기준 소유 (계가 때 죽은 돌 표시용): Board 자리 번호 → -1..1, 그리고 흑 기준 승률 · 집
@@ -346,7 +266,7 @@ const AugAI = (() => {
   // 경매: 증강 둘(of) 을 두고 AI 가 낙찰받고 싶은 최고 값 (먼저 고르면 좋은 것을 갖고, 진 쪽은 남은 것)
   const maxBid = of => Math.max(0, Math.round(Math.abs((VALUE[of[0]] || 0) - (VALUE[of[1]] || 0))));
   const prefer = of => (VALUE[of[0]] || 0) >= (VALUE[of[1]] || 0) ? of[0] : of[1];
-  // 이 AI 가 배운 증강 (AI 대국의 경매 후보). 벽·맞바꾸기·포로교환은 다음 학습부터
+  // 이 AI 가 배운 증강 (AI 대국의 경매 후보)
   const KNOWN = AUG_LIST.slice();
   return { load, move, judge, maxBid, prefer, VALUE, KNOWN, get ready() { return !!net; }, get backend() { return backend; }, get name() { return head ? head.name : ''; }, _internal: { St, fromTurns, run, parseFile, buildNet, search, Node } };
 })();
