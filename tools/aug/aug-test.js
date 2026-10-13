@@ -204,4 +204,24 @@ ok('먼저 부를 색은 1 또는 2, 같은 씨앗이면 같음', [1,2].includes
 {const g=G('shadow','');g.apply('h'+P(4,4));g.apply(String(P(0,0)));ok('예약수: 상대 차례 뒤 내 돌', g.b.c[P(4,4)]===1&&g.turn===1);
  const h=G('shadow','');h.apply('h'+P(4,4));h.apply(String(P(4,4)));ok('예약수: 상대가 먼저 두면 사라짐', h.b.c[P(4,4)]===2&&!h.resv);}
 
+// 네크로맨서 · 추크추방 · 중립지대 · 라고할뻔 · 큰돌 · 명당
+{const g=G('necro','');throws('네크로맨서: 따낸 돌이 없으면 못 씀', ()=>g.apply('n'+P(4,4)));
+ for(const p of [P(1,0),P(0,0),P(0,1),P(8,8)])g.apply(String(p));
+ throws('네크로맨서: 상대 자살수 자리는 안 됨', ()=>g.apply('n'+P(0,0)));
+ g.apply('n'+P(4,4));ok('네크로맨서: 따낸 돌로 상대 돌을 놓음, 내 수 없음', g.b.c[P(4,4)]===2&&g.turn===2&&g.necroLeft(1)===0);}
+{const g=G('zugzwang','');g.apply('z;'+P(4,4));
+ throws('추크추방: 상대는 1-1 말고 못 둠', ()=>g.apply(String(P(3,3))));
+ g.apply(String(P(0,0)));g.apply(String(P(5,5)));g.apply(String(P(3,3)));ok('추크추방: 1-1 뒤에는 자유', g.b.c[P(0,0)]===2&&g.b.c[P(3,3)]===2);}
+{const g=G('neutral','');g.apply('u'+P(4,4)+';'+P(4,3));const s=g.score(new Set());
+ ok('중립지대: 판 끝처럼 (활로도 집도 아님, 누구도 못 둠)', g.b.c[P(4,4)]===3&&s.bs+s.ws===80&&!g.canPlay(P(4,4),2));
+ const h=G('neutral','');for(const p of [P(1,0),P(0,0)])h.apply(String(p));h.apply('u'+P(0,1)+';'+P(5,5));
+ ok('중립지대: 활로가 없어진 상대 돌은 잡힘', h.b.c[P(0,0)]===0&&h.b.caps[1]===1);}
+{const g=G('retract','');g.apply(String(P(4,4)));g.apply(String(P(0,0)));g.apply('k'+P(4,4)+';'+P(2,2));
+ ok('라고할뻔: 내 돌을 들어내고 착수', g.b.c[P(4,4)]===0&&g.b.c[P(2,2)]===1&&g.turn===2);}
+{const g=G('bigstone','');g.apply('o'+P(3,3)+';'+P(0,0));
+ ok('큰돌: 2×2 와 착수', [P(3,3),P(4,3),P(3,4),P(4,4),P(0,0)].every(p=>g.b.c[p]===1)&&g.turn===2);
+ throws('큰돌: 판 밖으로 넘으면 안 됨', ()=>{const h=G('bigstone','');h.apply('o'+P(8,8)+';'+P(0,0));});}
+{const g=G('myeongdang','');g.apply(String(P(2,2)));const s=g.score(new Set());
+ ok('명당: 내 집인 화점 5곳 +10', s.mb===10);}
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);process.exit(fail?1:0);

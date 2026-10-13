@@ -284,6 +284,6 @@ const AugAI = (() => {
   const maxBid = of => Math.max(0, Math.round(Math.abs((VALUE[of[0]] || 0) - (VALUE[of[1]] || 0))));
   const prefer = of => (VALUE[of[0]] || 0) >= (VALUE[of[1]] || 0) ? of[0] : of[1];
   // 이 AI 가 배운 증강 (AI 대국의 경매 후보)
-  const KNOWN = AUG_LIST.slice();
+  const KNOWN = ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier', 'wall', 'swap', 'prisoner']; // 배운 것만 (거울수 등 7가지는 학습 중, 네크로맨서 등 6가지는 아직)
   return { load, move, judge, maxBid, prefer, VALUE, KNOWN, get ready() { return !!net; }, get backend() { return backend; }, get name() { return head ? head.name : ''; }, _internal: { St, fromTurns, run, parseFile, buildNet, search, Node } };
 })();

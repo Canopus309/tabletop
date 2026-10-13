@@ -18,6 +18,13 @@
  *            내 다음 차례가 끝났을 때도 활로가 없으면 그때 잡힌다
  *   양자택일 한 번. 수 대신 빈 점 두 곳을 예약. 상대 차례가 끝나면 아직 비어 있고 둘 수 있는 예약점마다 내 돌이 놓인다
  *   예약수   한 번. 수 대신 빈 점 한 곳을 예약 (지금 둘 수 없는 자리도 됨). 상대 차례가 끝나면 비어 있고 둘 수 있으면 내 돌
+ *   (2026-10-13 밤 추가. 따로 말이 없으면 능력을 쓰고 그 차례 수도 둔다)
+ *   네크로맨서 내 수 대신, 내가 따낸 돌 하나를 써서 상대 돌을 놓는다 (상대가 둔 것과 똑같이). 따낸 돌이 남아 있으면 계속
+ *   추크추방 한 번. 이번 수를 두면 상대는 다음 차례에 둘 수 있는 1-1점 중 하나에만 둔다 (없으면 효과 없음)
+ *   중립지대 한 번. 빈 점 하나를 누구도 못 두는 점으로 (판 가장자리처럼: 활로도 집도 아님). 그 차례 수도 둔다
+ *   라고할뻔 한 번. 내 돌 하나를 들어내고 그 차례 수도 둔다
+ *   큰돌     한 번. 2×2 칸의 빈 점을 모두 내 돌로 채우고 그 차례 수도 둔다
+ *   명당     늘. 계가 때 내 돌이나 내 집인 화점 한 곳마다 +2 (1점이 3점)
  *
  * 증강 정하기 (경매, 2026-10): 증강 둘을 공개하고 두 사람이 번갈아 덤을 부른다. 마지막에 높게 부른 사람이 먼저 고르고
  *   부른 만큼 상대에게 덤으로 준다 → 덤 = 7.5 + (흑이 낙찰이면 +값, 백이면 -값). 공정한 값은 두 사람이 정하므로 덤표가 필요 없다.
@@ -39,6 +46,8 @@
  *   "p12"        공수부대: 12 에 (자살수 자리도 됨)
  *   "f12,34"      양자택일: 12 와 34 를 예약
  *   "h12"        예약수: 12 를 예약
+ *   "n12"        네크로맨서: 12 에 상대 돌
+ *   "z;123"      추크추방 + 착수 · "u12;123" 중립지대 · "k12;123" 라고할뻔 · "o12;123" 큰돌 (12 = 2×2 의 왼쪽 위)
  */
 'use strict';
 // 증강 점수 (2026-10 추정값, 집): 수 하나의 값(포석에서 약 14집)을 기준으로 어림했다. 참고 한마디에만 쓴다.
@@ -65,6 +74,12 @@ const AUGS={
   para:{name:'공수부대',short:'자살수 자리에도 착수 · 한 턴 무적',desc:'한 번, 이번 수는 자살수 자리(활로가 없는 곳)에도 둘 수 있고, 그 돌의 무리는 상대의 다음 차례 동안 잡히지 않습니다. 내 다음 차례가 끝났을 때도 활로가 없으면 그때 잡힙니다.',v:{9:8,13:9,19:10}},
   fork:{name:'양자택일',short:'빈 점 두 곳 예약',desc:'한 번, 내 차례에 수를 두는 대신 빈 점 두 곳을 예약합니다. 상대 차례가 끝나면, 아직 비어 있고 둘 수 있는 예약점마다 내 돌이 놓입니다. 상대는 한 수로 한 곳만 막을 수 있습니다.',v:{9:8,13:9,19:10}},
   shadow:{name:'예약수',short:'빈 점 한 곳 예약',desc:'한 번, 내 차례에 수를 두는 대신 빈 점 한 곳을 예약합니다 (지금 둘 수 없는 자리도 됩니다). 상대 차례가 끝나면, 그 점이 비어 있고 둘 수 있으면 내 돌이 놓입니다.',v:{9:2,13:2,19:3}},
+  necro:{name:'네크로맨서',short:'따낸 돌로 상대 돌 놓기',desc:'내 차례에 내 수를 두는 대신, 내가 따낸 상대 돌 하나를 써서 상대 돌을 놓습니다 (상대가 그 자리에 둔 것과 똑같이 처리: 상대 눈 메우기 등). 따낸 돌이 남아 있으면 몇 번이든 쓸 수 있습니다.',v:{9:3,13:4,19:5}},
+  zugzwang:{name:'추크추방',short:'상대 다음 수를 1-1로',desc:'한 번, 이번 수를 두면 상대는 다음 차례에 둘 수 있는 1-1점(네 귀의 맨 끝) 중 하나에만 둘 수 있습니다. 둘 수 있는 1-1점이 없으면 효과가 없습니다.',v:{9:10,13:11,19:12}},
+  neutral:{name:'중립지대',short:'누구도 못 두는 점',desc:'한 번, 빈 점 하나를 누구도 둘 수 없는 점으로 만듭니다 (판 가장자리처럼: 활로도 집도 아님). 그 때문에 활로가 없어진 상대 무리는 잡히고, 내 무리가 활로 없이 남게 되는 점은 고를 수 없습니다. 쓴 차례에 수도 둡니다.',v:{9:6,13:6,19:7}},
+  retract:{name:'라고할뻔',short:'내 돌 하나 들어내기',desc:'한 번, 내 돌 하나를 들어내고 그 차례 수도 둡니다.',v:{9:3,13:3,19:4}},
+  bigstone:{name:'큰돌',short:'2×2를 내 돌로',desc:'한 번, 2×2 칸의 빈 점을 모두 내 돌로 채우고 그 차례 수도 둡니다 (상대 결계 점은 빠짐). 내 무리가 활로 없이 남게 되면 쓸 수 없습니다.',v:{9:30,13:30,19:30}},
+  myeongdang:{name:'명당',passive:true,short:'화점이 3배',desc:'늘 켜져 있습니다. 계가 때 내 돌이나 내 집인 화점(천원 포함) 한 곳마다 2집을 더합니다 (1점이 3점).',v:{9:5,13:8,19:8}},
   prisoner:{name:'포로교환',passive:true,short:'따낸 돌만큼 집',desc:'늘 켜져 있습니다. 대국 중 따내거나 들어낸 상대 돌 수와, 계가 때 죽은 돌로 표시한 상대 돌 수만큼 내 집에 더합니다 (중국식 계가에 일본식 사석 계산을 더하는 셈).',v:{9:5,13:7,19:10}},
 };
 const AUG_IDS=Object.keys(AUGS);
@@ -72,6 +87,8 @@ const AUG_BASE_KOMI=7.5;
 const augValue=(id,n)=>id&&AUGS[id]?AUGS[id].v[n]??AUGS[id].v[19]:0;
 // 경매 전(덤표 시절) 기보의 덤을 되살릴 때만: 그때의 점수 (저격 규칙을 바꾸기 전 값)
 const augValue0=(id,n)=>id&&AUGS[id]?(AUGS[id].v0||AUGS[id].v)[n]??(AUGS[id].v0||AUGS[id].v)[19]:0;
+// 화점 (명당): 판 크기별 [x, y]
+const AUG_STARS={9:[[2,2],[6,6],[6,2],[2,6],[4,4]],13:[[3,3],[9,9],[9,3],[3,9],[6,6],[3,6],[9,6],[6,3],[6,9]],19:[[3,3],[15,15],[15,3],[3,15],[9,9],[3,9],[15,9],[9,3],[9,15]]};
 // 벽: 흑은 아래 변, 백은 위 변의 1선 (Board 자리 번호)
 function augWallPts(n,col){const y=col===1?n-1:0,out=[];for(let x=0;x<n;x++)out.push((y+1)*(n+2)+x+1);return out;}
 // 참고 한마디 (정확한 숫자 대신): 같은 판 크기에서 가장 센 증강에 견준 비율로
@@ -98,7 +115,8 @@ function augParse(s){
   if((m=/^p(\d+)$/.exec(s)))return{kind:'para',p:+m[1]};
   if((m=/^f(\d+),(\d+)$/.exec(s)))return{kind:'fork',a:+m[1],b:+m[2]};
   if((m=/^h(\d+)$/.exec(s)))return{kind:'shadow',a:+m[1]};
-  if((m=/^(?:([ibs])(\d+);|(r);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:'r'}:null};
+  if((m=/^n(\d+)$/.exec(s)))return{kind:'necro',p:+m[1]};
+  if((m=/^(?:([ibsuko])(\d+);|([rz]);)?(\d+)$/.exec(s)))return{kind:'move',p:+m[4],pre:m[1]?{k:m[1],q:+m[2]}:m[3]?{k:m[3]}:null};
   return null;
 }
 function augFormat(t){
@@ -112,7 +130,8 @@ function augFormat(t){
   if(t.kind==='para')return'p'+t.p;
   if(t.kind==='fork')return'f'+t.a+','+t.b;
   if(t.kind==='shadow')return'h'+t.a;
-  return(t.pre?(t.pre.k==='r'?'r;':t.pre.k+t.pre.q+';'):'')+t.p;
+  if(t.kind==='necro')return'n'+t.p;
+  return(t.pre?(t.pre.k==='r'||t.pre.k==='z'?t.pre.k+';':t.pre.k+t.pre.q+';'):'')+t.p;
 }
 
 class AugGame{
@@ -123,7 +142,7 @@ class AugGame{
   }
   reset(){
     this.b=new Board(this.n);this.inv={1:0,2:0};this.bar={1:0,2:0};this.koBan=null;this.last=-1;this.lastCol=0;this.usedNow={1:false,2:false};
-    this.ply=0;this.saves={1:0,2:0};this.para=null;this.resv=null; // resv: 양자택일 · 예약수 {col, pts, at: 이 차례 수가 되면 놓음} // ply: 판에 적용한 차례 수 · saves: 패스 저축 · para: 공수부대 {col, p, prot(이 차례까지 보호), check(이 차례 끝에 확인)}
+    this.ply=0;this.saves={1:0,2:0};this.para=null;this.resv=null;this.necroUsed={1:0,2:0};this.forced=null;this.neutral=[]; // necroUsed: 네크로맨서로 쓴 따낸 돌 · forced: 추크추방 {col, at} // resv: 양자택일 · 예약수 {col, pts, at: 이 차례 수가 되면 놓음} // ply: 판에 적용한 차례 수 · saves: 패스 저축 · para: 공수부대 {col, p, prot(이 차례까지 보호), check(이 차례 끝에 확인)}
     for(const col of [1,2])if(this.aug[col]==='wall')for(const p of augWallPts(this.n,col))this.b.place(p,col);
   }
   get komi(){return this.base;}
@@ -188,6 +207,8 @@ class AugGame{
   // 한 차례(객체)를 판에 적용. 규칙에 맞지 않으면 Error. 반환: 따낸 돌 수
   step(t,col){
     const cap=this.stepCore(t,col),k=this.ply++;
+    if(this.forced&&k===this.forced.at)this.forced=null; // 추크추방에 묶였던 차례가 지남
+    if(t.pre&&t.pre.k==='z')this.forced={col:3-col,at:k+1};
     // 패스 저축: 아직 쓰지 않은 패스 저축을 가진 사람이 그냥 패스하면 1 저축
     if(t.kind==='move'&&!t.p&&!t.pre&&this.aug[col]==='save'&&!this.used(col))this.saves[col]++;
     // 공수부대: 내 다음 차례가 끝났을 때 활로가 없으면 잡힘
@@ -199,8 +220,14 @@ class AugGame{
     if(this.resv&&this.ply===this.resv.at){const R=this.resv;this.resv=null;let c2=0;for(const p of R.pts)if(this.canPlay(p,R.col))c2+=this.put(p,R.col);this.koBan=null;this.last=-1;void c2;}
     return cap;
   }
+  // 네크로맨서로 쓸 수 있는 따낸 돌 수
+  necroLeft(col){return this.b.caps[col]-this.necroUsed[col];}
+  corners(){const n=this.n,b=this.b;return [b.pt(0,0),b.pt(n-1,0),b.pt(0,n-1),b.pt(n-1,n-1)];}
+  // 추크추방에 묶인 차례인가 (둘 수 있는 1-1점이 있을 때만)
+  forcedNow(col){const F=this.forced;return !!(F&&F.col===col&&F.at===this.ply&&this.corners().some(p=>this.canPlay(p,col)));}
   stepCore(t,col){
     const b=this.b,a=this.aug[col],fail=m=>{throw new Error(m);};
+    if(this.forcedNow(col)&&!(t.kind==='move'&&!t.pre&&this.corners().includes(t.p)))fail('추크추방: 이번 차례는 1-1점(네 귀 끝) 중 하나에 둬야 합니다');
     const need=id=>{if(a!==id)fail(AUGS[id].name+' 증강이 없습니다');if(this.used(col))fail('증강은 한 번만 쓸 수 있습니다');this.usedNow[col]=true;};
     if(t.pre&&t.pre.k==='r')this.usedNow[col]=true; // 되감기는 apply 에서 확인하고 되돌린 뒤 여기 온다
     if(t.kind==='snipe'){ // 예전 저격 (수 대신)
@@ -251,6 +278,11 @@ class AugGame{
       this.para={col,p:q,prot:this.ply+1,check:this.ply+2};
       return this.put(q,col);
     }
+    if(t.kind==='necro'){
+      if(a!=='necro')fail('네크로맨서 증강이 없습니다');if(this.necroLeft(col)<1)fail('쓸 수 있는 따낸 돌이 없습니다');
+      const q=t.p,opp=3-col;if(!this.canPlay(q,opp))fail('상대가 둘 수 없는 자리입니다 ('+this.whyNot(q,opp)+')');
+      this.necroUsed[col]++;const cap=this.put(q,opp);this.lastCol=opp;return cap;
+    }
     if(t.kind==='fork'||t.kind==='shadow'){
       need(t.kind);const pts=t.kind==='fork'?[t.a,t.b]:[t.a];
       if(t.kind==='fork'&&t.a===t.b)fail('서로 다른 두 점을 골라야 합니다');
@@ -264,6 +296,21 @@ class AugGame{
     }
     if(t.pre&&t.pre.k==='i'){need('invincible');if(b.c[t.pre.q]!==col)fail('무적수는 내 돌에 겁니다');this.inv[col]=t.pre.q;}
     if(t.pre&&t.pre.k==='b'){need('barrier');if(b.c[t.pre.q]!==EMPTY)fail('결계는 빈 점에 칩니다');this.bar[col]=t.pre.q;}
+    if(t.pre&&t.pre.k==='z')need('zugzwang');
+    if(t.pre&&t.pre.k==='u'){
+      need('neutral');const q=t.pre.q;if(b.c[q]!==EMPTY)fail('빈 점만 고를 수 있습니다');
+      b.c[q]=EDGE;b.delE(q);if(this.bar[1]===q)this.bar[1]=0;if(this.bar[2]===q)this.bar[2]=0;
+      if(this.settle(col,[q])<0)fail('내 돌이 활로 없이 남는 점입니다');this.neutral=(this.neutral||[]).concat(q);
+    }
+    if(t.pre&&t.pre.k==='k'){
+      need('retract');const q=t.pre.q;if(b.c[q]!==col)fail('들어낼 내 돌을 골라야 합니다');
+      b.c[q]=EMPTY;b.addE(q);if(this.inv[col]===q)this.inv[col]=0;this.koBan=null;
+    }
+    if(t.pre&&t.pre.k==='o'){
+      need('bigstone');const q=t.pre.q,[x,y]=b.xy(q);if(x>this.n-2||y>this.n-2)fail('2×2 칸이 판 안에 있어야 합니다');
+      const pts=[q,q+1,q+b.W,q+b.W+1].filter(p=>b.c[p]===EMPTY&&this.bar[3-col]!==p);if(!pts.length)fail('채울 빈 점이 없습니다');
+      for(const p of pts)b.place(p,col);if(this.settle(col,pts)<0)fail('내 돌이 활로 없이 남습니다');
+    }
     if(t.pre&&t.pre.k==='s'){
       need('snipe');const q=t.pre.q;
       if(b.c[q]!==3-col)fail('상대 돌을 골라야 합니다');if(this.invincible(q))fail('무적인 돌은 들어낼 수 없습니다');
@@ -310,7 +357,7 @@ class AugGame{
     const b=this.b,own=new Float32Array(b.size),seen=new Uint8Array(b.size);let bs=0,ws=0;
     const col=p=>dead.has(p)&&!this.invincible(p)?EMPTY:b.c[p];
     for(const p of b.pts){
-      const v=col(p);
+      const v=col(p);if(v===EDGE)continue; // 중립지대
       if(v===BLACK){bs++;own[p]=1;continue;}
       if(v===WHITE){ws++;own[p]=-1;continue;}
       if(seen[p])continue;
@@ -322,9 +369,13 @@ class AugGame{
     let pb=0,pw=0;
     if(this.aug[1]==='prisoner'){pb=b.caps[1];for(const p of dead)if(b.c[p]===WHITE&&!this.invincible(p))pb++;}
     if(this.aug[2]==='prisoner'){pw=b.caps[2];for(const p of dead)if(b.c[p]===BLACK&&!this.invincible(p))pw++;}
+    // 명당: 내 돌이나 내 집인 화점 한 곳마다 +2
+    let mb=0,mw=0;
+    for(const [x,y] of AUG_STARS[this.n]||[]){const p=b.pt(x,y);if(this.aug[1]==='myeongdang'&&own[p]>0)mb+=2;if(this.aug[2]==='myeongdang'&&own[p]<0)mw+=2;}
+    pb+=mb;pw+=mw;
     bs+=pb;ws+=pw;
     const diff=bs-ws-this.komi;
-    return{bs,ws,pb,pw,w:diff>0?BLACK:WHITE,d:Math.abs(diff),own};
+    return{bs,ws,pb:pb-mb,pw:pw-mw,mb,mw,w:diff>0?BLACK:WHITE,d:Math.abs(diff),own};
   }
   // 기보에 남길 실제 수순 (되감은 차례는 빠짐): [{col, p}] 와 증강 설명
   record(){
@@ -356,4 +407,4 @@ function augOffers(seed,k=3,pool=AUG_IDS){
 }
 // 씨앗으로 정하는 1 또는 2 (경매를 먼저 부를 색)
 function augCoin(seed){let h=7;for(const ch of String(seed))h=(h*31+ch.charCodeAt(0))>>>0;return h%2?1:2;}
-if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,AUG_BID_MAX,augWallPts,augValue,augValue0,augTier,augKomi,augParse,augFormat,AugGame,augOffers,augCoin};
+if(typeof module!=='undefined')module.exports={AUGS,AUG_IDS,AUG_BASE_KOMI,AUG_BID_MAX,AUG_STARS,augWallPts,augValue,augValue0,augTier,augKomi,augParse,augFormat,AugGame,augOffers,augCoin};
