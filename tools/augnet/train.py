@@ -20,7 +20,8 @@ SUF = '' if NET == 'b10' else '-' + NET
 DATA = os.environ.get('AUGNET_DATA_DIR') or os.path.join(HERE, 'data' + SUF)
 MODELS = os.environ.get('AUGNET_MODELS_DIR') or os.path.join(HERE, 'models' + SUF)
 arg = lambda k, d: type(d)(sys.argv[sys.argv.index('--' + k) + 1]) if '--' + k in sys.argv else d
-EVERY, WINDOW, BATCH = arg('every', 10000), arg('window', 300000), 256
+EVERY, WINDOW, BATCH = arg('every', 8000), arg('window', 300000), 256   # 2026-10-14: 10000 → 8000 (자기 대국 6개가 한 번에 약 9000장면씩 내놓아 10000이면 두 번에 한 세대였음)
+REUSE = arg('reuse', 8)   # 새 기록 한 장면을 평균 몇 번 학습하나 (2026-10-13 밤 4 → 8: GPU 여유로 같은 대국에서 더 배움)
 n = 9; area = n * n
 IN = area * NF2 + NG2; SAMPLE = IN + (2 * area + 2) + 2 + area
 dev = torch.device('cuda')
@@ -85,6 +86,9 @@ def train_round(steps):
     sizes = np.array([len(a) for a in arrays]); ends = np.cumsum(sizes); total = int(ends[-1])
     tot = {'pol': 0, 'val': 0, 'score': 0, 'own': 0, 'teach': 0}
     for s in range(steps):
+        while os.path.exists(PAUSE) and not os.path.exists(stop):   # 온도 지킴이가 자기 대국을 얼리면 학습도 쉰다 (학습을 시작할 때 CPU 가 90도 넘게 튀었음)
+            time.sleep(2)
+        t_step = time.time()
         g = np.sort(np.random.randint(0, total, BATCH)); k = np.searchsorted(ends, g, side='right')
         rows = [arrays[ki][gi - (ends[ki] - sizes[ki])] for ki, gi in zip(k, g)]
         x = torch.from_numpy(np.stack(rows)).to(dev)
@@ -112,10 +116,18 @@ def train_round(steps):
         scaler.unscale_(opt); torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
         scaler.step(opt); scaler.update()
         tot['pol'] += l_pol.item(); tot['val'] += l_val.item(); tot['score'] += l_sc.item(); tot['own'] += l_own.item()
+        # 잘게 쉬기: 학습 한 걸음 한 시간 × THROTTLE(1~5) 만큼 쉰다. 쉬지 않으면 학습할 때마다 GPU 열까지 겹쳐 CPU 가 97도까지 튀었음 (2026-10-14 새벽)
+        try:
+            k = float(open(THROTTLE).read())
+        except Exception:
+            k = 1
+        time.sleep((time.time() - t_step) * min(5, max(1, k)))
     return {k: v / steps for k, v in tot.items()}, total
 
 
 stop = os.path.join(HERE, 'STOP')
+PAUSE = os.path.join(HERE, 'PAUSE')
+THROTTLE = os.path.join(HERE, 'THROTTLE')
 # 다시 시작할 때: 이미 학습한 기록은 '새 기록'으로 치지 않는다 (마지막 세대 저장 뒤에 생긴 것만)
 load_new()
 last_t = os.path.getmtime(os.path.join(MODELS, open(latest).read().strip()))
@@ -125,7 +137,7 @@ while not os.path.exists(stop):
     pending += load_new()
     if pending < EVERY:
         time.sleep(30); continue
-    steps = max(150, pending * 4 // BATCH)
+    steps = max(150, pending * REUSE // BATCH)
     t0 = time.time()
     loss, wsize = train_round(steps)
     gen += 1; pending = 0

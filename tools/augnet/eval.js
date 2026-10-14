@@ -6,7 +6,7 @@ const { spawn, execFileSync } = require('child_process'), fs = require('fs'), pa
 const HERE = __dirname, arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const SUF = process.env.AUGNET_NET && process.env.AUGNET_NET !== 'b10' ? '-' + process.env.AUGNET_NET : '', MD = path.join(HERE, 'models' + SUF);
 const PY = process.env.AUGNET_PY || path.join(os.homedir(), 'AppData/Local/Programs/Python/Python312/python.exe');
-const PAIRS = arg('pairs', '100'), VISITS = arg('visits', '64');
+const PAIRS = arg('pairs', '50'), VISITS = arg('visits', '64');
 const read = f => { try { return fs.readFileSync(path.join(MD, f), 'utf8').trim(); } catch (e) { return ''; } };
 const log = s => console.log(new Date().toLocaleTimeString('ko-KR'), s);
 

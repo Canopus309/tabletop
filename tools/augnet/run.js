@@ -26,6 +26,9 @@ function start(name, cmd, args, delay = 0) {
 start('server', PY, ['server.py']);
 start('train', PY, ['train.py']);
 const WORKERS = (process.argv.indexOf('--workers') > 0 ? process.argv[process.argv.indexOf('--workers') + 1] : '6');
+// 학습할 때 필요 없는 프로그램 끄기 (스팀 · 라이엇 · 뱅가드 트레이 · OneDrive · 위젯): 시작할 때와 한 시간마다 (사용자 요청 2026-10-14)
+function quiet() { execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HERE, 'quiet.ps1')], (e, out) => { if (out && out.trim()) fs.appendFileSync(path.join(LOGS, 'quiet.log'), out.trim() + '\n'); }); }
+quiet(); setInterval(() => { if (!stop()) quiet(); }, 3600000);
 const RA = (k, d) => (process.argv.indexOf('--' + k) > 0 ? process.argv[process.argv.indexOf('--' + k) + 1] : d);
 start('selfplay', process.execPath, ['selfplay.js', '--workers', WORKERS, '--games', '32', '--full', RA('full', '200'), '--fast', RA('fast', '48')], 15000);
 
@@ -44,7 +47,8 @@ if (SUF) setInterval(evaluate, +RA('eval-hours', '2') * 3600000);
 // cool 도까지 식으면 이어서 둔다 (사용자 요청 2026-10-13). 그 아래에서는 hot-10 ~ hot-5 도에 머물도록 잘게 쉰다. 이 노트북 CPU 는 일을 시작하면 30초 안에 90도까지 올라서 자주 오간다.
 // 기준은 thermo.json {hot, cool} 에서 읽는다 (고치면 다시 띄우지 않아도 바로 적용). 2026-10-13: 처음 70/50 → 사용자가 80/60 으로 올림
 const TH = path.join(HERE, 'thermo.json');
-const th = () => { try { const j = JSON.parse(fs.readFileSync(TH, 'utf8')); return { hot: +j.hot || 80, cool: +j.cool || 60 }; } catch (e) { return { hot: 80, cool: 60 }; } };
+// band: [lo, hi] 이 사이에 머물도록 잘게 쉰다 (없으면 hot-10 ~ hot-5). 2026-10-13 밤: 75~79 로 올림 (CPU 는 거의 놀고 있었음)
+const th = () => { try { const j = JSON.parse(fs.readFileSync(TH, 'utf8')), hot = +j.hot || 80; return { hot, cool: +j.cool || 60, band: Array.isArray(j.band) ? j.band : [hot - 10, hot - 5] }; } catch (e) { return { hot: 80, cool: 60, band: [70, 75] }; } };
 let iPaused = paused(), lastTemp = '', pausedMs = 0, sinceMs = Date.now(), pauseAt = iPaused ? Date.now() : 0;
 const tlog = s => fs.appendFileSync(path.join(LOGS, 'temp.log'), s + '\n');
 const THROTTLE = path.join(HERE, 'THROTTLE');
@@ -57,9 +61,9 @@ function thermo() {
     for (const l of lines) {
       const m = /cpu=([\d.]+)/.exec(l); if (!m) continue;
       lastTemp = l.trim(); tlog(`${lastTemp} slow=${slow.toFixed(2)}`);
-      const c = +m[1], { hot: HOT, cool: COOL } = th();
+      const c = +m[1], { hot: HOT, cool: COOL, band: BAND } = th();
       // 잘게 쉬기: 70도에 닿기 전에 60~65도에 머물도록 자기 대국의 쉬는 비율(THROTTLE)을 조금씩 바꾼다
-      if (c > HOT - 5) slow = Math.min(30, slow * 1.3 + 0.2); else if (c < HOT - 10) slow = Math.max(0, slow / 1.15 - 0.05);
+      if (c > BAND[1]) slow = Math.min(30, slow * 1.3 + 0.2); else if (c < BAND[0]) slow = Math.max(0, slow / 1.15 - 0.05);
       if (c > HOT) slow = Math.min(30, Math.max(slow * 2, 2));
       fs.writeFileSync(THROTTLE, slow.toFixed(2));
       if (c > HOT && !paused()) { fs.writeFileSync(PAUSE, lastTemp); iPaused = true; pauseAt = Date.now(); tlog(`  ${c}도 → 자기 대국 얼림`); }
