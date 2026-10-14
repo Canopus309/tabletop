@@ -607,9 +607,9 @@ $('#aPass').onclick=async()=>{
   if(G.forcedNow(G.turn)){toast('추크추방: 이번 차례는 1-1점(네 귀 끝) 중 하나에 둬야 합니다');return;}
   if(act&&(['d','x','m','g','t','e','p','f','n'].includes(act.k)||(['s','u','o','h'].includes(act.k)&&act.stage==='target'))){toast('지금은 패스할 수 없습니다');return;}
   if(G.entries[G.entries.length-1]!=='0'&&G.turns.length<game.n*game.n*0.3&&!(await ask('패스할까요?','아직 둘 곳이 많이 남아 있습니다.','패스')))return;
-  const col=G.turn,sv=!act&&game.aug[col]==='save'&&!G.used(col);
+  const col=G.turn,sv=!act&&game.aug[col]==='save';
   play(act?(act.k==='r'||act.k==='z'?act.k+';0':act.k+act.q+';0'):'0');
-  if(sv&&G.saves[col])toast(`패스 저축 +1 · 지금 ${G.saves[col]} (쓰면 ${G.saves[col]+1}수 연달아)`);
+  if(sv&&G.saves[col])toast(`패스 저축 +1 · 지금 ${G.saves[col]} (쓰면 최대 ${G.saves[col]+1}수 연달아)`);
 };
 $('#aResign').onclick=async()=>{
   if(!G||game.over||phase==='pick'||phase==='wait')return;
@@ -685,16 +685,17 @@ function ui(){
      :act.k==='h'?(act.stage==='target'?`<b>${nm}</b>: 예약할 빈 점을 누르세요 (지금 둘 수 없는 자리도 됩니다)`:`<b>${nm}</b>: ${pname(act.q)} 예약 · 이번 차례의 수를 두세요`)
      :act.k==='t'?(act.stage==='mine'?`<b>${nm}</b>: 옮길 내 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.a)} 돌을 옮길 빈 점을 누르세요`)
      :act.k==='p'?`<b>${nm}</b>: 내려앉을 자리를 누르세요 (활로가 없는 곳도 됩니다 · 상대 다음 차례 동안 무적)`
-     :act.k==='e'?`<b>${nm}</b>: ${act.ps.length+1}/${act.n}번째 수를 두세요`
+     :act.k==='e'?`<b>${nm}</b>: ${act.ps.length+1}번째 수를 두세요 (최대 ${act.n}수${act.ps.length>=2?' · 여기서 멈추면 남은 저축 '+(act.n-act.ps.length)+'개는 다음에':''})`
      :act.k==='x'?(act.stage==='mine'?`<b>${nm}</b>: 자리를 바꿀 내 돌을 누르세요`:`<b>${nm}</b>: ${pname(act.a)} 와 바꿀 상대 돌을 누르세요`)
      :act.k==='d'?`<b>${nm}</b>: ${act.stage===1?'첫 수를 두세요':'두 번째 수를 두세요 (첫 수 '+pname(act.p1)+')'}`
      :`<b>${nm}</b>: 되돌린 장면입니다 · 다시 두세요`;
+    if(act.k==='e'&&act.ps.length>=2)B('iStop',`${act.ps.length}수로 끝내기`,'primary');
     B('iCancel','증강 취소');
   }
   if(!t&&phase==='score'&&!game.online){const s=G.score(deadSet);t=`<b>계가</b> · 죽은 돌을 눌러 표시하세요 (무적인 돌은 늘 삶)<br>${scoreText(s)}`;B('iResume','이어 두기');B('iScore','계가 확정','primary');}
   $('#infoCard').classList.toggle('hidden',!t);$('#infoText').innerHTML=t;$('#infoBtns').innerHTML=btns.join('');
   const bind=(i,f)=>{const el=document.getElementById(i);if(el)el.onclick=f;};
-  bind('iCancel',()=>{act=null;PG=null;pending=0;draw();ui();});bind('iResume',resumeLocal);bind('iScore',confirmScore);
+  bind('iCancel',()=>{act=null;PG=null;pending=0;draw();ui();});bind('iStop',()=>{if(act&&act.k==='e'&&act.ps.length>=2&&canAct())play('e'+act.ps.join(','));});bind('iResume',resumeLocal);bind('iScore',confirmScore);
   if(game.online)onBind(bind);
   // 결과
   $('#resultCard').classList.toggle('hidden',!game.over);

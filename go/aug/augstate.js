@@ -7,9 +7,9 @@
  *   tele2   순간이동: 내 돌을 고른 뒤 옮길 빈 점 (대상 칸)
  *   mirror  거울수의 착수 (대칭점에도 놓임, 패스 없음)
  *   para    공수부대의 착수 (자살수 자리도 됨, 패스 없음)
- *   chain   패스 저축을 쓴 연속 착수 (남은 수 chainLeft, 패스 없음)
+ *   chain   패스 저축을 쓴 연속 착수 (더 둘 수 있는 수 chainLeft, 둔 수 chainN). 2수를 둔 뒤에는 패스 = 여기서 멈춤 (남은 저축은 그대로)
  *   fork2   양자택일: 첫 예약점을 고른 뒤 둘째 예약점 (대상 칸). 예약하면 차례가 넘어감
- * 벽 · 포로교환 · 패왕은 늘 켜진 증강 (쓰기 행동 없음). 패스 저축은 decide 에서 그냥 패스할 때 1 저축
+ * 벽 · 포로교환 · 패왕은 늘 켜진 증강 (쓰기 행동 없음). 패스 저축은 decide 에서 그냥 패스할 때 1 저축, 저축이 있으면 몇 번이든 쓴다 (2026-10-14)
  * 행동 번호: 0..area-1 = 착수(칸 y*n+x), area = 패스, area+1+t = 대상 칸 t, 2*area+1 = 지금 쓰기
  * 되감기는 실제 대국의 뿌리에서만 고려한다 (탐색 나무 안에서는 다루지 않음, selfplay.js)
  * 한 차례가 끝날 때마다 AugBoard.turnEnd() (공수부대 기한)
@@ -49,7 +49,7 @@ const AugState = (() => {
       this.b = new AugBoard(n);
       for (const c of [1, 2]) if (this.aug[c] === 'wall') this.b.wall(c);
       if (this.aug[1] === 'kowang' && this.aug[2] !== 'kowang') this.b.kw = 1; else if (this.aug[2] === 'kowang' && this.aug[1] !== 'kowang') this.b.kw = 2;
-      this.used = { 1: false, 2: false }; this.saves = { 1: 0, 2: 0 }; this.step = 'decide'; this.pickA = 0; this.chainLeft = 0;
+      this.used = { 1: false, 2: false }; this.saves = { 1: 0, 2: 0 }; this.step = 'decide'; this.pickA = 0; this.chainLeft = 0; this.chainN = 0; this.chainKo = 0;
       this.node = { board: this.b, move: -1, parent: null, lad: null }; // katago.js encode 가 쓰는 수순 정보
       this.len = 0;
     }
@@ -58,7 +58,7 @@ const AugState = (() => {
       s.n = this.n; s.area = this.area; s.komi = this.komi; s.aug = this.aug;
       s.b = new AugBoard(this.n); s.b.copyFrom(this.b);
       s.used = { 1: this.used[1], 2: this.used[2] }; s.saves = { 1: this.saves[1], 2: this.saves[2] };
-      s.step = this.step; s.node = this.node; s.len = this.len; s.pickA = this.pickA; s.chainLeft = this.chainLeft;
+      s.step = this.step; s.node = this.node; s.len = this.len; s.pickA = this.pickA; s.chainLeft = this.chainLeft; s.chainN = this.chainN; s.chainKo = this.chainKo;
       return s;
     }
     get col() { return this.b.turn; }
@@ -72,7 +72,7 @@ const AugState = (() => {
       if (this.aug[2] === 'prisoner') s -= this.b.caps[2];
       return s;
     }
-    canAug(col) { const a = this.aug[col]; return !!a && !PASSIVE[a] && a !== 'rewind' && !this.used[col] && (a !== 'save' || this.saves[col] > 0); }
+    canAug(col) { const a = this.aug[col]; return !!a && !PASSIVE[a] && a !== 'rewind' && (a === 'save' ? this.saves[col] > 0 : !this.used[col]); }
     // 맞바꾸기 · 순간이동: 내 돌 p 로 할 수 있는 것이 하나라도 있나
     hasSwap(p) { const b = this.b; for (let i = 0; i < this.area; i++) { const q = this.pt(i); if (b.c[q] === 3 - b.turn && b.canSwap(p, q)) return true; } return false; }
     hasTele(p) { const b = this.b; for (let i = 0; i < this.area; i++) { const q = this.pt(i); if (b.c[q] === EMPTY && b.canTeleport(p, q)) return true; } return false; }
@@ -88,7 +88,7 @@ const AugState = (() => {
         if (!A.length) A.push(area);
         return A;
       }
-      const noPass = st === 'first' || st === 'second' || st === 'mirror' || st === 'chain';
+      const noPass = st === 'first' || st === 'second' || st === 'mirror' || (st === 'chain' && this.chainN < 2); // 패스 저축: 2수 뒤 패스 = 멈춤
       for (let i = 0; i < area; i++) { const p = this.pt(i); if (b.isLegal(p, col)) A.push(i); }
       if (!noPass) A.push(area);
       if (st === 'decide' && this.canAug(col)) {
@@ -111,28 +111,36 @@ const AugState = (() => {
       const prevNode = this.node;
       const moveNode = m => { s.node = { board: b, move: m, parent: prevNode, lad: null }; };
       const sameNode = () => { s.node = { board: b, move: prevNode.move, parent: prevNode.parent, lad: null }; };
-      const done = () => { s.step = 'decide'; s.pickA = 0; s.chainLeft = 0; b.turnEnd(); }; // 차례 끝
+      const done = () => { s.step = 'decide'; s.pickA = 0; s.chainLeft = 0; s.chainN = 0; b.turnEnd(); }; // 차례 끝
       if (st === 'swap2' || st === 'tele2' || st === 'fork2') { // 둘째 고르기 (고를 것이 없으면 패스)
         if (a === area) { b.play(PASS); done(); moveNode(PASS); return s; }
         const q = this.pt(a - area - 1);
         if (st === 'swap2') b.swap(this.pickA, q); else if (st === 'tele2') b.teleport(this.pickA, q); else b.reserve([this.pickA, q]);
         done(); moveNode(q); return s;
       }
-      if (a === area && (st === 'first' || st === 'second' || st === 'chain' || st === 'mirror' || st === 'para')) { b.endTurn(); done(); moveNode(PASS); return s; } // 둘 곳이 없음 (드묾): 차례만 끝남
+      if (a === area && st === 'chain') { // 패스 저축: 2수 뒤면 여기서 멈춤, 아니면 둘 곳이 없음 (드묾: 2수를 둔 것으로 쳐 저축 1을 씀, 앱 'e12,0' 과 같게)
+        if (this.chainN < 2) s.saves[col]--;
+        const stopped = this.chainN >= 2; b.endTurn(); if (stopped) b.ko = this.chainKo; // 멈추면 마지막 수의 패 금지를 되살림 (again 이 지웠음)
+        done(); if (stopped) sameNode(); else moveNode(PASS); return s;
+      }
+      if (a === area && (st === 'first' || st === 'second' || st === 'mirror' || st === 'para')) { b.endTurn(); done(); moveNode(PASS); return s; } // 둘 곳이 없음 (드묾): 차례만 끝남
       if (a < area || a === area) {
         const p = a === area ? PASS : this.pt(a);
         if (st === 'mirror' && p) { b.mirror(p); done(); }
         else if (st === 'para' && p) { b.paraPlay(p); done(); }
         else if (st === 'first') { b.play(p); b.again(); s.step = 'second'; }
-        else if (st === 'chain' && this.chainLeft > 1) { b.play(p); b.again(); s.chainLeft = this.chainLeft - 1; }
+        else if (st === 'chain') { // 둘째 수부터 저축 1씩
+          s.chainN = this.chainN + 1; s.chainLeft = this.chainLeft - 1; if (s.chainN >= 2) s.saves[col]--;
+          b.play(p); if (s.chainLeft > 0) { s.chainKo = b.ko; b.again(); } else done();
+        }
         else {
-          if (st === 'decide' && !p && this.aug[col] === 'save' && !this.used[col]) s.saves[col]++; // 그냥 패스: 1 저축
+          if (st === 'decide' && !p && this.aug[col] === 'save') s.saves[col]++; // 그냥 패스: 1 저축
           b.play(p); done();
         }
         moveNode(p);
       } else if (a === 2 * area + 1) { // 지금 쓰기
-        const au = this.aug[col]; s.used[col] = true; s.step = ACT[au];
-        if (au === 'save') { s.chainLeft = this.saves[col] + 1; s.saves[col] = 0; }
+        const au = this.aug[col]; s.step = ACT[au];
+        if (au === 'save') { s.chainLeft = this.saves[col] + 1; s.chainN = 0; } else s.used[col] = true; // 패스 저축은 쓴 것으로 표시하지 않음 (저축은 수를 둘 때마다 줄어듦)
         sameNode();
       } else {
         const q = this.pt(a - area - 1), au = this.aug[col];

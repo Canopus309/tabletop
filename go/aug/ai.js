@@ -32,7 +32,7 @@ const AugAI = (() => {
         const prev = s.node; s = s.clone(); s.len++; s.used[x.col] = true; s.b.snipe(t.q); s.b.turnEnd(); s.step = 'decide'; s.node = { board: s.b, move: PASS, parent: prev, lad: null };
       }
       else if (t.kind === 'double') { s = s.apply(A1); seq([t.p, t.p2]); }
-      else if (t.kind === 'spend') { s = s.apply(A1); seq(t.ps); }
+      else if (t.kind === 'spend') { s = s.apply(A1); seq(t.ps); if (s.step === 'chain') s = s.apply(s.area); } // 저축을 다 쓰지 않고 멈춤
       else if (t.kind === 'mirror' || t.kind === 'para') { s = s.apply(A1); seq([t.p]); }
       else {
         if (t.pre && t.pre.k === 'r') s.used[x.col] = true;
@@ -251,12 +251,14 @@ const AugAI = (() => {
       const need = au === 'double' ? 2 : au === 'save' ? st.saves[col] + 1 : 1, ps = [];
       let nd = await child(root, a);
       while (ps.length < need) {
-        const m = nd.A[best(nd)]; ps.push(pt(m));
+        const m = nd.A[best(nd)];
+        if (au === 'save' && m === area && ps.length >= 2) break; // 패스 저축: 여기서 멈춤 (남은 저축은 다음에)
+        ps.push(pt(m));
         const nx = nd.kids[nd.A.indexOf(m)] || new Node(nd.st.apply(m));
         if (nx.st.step === 'decide') break;
         nd = await search(nx, V, ab);
       }
-      while (ps.length < need) ps.push(0);
+      while (ps.length < (au === 'save' ? 2 : need)) ps.push(0); // 둘 곳이 없어 일찍 끝난 차례 (드묾)
       return au === 'double' ? 'd' + ps.join(',') : au === 'save' ? 'e' + ps.join(',') : (au === 'mirror' ? 'm' : 'p') + ps[0];
     }
     const q = st.pt(a - area - 1);

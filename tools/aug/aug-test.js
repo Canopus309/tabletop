@@ -189,8 +189,13 @@ ok('먼저 부를 색은 1 또는 2, 같은 씨앗이면 같음', [1,2].includes
  ok('증식: 둘레 빈 점 4곳이 내 돌', [P(3,4),P(5,4),P(4,3),P(4,5)].every(p=>g.b.c[p]===1)&&g.turn===2);}
 {const g=G('save','');g.apply('0');g.apply(String(P(0,0)));g.apply('0');g.apply(String(P(8,8)));
  ok('패스 저축: 패스 두 번이면 2 저축', g.saves[1]===2);
- throws('패스 저축: 수가 모자라면 거부', ()=>g.apply('e'+P(4,4)+','+P(4,5)));
- g.apply('e'+P(4,4)+','+P(4,5)+','+P(4,6));ok('패스 저축: 3수 연달아, 백 차례', [P(4,4),P(4,5),P(4,6)].every(p=>g.b.c[p]===1)&&g.turn===2&&g.saves[1]===0);}
+ throws('패스 저축: 한 수만은 거부', ()=>g.apply('e'+P(4,4)));
+ throws('패스 저축: 저축보다 많으면 거부', ()=>g.apply('e'+P(4,4)+','+P(4,5)+','+P(4,6)+','+P(4,7)));
+ g.apply('e'+P(4,4)+','+P(4,5));ok('패스 저축: 1개만 꺼내 2수, 1 남음', [P(4,4),P(4,5)].every(p=>g.b.c[p]===1)&&g.turn===2&&g.saves[1]===1);
+ g.apply(String(P(8,7)));g.apply('e'+P(2,2)+','+P(2,3));ok('패스 저축: 남은 저축으로 또 씀', g.b.c[P(2,2)]===1&&g.b.c[P(2,3)]===1&&g.saves[1]===0&&g.turn===2);
+ g.apply(String(P(7,7)));g.apply('0');ok('패스 저축: 다 쓴 뒤에도 패스하면 다시 저축', g.saves[1]===1);
+ const h=G('save','');h.apply('0');h.apply(String(P(0,0)));h.apply('0');h.apply(String(P(8,8)));h.apply('e'+P(4,4)+','+P(4,5)+','+P(4,6));
+ ok('패스 저축: 다 꺼내 3수', [P(4,4),P(4,5),P(4,6)].every(p=>h.b.c[p]===1)&&h.saves[1]===0&&h.turn===2);}
 {const g=G('teleport','');g.apply(String(P(0,0)));g.apply(String(P(8,8)));g.apply('t'+P(0,0)+','+P(4,4));
  ok('순간이동: 돌이 옮겨짐', g.b.c[P(0,0)]===0&&g.b.c[P(4,4)]===1&&g.turn===2);}
 {const g=G('para','');

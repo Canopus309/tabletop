@@ -18,6 +18,7 @@ for (let gi = 0; gi < N && !bad; gi++) {
     const A = s.actions(), aug1 = A.filter(a => a > area);
     let a = aug1.length && rnd() < 0.2 ? pick(aug1) : pick(A);
     if (a === area && A.length > 1 && s.step === 'decide' && rnd() < (s.aug[s.col] === 'save' ? 0.85 : 0.97)) a = pick(A.filter(x => x !== area));
+    if (s.step === 'chain' && A.includes(area) && rnd() < 0.3) a = area; // 패스 저축: 2수 뒤 멈추기
     const st0 = s.step, col = s.col, au = s.aug[col];
     cur.push({ a, st: st0 });
     s = s.apply(a);
@@ -29,7 +30,9 @@ for (let gi = 0; gi < N && !bad; gi++) {
     let str;
     if (cur.length === 1) str = f.a > area ? 'g' + T(f.a) : String(P(f.a));
     else if (f.a === 2 * area + 1) {
-      const ms = cur.slice(1).map(c => P(c.a)); while (ms.length < f.need) ms.push(0); // 둘 곳이 없어 일찍 끝난 차례
+      const ms = cur.slice(1).map(c => P(c.a));
+      if (au === 'save' && ms.length > 2 && last.a === area) ms.pop(); // 패스 저축: 여기서 멈춤
+      while (ms.length < (au === 'save' ? 2 : f.need)) ms.push(0); // 둘 곳이 없어 일찍 끝난 차례
       str = au === 'double' ? 'd' + ms.join(',') : au === 'mirror' ? 'm' + ms[0] : au === 'para' ? 'p' + ms[0] : 'e' + ms.join(',');
     } else if (au === 'swap' || au === 'teleport' || au === 'fork') str = ({ swap: 'x', teleport: 't', fork: 'f' })[au] + T(f.a) + ',' + (last.a === area ? 0 : T(last.a));
     else str = ({ invincible: 'i', barrier: 'b', snipe: 's', shadow: 'h' })[au] + T(f.a) + ';' + P(last.a);

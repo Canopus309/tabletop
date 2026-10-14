@@ -49,8 +49,9 @@ for (let gi = 0; gi < N; gi++) {
     else if (use && a === 'save' && savesB[col] > 0) {
       // 저축 수 + 1 수를 차례로 (앱 규칙으로 하나씩 둘 수 있는 자리 고르기)
       const g2 = new AugGame({ n, aug: G.aug }); g2.load(G.entries); const ps = [];
-      for (let k = 0; k <= savesB[col]; k++) { const lg = Array.from(b.pts).filter(p => g2.canPlay(p, col)); if (!lg.length) break; const p = pick(lg); ps.push(p); g2.put(p, col); }
-      s = ps.length === savesB[col] + 1 ? 'e' + ps.join(',') : String(pick(legal));
+      const take = 1 + Math.floor(rnd() * savesB[col]); // 꺼낼 저축 (1 ~ 전부)
+      for (let k = 0; k <= take; k++) { const lg = Array.from(b.pts).filter(p => g2.canPlay(p, col)); if (!lg.length) break; const p = pick(lg); ps.push(p); g2.put(p, col); }
+      s = ps.length === take + 1 ? 'e' + ps.join(',') : String(pick(legal));
     }
     else s = rnd() < (a === 'save' ? 0.12 : 0.03) ? '0' : String(pick(legal));
     if (s.startsWith('d') && s.split(',').length === 1) s = s.slice(1);
@@ -64,12 +65,12 @@ for (let gi = 0; gi < N; gi++) {
     else if (s[0] === 'g') { b.grow(+s.slice(1)); augUses++; }
     else if (s[0] === 't') { const [x, y] = s.slice(1).split(',').map(Number); b.teleport(x, y); augUses++; }
     else if (s[0] === 'p') { b.paraPlay(+s.slice(1)); augUses++; }
-    else if (s[0] === 'e') { const ps = s.slice(1).split(',').map(Number); ps.forEach((p, i) => { b.play(p); if (i < ps.length - 1) b.again(); }); savesB[col] = 0; augUses++; }
+    else if (s[0] === 'e') { const ps = s.slice(1).split(',').map(Number); ps.forEach((p, i) => { b.play(p); if (i < ps.length - 1) b.again(); }); savesB[col] -= ps.length - 1; augUses++; }
     else if (s[0] === 'x') { const [x, y] = s.slice(1).split(',').map(Number); b.swap(x, y); augUses++; }
     else if (s[0] === 'i' || s[0] === 'b') { const [q, p] = s.slice(1).split(';').map(Number); if (s[0] === 'i') b.inv[col] = q; else b.bar[col] = q; b.play(p); augUses++; }
     else b.play(+s);
     if (/^[mgtpexdsibfh]/.test(s)) kinds[s[0]] = (kinds[s[0]] || 0) + 1;
-    if (s === '0' && G.aug[col] === 'save' && !G.used(col)) savesB[col]++;
+    if (s === '0' && G.aug[col] === 'save') savesB[col]++;
     b.turnEnd();
     moves++;
     const same = b.pts.every(p => b.c[p] === G.b.c[p]);
