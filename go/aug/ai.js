@@ -1,5 +1,5 @@
 /* 증강 바둑 AI (시험판, 9줄): 증강을 배운 신경망 + 수 읽기(PUCT)
- * - 신경망: KataGo g170e-b10c128 (CC0) 에 증강 입력·출력을 붙여 AI끼리 대국으로 학습한 것 (tools/augnet).
+ * - 신경망: KataGo g170e-b15c192 (CC0) 에 증강 입력·출력을 붙여 AI끼리 대국으로 학습한 것 (tools/augnet).
  *   파일 models/augnet9.bin 은 tools/augnet/export.py 가 만든다 (float16 가중치)
  * - 장면 · 행동 · 입력 특징은 augstate.js (학습 도구와 같은 파일)
  * - 규칙 판은 augboard.js 의 AugBoard. 한 차례를 단계로 나눠 읽는다:
@@ -9,9 +9,9 @@
 'use strict';
 const AugAI = (() => {
   const { AUG_LIST, NF2, NG2 } = AugState;
-  // 신경망이 본 증강 값 (9줄, 집 · 2026-10-13 AI끼리 4만 판). 경매에서 AI 가 덤을 부를 때 쓴다
-  // 저격은 2026-10-13 에 '들어내고 착수'로 바뀌어 아직 재지 못했다: 슈퍼선수와 비슷하게 어림
-  const VALUE = { wall: 35, swap: 15, double: 14, snipe: 13, prisoner: 11, invincible: 9, barrier: 9, kowang: 8, rewind: 4, grow: 20, mirror: 12, fork: 8, para: 8, save: 6, teleport: 5, shadow: 2 }; // b15 학습 초반 값 · 새 증강은 어림, 배포 때 다시 잼
+  // 신경망이 본 증강 값 (9줄, 집 · 2026-10-14 b15 AI끼리 1만 1천 판 회귀). 경매에서 AI 가 덤을 부를 때 쓴다
+  // AI 가 아직 잘 못 쓰는 증강(결계 · 되감기 등)은 낮게 나온다: AI 자신이 쓸 때의 값이므로 경매에는 이 값이 맞다
+  const VALUE = { wall: 34, double: 16, grow: 15, snipe: 15, swap: 12, mirror: 11, invincible: 9, shadow: 8, kowang: 5, save: 4, prisoner: 4, fork: 4, teleport: 3, para: 2, barrier: 1, rewind: 0 };
   let net = null, head = null, backend = '', loading = null;
   // 이 파일(go/aug/ai.js) 이 있는 곳 기준으로 TF.js · 신경망 파일을 찾는다
   const HERE = typeof document !== 'undefined' && document.currentScript ? new URL('.', document.currentScript.src).href : './';
@@ -282,6 +282,6 @@ const AugAI = (() => {
   const maxBid = of => Math.max(0, Math.round(Math.abs((VALUE[of[0]] || 0) - (VALUE[of[1]] || 0))));
   const prefer = of => (VALUE[of[0]] || 0) >= (VALUE[of[1]] || 0) ? of[0] : of[1];
   // 이 AI 가 배운 증강 (AI 대국의 경매 후보)
-  const KNOWN = ['kowang', 'rewind', 'snipe', 'double', 'invincible', 'barrier', 'wall', 'swap', 'prisoner']; // 배운 것만 (거울수 등 7가지는 학습 중, 네크로맨서 등 6가지는 아직)
+  const KNOWN = AUG_LIST.slice(); // 배운 16가지 (네크로맨서 등 5가지는 아직: 장면에 넣고 다시 학습해야 함)
   return { load, move, judge, maxBid, prefer, VALUE, KNOWN, get ready() { return !!net; }, get backend() { return backend; }, get name() { return head ? head.name : ''; }, _internal: { St, fromTurns, run, parseFile, buildNet, search, Node } };
 })();
