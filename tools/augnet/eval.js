@@ -49,6 +49,7 @@ function match(a, b, label) {
       const last = fs.readdirSync(MD).filter(f => /^gen_\d{4}\.pt$/.test(f)).map(f => +f.slice(4, 8)).sort((x, y) => x - y).pop();
       const name = `gen_${String(last + 1).padStart(4, '0')}.pt`;
       fs.copyFileSync(path.join(MD, best), path.join(MD, name));
+      const now = new Date(); fs.utimesSync(path.join(MD, name), now, now); // 복사는 옛 수정 시각을 그대로 가져와, train.py 가 창 전체를 '새 기록'으로 보고 한 번에 수천 걸음 학습했음 (2026-10-14)
       fs.writeFileSync(path.join(MD, 'latest.txt.tmp'), name); fs.renameSync(path.join(MD, 'latest.txt.tmp'), path.join(MD, 'latest.txt'));
       fs.writeFileSync(path.join(HERE, 'RESTART_TRAIN'), name);
       rec.decision = 'revert'; rec.revertTo = name; log(`${cand} 가 약해짐 → ${best} 로 되돌림 (${name})`);
